@@ -68,21 +68,22 @@ libdatachannel = [
 
 # other dependencies
 
-libplacebo_options = {
-  'default_library':  'static',
-  'opengl':           'enabled',
-  'demos':            false,
-  'd3d11':            'disabled',
-  'dovi':             'disabled',
-  'glslang':          'disabled',
-  'lcms':             'disabled',
-  'libdovi':          'disabled',
-  'unwind':           'disabled',
-  'vk-proc-addr':     'disabled',
-  'vulkan':           'disabled',
-  'xxhash':           'disabled',
-}
-libplacebo = dependency('libplacebo', default_options: libplacebo_options)
+libplacebo = dependency('libplacebo',
+  default_options: {
+    'default_library':  'static',
+    'opengl':           'enabled',
+    'demos':            false,
+    'd3d11':            'disabled',
+    'dovi':             'disabled',
+    'glslang':          'disabled',
+    'lcms':             'disabled',
+    'libdovi':          'disabled',
+    'unwind':           'disabled',
+    'vk-proc-addr':     'disabled',
+    'vulkan':           'disabled',
+    'xxhash':           'disabled',
+  }
+)
 
 nuklear = dependency('nuklear')
 
