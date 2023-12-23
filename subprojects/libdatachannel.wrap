@@ -1,0 +1,6 @@
+[wrap-git]
+url = https://github.com/paullouisageneau/libdatachannel.git
+revision = 5b1fbd793a82bbd5eca6c1df3100365c40fbfa9a
+depth = 1
+clone-recursive = true
+method = cmake
