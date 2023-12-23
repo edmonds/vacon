@@ -88,27 +88,15 @@ threads = dependency('threads')
 
 # targets
 
-plplay_sources = [
-  'src/plplay/plplay.c',
-  'src/plplay/settings.c',
-  'src/plplay/ui.c',
-  'src/plplay/utils.c',
-  'src/plplay/window.c',
-  'src/plplay/window_glfw.c',
-]
-
-plplay_dependencies = [
-  # ffmpeg deps
-  libavcodec, libavformat, libavutil,
-
-  glfw,
-  libplacebo,
-  nuklear,
-  threads,
-]
-
-executable('plplay',
-  plplay_sources,
+plplay_static = static_library('plplay',
+  sources: [
+    'src/plplay/plplay.c',
+    'src/plplay/settings.c',
+    'src/plplay/ui.c',
+    'src/plplay/utils.c',
+    'src/plplay/window.c',
+    'src/plplay/window_glfw.c',
+  ],
   c_args: [
     '-DHAVE_EGL',
     '-DHAVE_GLFW_OPENGL',
@@ -117,7 +105,20 @@ executable('plplay',
     '-DPTHREAD_HAS_SETCLOCK',
     '-DUSE_GL',
   ],
-  dependencies: plplay_dependencies)
+  dependencies: [
+    # ffmpeg deps
+    libavcodec, libavformat, libavutil,
+
+    glfw,
+    libplacebo,
+    nuklear,
+    threads,
+  ],
+)
+plplay = declare_dependency(link_with: plplay_static)
+executable('plplay',
+  sources: 'src/plplay/main.c',
+  dependencies: plplay)
 
 vacon_sources = [
   'src/main.cpp',
@@ -128,6 +129,8 @@ vacon_sources = [
 ]
 
 vacon_dependencies = [
+  plplay,
+
   # libdatachannel deps
   libdatachannel, juice, nlohmann_json, srtp2, usrsctp,
 

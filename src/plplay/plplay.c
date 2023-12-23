@@ -654,7 +654,7 @@ static void info_callback(void *priv, const struct pl_render_info *info)
 
 static struct plplay state;
 
-int main(int argc, char *argv[])
+int plplay_main(int argc, char *argv[])
 {
     state = (struct plplay) {
         .target_override = true,
