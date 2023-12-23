@@ -129,6 +129,7 @@ vacon_sources = [
   'src/decoder_receiver.cpp',
   'src/sink_receiver.cpp',
   'src/v4l2_ffmpeg_input_vaapi_encode.c',
+  'src/video_receiver.cpp',
 ]
 
 vacon_dependencies = [

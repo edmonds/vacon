@@ -10,6 +10,7 @@ using std::string;
 int camera_sender(const string&);
 int decoder_receiver(const string&);
 int sink_receiver(const string&);
+int video_receiver(const string&);
 
 int main(int argc, char **argv) try {
 	const char *ws_url_cstr = getenv("VACON_SIGNALING_URL");
@@ -28,12 +29,14 @@ int main(int argc, char **argv) try {
 			return decoder_receiver(ws_url);
 		} else if (strcmp(argv[1], "sink_receiver") == 0) {
 			return sink_receiver(ws_url);
+		} else if (strcmp(argv[1], "video_receiver") == 0) {
+			return video_receiver(ws_url);
 		}
 	} else {
 		std::cerr
 			<< "Error: Usage: "
 			<< argv[0]
-			<< " < camera_sender | decoder_receiver | sink_receiver >"
+			<< " {camera_sender | decoder_receiver | sink_receiver | video_receiver}"
 			<< std::endl;
 		return -1;
 	}
