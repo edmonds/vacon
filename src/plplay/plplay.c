@@ -528,7 +528,7 @@ static bool render_loop(struct plplay *p)
     pl_options opts = p->opts;
 
     struct pl_queue_params qparams = *pl_queue_params(
-        .interpolation_threshold = 0.01,
+        .interpolation_threshold = 1.00,
         .timeout = UINT64_MAX,
     );
 
