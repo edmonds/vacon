@@ -1,0 +1,13 @@
+diff --git a/src/meson.build b/src/meson.build
+index 63f9d53c..3d1a57dd 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -217,7 +217,7 @@ sources += configure_file(
+ )
+ 
+ version_h = vcs_tag(
+-  command: ['git', 'describe', '--dirty'],
++  command: ['git', 'describe', '--dirty', '--always'],
+   fallback: version_pretty,
+   replace_string: '@buildver@',
+   input: 'version.h.in',
