@@ -147,6 +147,59 @@ static bool open_file(struct plplay *p, const char *filename)
     return true;
 }
 
+static bool open_format(struct plplay *p, AVFormatContext *format)
+{
+    static const int av_log_level[] = {
+        [PL_LOG_NONE]  = AV_LOG_QUIET,
+        [PL_LOG_FATAL] = AV_LOG_PANIC,
+        [PL_LOG_ERR]   = AV_LOG_ERROR,
+        [PL_LOG_WARN]  = AV_LOG_WARNING,
+        [PL_LOG_INFO]  = AV_LOG_INFO,
+        [PL_LOG_DEBUG] = AV_LOG_VERBOSE,
+        [PL_LOG_TRACE] = AV_LOG_DEBUG,
+    };
+
+    av_log_set_level(av_log_level[p->args.verbosity]);
+
+    p->format = format;
+
+    if (avformat_find_stream_info(p->format,  NULL) < 0) {
+        fprintf(stderr, "libavformat: Failed finding stream info!\n");
+        return false;
+    }
+
+    // Find "best" video stream
+    int stream_idx =
+        av_find_best_stream(p->format, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
+
+    if (stream_idx < 0) {
+        fprintf(stderr, "plplay: File contains no video streams?\n");
+        return false;
+    }
+
+    const AVStream *stream = p->format->streams[stream_idx];
+    const AVCodecParameters *par = stream->codecpar;
+    printf("Found video track (stream %d)\n", stream_idx);
+    printf("Resolution: %d x %d\n", par->width, par->height);
+
+    if (stream->avg_frame_rate.den && stream->avg_frame_rate.num)
+        printf("FPS: %f\n", av_q2d(stream->avg_frame_rate));
+
+    if (stream->r_frame_rate.den && stream->r_frame_rate.num)
+        printf("TBR: %f\n", av_q2d(stream->r_frame_rate));
+
+    if (stream->time_base.den && stream->time_base.num)
+        printf("TBN: %f\n", av_q2d(stream->time_base));
+
+    if (par->bit_rate)
+        printf("Bitrate: %"PRIi64" kbps\n", par->bit_rate / 1000);
+
+    printf("Pixel format: %s\n", av_get_pix_fmt_name(par->format));
+
+    p->stream = stream;
+    return true;
+}
+
 static bool init_codec(struct plplay *p)
 {
     assert(p->stream);
