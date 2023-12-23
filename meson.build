@@ -56,11 +56,13 @@ libdatachannel_cmake = cmake.subproject('libdatachannel', options: libdatachanne
 
 #message('Available CMake targets in libdatachannel_cmake:\n - ' + '\n - '.join(libdatachannel_cmake.target_list()))
 
-libdatachannel  = libdatachannel_cmake.dependency('datachannel-static')
-juice           = libdatachannel_cmake.dependency('juice-static')
-nlohmann_json   = libdatachannel_cmake.dependency('nlohmann_json')
-srtp2           = libdatachannel_cmake.dependency('srtp2')
-usrsctp         = libdatachannel_cmake.dependency('usrsctp')
+libdatachannel = [
+  libdatachannel_cmake.dependency('datachannel-static'),
+  libdatachannel_cmake.dependency('juice-static'),
+  libdatachannel_cmake.dependency('nlohmann_json'),
+  libdatachannel_cmake.dependency('srtp2'),
+  libdatachannel_cmake.dependency('usrsctp'),
+]
 
 # other dependencies
 
@@ -130,9 +132,7 @@ vacon_sources = [
 
 vacon_dependencies = [
   plplay,
-
-  # libdatachannel deps
-  libdatachannel, juice, nlohmann_json, srtp2, usrsctp,
+  libdatachannel,
 
   # ffmpeg deps
   libavcodec, libavdevice, libavformat, libavutil,
