@@ -28,10 +28,12 @@ cc.check_header('EGL/egl.h', required: true)
 
 # ffmpeg
 
-libavcodec  = dependency('libavcodec')
-libavdevice = dependency('libavdevice')
-libavformat = dependency('libavformat')
-libavutil   = dependency('libavutil')
+ffmpeg = [
+  dependency('libavcodec'),
+  dependency('libavdevice'),
+  dependency('libavformat'),
+  dependency('libavutil'),
+]
 
 # glfw
 
@@ -108,9 +110,7 @@ plplay_static = static_library('plplay',
     '-DUSE_GL',
   ],
   dependencies: [
-    # ffmpeg deps
-    libavcodec, libavformat, libavutil,
-
+    ffmpeg,
     glfw,
     libplacebo,
     nuklear,
@@ -131,14 +131,10 @@ vacon_sources = [
 ]
 
 vacon_dependencies = [
-  plplay,
+  ffmpeg,
   libdatachannel,
-
-  # ffmpeg deps
-  libavcodec, libavdevice, libavformat, libavutil,
-
-  # other deps
   libplacebo,
+  plplay,
   readerwriterqueue,
   threads,
 ]
