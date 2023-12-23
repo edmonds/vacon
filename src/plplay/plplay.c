@@ -331,6 +331,10 @@ static PL_THREAD_VOID decode_loop(void *arg)
             }
             ret = avcodec_send_packet(p->codec, packet);
             av_packet_unref(packet);
+            if (ret == AVERROR(EIO)) {
+                    /* Ignore decoder errors. */
+                    continue;
+            }
             break;
         case AVERROR_EOF:
             // Send empty input to flush decoder
