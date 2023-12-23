@@ -820,3 +820,99 @@ error:
     uninit(p);
     return 1;
 }
+
+int plplay_play(AVFormatContext *format)
+{
+    state = (struct plplay) {
+        .args = {
+            .hwdec = true,
+            .preset = &pl_render_fast_params,
+            .verbosity = PL_LOG_INFO,
+        },
+    };
+
+    state.log = pl_log_create(PL_API_VER, pl_log_params(
+        .log_cb    = pl_log_color,
+        .log_level = state.args.verbosity,
+    ));
+
+    pl_options opts = state.opts = pl_options_alloc(state.log);
+    pl_options_reset(opts, state.args.preset);
+
+    // Hook up our pass info callback
+    opts->params.info_callback = info_callback;
+    opts->params.info_priv = &state;
+
+    struct plplay *p = &state;
+    if (!open_format(p, format))
+        goto error;
+
+    const AVCodecParameters *par = p->stream->codecpar;
+    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(par->format);
+    if (!desc)
+        goto error;
+
+    struct window_params params = {
+        .title = "plplay",
+        .width = par->width,
+        .height = par->height,
+        .forced_impl = state.args.window_impl,
+    };
+
+    p->win = window_create(p->log, &params);
+    if (!p->win)
+        goto error;
+
+    // Test the AVPixelFormat against the GPU capabilities
+    if (!pl_test_pixfmt(p->win->gpu, par->format)) {
+        fprintf(stderr, "Unsupported AVPixelFormat: %s\n", desc->name);
+        goto error;
+    }
+
+#ifdef HAVE_NUKLEAR
+    p->ui = ui_create(p->win->gpu);
+    if (!p->ui)
+        goto error;
+#endif
+
+    if (!init_codec(p))
+        goto error;
+
+    const char *cache_dir = get_cache_dir(&(char[512]) {0});
+    if (cache_dir) {
+        int ret = snprintf(p->cache_file, sizeof(p->cache_file), "%s/plplay.cache", cache_dir);
+        if (ret > 0 && ret < sizeof(p->cache_file)) {
+            p->cache = pl_cache_create(pl_cache_params(
+                .log             = p->log,
+                .max_total_size  = 50 << 20, // 50 MB
+            ));
+            pl_gpu_set_cache(p->win->gpu, p->cache);
+            FILE *file = fopen(p->cache_file, "rb");
+            if (file) {
+                pl_cache_load_file(p->cache, file);
+                p->cache_sig = pl_cache_signature(p->cache);
+                fclose(file);
+            }
+        }
+    }
+
+    p->queue = pl_queue_create(p->win->gpu);
+    int ret = pl_thread_create(&p->decoder_thread, decode_loop, p);
+    if (ret != 0) {
+        fprintf(stderr, "Failed creating decode thread: %s\n", strerror(errno));
+        goto error;
+    }
+
+    p->decoder_thread_created = true;
+
+    p->renderer = pl_renderer_create(p->log, p->win->gpu);
+    if (!render_loop(p))
+        goto error;
+
+    uninit(p);
+    return 0;
+
+error:
+    uninit(p);
+    return 1;
+}
