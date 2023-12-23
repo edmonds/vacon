@@ -157,22 +157,19 @@ static bool setupFfmpeg(void)
 
 	// Allocate fixed size buffer for readAvioPacketString() to write into.
 	const size_t sdp_ioctx_buf_size = 1024;
-	__attribute__((cleanup(av_freep)))
-		unsigned char *sdp_ioctx_buf =
-			(unsigned char *)av_malloc(sdp_ioctx_buf_size);
+	unsigned char *sdp_ioctx_buf = (unsigned char *)av_malloc(sdp_ioctx_buf_size);
 	assert(sdp_ioctx_buf != NULL);
 
 	// Create AVIOContext for reading the fake session descriptor from an
 	// in-memory buffer. Must be freed with avio_context_free().
-	__attribute__((cleanup(avio_context_free)))
-		AVIOContext *sdp_ioctx =
-			avio_alloc_context(sdp_ioctx_buf,			// buffer
-					   sdp_ioctx_buf_size,			// buffer_size
-					   0,					// write_flag
-					   static_cast<void*>(&sdp_string),	// opaque
-					   readAvioPacketString,		// read_packet
-					   NULL,				// write_packet
-					   NULL);				// seek
+	AVIOContext *sdp_ioctx =
+		avio_alloc_context(sdp_ioctx_buf,			// buffer
+				   sdp_ioctx_buf_size,			// buffer_size
+				   0,					// write_flag
+				   static_cast<void*>(&sdp_string),	// opaque
+				   readAvioPacketString,		// read_packet
+				   NULL,				// write_packet
+				   NULL);				// seek
 	assert(sdp_ioctx != NULL);
 
 	// Plug in the custom AVIOContext for reading the fake session
