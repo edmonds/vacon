@@ -1,5 +1,5 @@
-glfw/
-libdatachannel/
-libplacebo/
-nuklear/
-readerwriterqueue/
+/glfw/
+/libdatachannel/
+/libplacebo/
+/nuklear/
+/readerwriterqueue/
