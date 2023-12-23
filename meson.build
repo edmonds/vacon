@@ -19,7 +19,12 @@ project(
 add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: 'c')
 add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: 'cpp')
 
+cc = meson.get_compiler('c')
 cmake = import('cmake')
+
+# egl
+
+cc.check_header('EGL/egl.h', required: true)
 
 # ffmpeg
 
@@ -105,6 +110,7 @@ plplay_dependencies = [
 executable('plplay',
   plplay_sources,
   c_args: [
+    '-DHAVE_EGL',
     '-DHAVE_GLFW_OPENGL',
     '-DHAVE_NUKLEAR',
     '-DPL_HAVE_PTHREAD',
