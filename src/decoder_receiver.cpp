@@ -16,6 +16,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
 }
 
 using namespace std::chrono_literals;
@@ -45,11 +46,10 @@ static BlockingReaderWriterQueue<rtc::binary> g_rtp_packet_queue(100);
 static shared_ptr<rtc::PeerConnection> g_pc;
 static shared_ptr<rtc::WebSocket> g_ws;
 
-static const AVInputFormat *sdp_iformat;
-static AVFormatContext *sdp_fctx;
-static unsigned char *sdp_buf;
-static AVIOContext *sdp_ioctx;
-static int sdp_video_stream;
+static AVFormatContext *rtp_fctx;
+static unsigned char *rtp_buf;
+static AVIOContext *rtp_ioctx;
+static int rtp_video_stream;
 
 static AVBufferRef *hw_device_ctx = NULL;
 static AVCodecContext *decoder_ctx = NULL;
@@ -67,9 +67,9 @@ static enum AVPixelFormat getVaapiFormat(AVCodecContext *ctx __attribute__((unus
 	return AV_PIX_FMT_NONE;
 }
 
-static int readAvioPacket(void *ptr __attribute__((unused)),
-			  uint8_t *buf,
-			  int buf_size)
+static int readAvioPacketRTP(void *ptr __attribute__((unused)),
+			     uint8_t *buf,
+			     int buf_size)
 {
 	rtc::binary message;
 	long count_rtp_packets = 0;
@@ -100,11 +100,32 @@ static int readAvioPacket(void *ptr __attribute__((unused)),
 	return message.size();
 }
 
-static int writeAvioPacket(void *ptr __attribute__((unused)),
-			   /* const */ uint8_t *buf __attribute__((unused)),
-			   int buf_size __attribute__((unused)))
+static int writeAvioPacketRTP(void *ptr __attribute__((unused)),
+			      /* const */ uint8_t *buf __attribute__((unused)),
+			      int buf_size __attribute__((unused)))
 {
-	//std::cerr << "[writeAvioPacket] Want to write " << buf_size << " bytes " << std::endl;
+	//std::cerr << "[writeAvioPacketRTP] Want to write " << buf_size << " bytes " << std::endl;
+	return buf_size;
+}
+
+static int readAvioPacketString(void *ptr, uint8_t *buf, int buf_size)
+{
+	string &s = *(static_cast<string*>(ptr));
+	buf_size = FFMIN(buf_size, s.length());
+	const char *data = s.c_str();
+
+	// Don't copy the NUL at the end of the string.
+	if (buf_size >= 1 && data[buf_size - 1] == '\0') {
+		buf_size -= 1;
+	}
+
+	if (!buf_size) {
+		return AVERROR_EOF;
+	}
+
+	memcpy(buf, data, buf_size);
+	s.erase(0, buf_size);
+
 	return buf_size;
 }
 
@@ -112,50 +133,85 @@ static bool setupFfmpeg(void)
 {
 	int ret;
 
-	// Find AVInputFormat* for the SDP input format.
-	sdp_iformat = av_find_input_format("sdp");
-	assert(sdp_iformat != NULL);
+	// Fake SDP descriptor.
+	// XXX: Generate this dynamically.
+	string sdp_string(
+		"c=IN IP4 127.0.0.1\n"
+		"m=video 5000 RTP/AVP 96\n"
+		"a=rtpmap:96 H265/90000\n"
+	);
 
-	// Allocate AVFormatContext* for the SDP input format.
-	sdp_fctx = avformat_alloc_context();
-	assert(sdp_fctx != NULL);
-
-	// Create format options dictionary for the SDP input format.
-	AVDictionary *options = NULL;
-	ret = av_dict_set(&options, "sdp_flags", "custom_io", 0);
+	// Create format options dictionary for the SDP input format, set
+	// RTSP_FLAG_CUSTOM_IO.
+	AVDictionary *sdp_options = NULL;
+	ret = av_dict_set(&sdp_options, "sdp_flags", "custom_io", 0);
 	assert(ret >= 0);
 
-	// Open the SDP input stream. Must be closed with
-	// avformat_close_input().
-	ret = avformat_open_input(&sdp_fctx,
-				  "./fake.sdp", // XXX
-				  sdp_iformat,
-				  &options);
-	assert(ret == 0);
+	// Find AVInputFormat* for the SDP input format.
+	const AVInputFormat *sdp_iformat = av_find_input_format("sdp");
+	assert(sdp_iformat != NULL);
 
-	// Allocate fixed size buffer for readAvioPacket() to write into.
-	sdp_buf = (unsigned char *)av_malloc(1500);
-	assert(sdp_buf != NULL);
-	fprintf(stderr, "[setupFfmpeg] sdp_buf = %p\n", sdp_buf);
+	// Allocate AVFormatContext* for the RTP stream.
+	rtp_fctx = avformat_alloc_context();
+	assert(rtp_fctx != NULL);
 
-	// Allocate and initialize an AVIOContext for custom buffered I/O. Must
-	// be freed with avio_context_free().
-	sdp_ioctx = avio_alloc_context(sdp_buf,		// buffer
-				       1500,		// buffer size
-				       1,		// write_flag
-				       NULL,		// opaque
-				       readAvioPacket,	// read_packet
-				       writeAvioPacket,	// write_packet
-				       NULL);		// seek
+	// Allocate fixed size buffer for readAvioPacketString() to write into.
+	const size_t sdp_ioctx_buf_size = 1024;
+	__attribute__((cleanup(av_freep)))
+		unsigned char *sdp_ioctx_buf =
+			(unsigned char *)av_malloc(sdp_ioctx_buf_size);
+	assert(sdp_ioctx_buf != NULL);
+
+	// Create AVIOContext for reading the fake session descriptor from an
+	// in-memory buffer. Must be freed with avio_context_free().
+	__attribute__((cleanup(avio_context_free)))
+		AVIOContext *sdp_ioctx =
+			avio_alloc_context(sdp_ioctx_buf,			// buffer
+					   sdp_ioctx_buf_size,			// buffer_size
+					   0,					// write_flag
+					   static_cast<void*>(&sdp_string),	// opaque
+					   readAvioPacketString,		// read_packet
+					   NULL,				// write_packet
+					   NULL);				// seek
 	assert(sdp_ioctx != NULL);
 
-	// Plug in our custom AVIOContext to the AVFormatContext.
-	sdp_fctx->pb = sdp_ioctx;
+	// Plug in the custom AVIOContext for reading the fake session
+	// descriptor to the AVFormatContext.
+	rtp_fctx->pb = sdp_ioctx;
+
+	// Open the RTP input stream. This will read the fake in-memory session
+	// descriptor. Must be closed with avformat_close_input().
+	ret = avformat_open_input(&rtp_fctx, NULL, sdp_iformat, &sdp_options);
+	assert(ret == 0);
+
+	// Now that the fake in-memory SDP has been completely read by
+	// avformat_open_input(), swap out the AVFormatContext's I/O context
+	// for a new AVIOContext that reads packets from the RTP stream.
+
+	// Allocate fixed size buffer for readAvioPacketRTP() to write into.
+	rtp_buf = (unsigned char *)av_malloc(1500);
+	assert(rtp_buf != NULL);
+
+	// Create AVIOContext for reading RTP packets from a callback. Must be
+	// freed with avio_context_free().
+	rtp_ioctx =
+		avio_alloc_context(rtp_buf,		// buffer
+				   1500,		// buffer size
+				   1,			// write_flag
+				   NULL,		// opaque
+				   readAvioPacketRTP,	// read_packet
+				   writeAvioPacketRTP,	// write_packet
+				   NULL);		// seek
+	assert(rtp_ioctx != NULL);
+
+	// Plug in the custom AVIOContext for reading RTP packets to the
+	// AVFormatContext.
+	rtp_fctx->pb = rtp_ioctx;
 
 	// Read packets of a media file to get stream information. The logical
 	// file position is not changed by this function; examined packets may
 	// be buffered for later processing.
-	if ((ret = avformat_find_stream_info(sdp_fctx, NULL)) < 0) {
+	if ((ret = avformat_find_stream_info(rtp_fctx, NULL)) < 0) {
 		std::cerr
 			<< "Cannot find input stream information. Error code: "
 			<< av_err2str(ret)
@@ -165,7 +221,7 @@ static bool setupFfmpeg(void)
 
 	// ???
 	const AVCodec *decoder = NULL;
-	ret = av_find_best_stream(sdp_fctx, AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
+	ret = av_find_best_stream(rtp_fctx, AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
 	if (ret < 0) {
 		std::cerr
 			<< "Cannot find a video stream in the input. Error code: "
@@ -174,10 +230,10 @@ static bool setupFfmpeg(void)
 		return false;
 	}
 	// ???
-	sdp_video_stream = ret;
+	rtp_video_stream = ret;
 
-	// Log detailed information about input format.
-	av_dump_format(sdp_fctx, sdp_video_stream, "(custom in-memory I/O)", 0 /* is_output */);
+	// Log detailed information about the video stream.
+	av_dump_format(rtp_fctx, rtp_video_stream, "(custom in-memory I/O)", 0 /* is_output */);
 
 	// Allocate an AVCodecContext and set its fields to default values. The
 	// resulting struct should be freed with avcodec_free_context().
@@ -193,7 +249,7 @@ static bool setupFfmpeg(void)
 	// a corresponding field in `par` (video->codecpar) are freed and
 	// replaced with duplicates of the corresponding field in `par`. Fields
 	// in `codec` that do not have a counterpart in par are not touched.
-	AVStream *video = sdp_fctx->streams[sdp_video_stream];
+	AVStream *video = rtp_fctx->streams[rtp_video_stream];
 	if ((ret = avcodec_parameters_to_context(decoder_ctx, video->codecpar)) < 0) {
 		std::cerr
 			<< "avcodec_parameters_to_context() failed with error code "
@@ -330,11 +386,11 @@ static void runFfmpeg(void)
 
 	int count_frames_recv = 0;
 	while (ret >= 0) {
-		if ((ret = av_read_frame(sdp_fctx, dec_pkt)) < 0) {
+		if ((ret = av_read_frame(rtp_fctx, dec_pkt)) < 0) {
 			break;
 		}
 
-		if (sdp_video_stream != dec_pkt->stream_index) {
+		if (rtp_video_stream != dec_pkt->stream_index) {
 			continue;
 		}
 
