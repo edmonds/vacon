@@ -163,7 +163,7 @@ static void draw_shader_pass(struct nk_context *nk,
 
     int id = (unsigned int) (uintptr_t) info; // pointer into `struct plplay`
     if (nk_tree_push_id(nk, NK_TREE_NODE, label, NK_MINIMIZED, id)) {
-        nk_layout_row_dynamic(nk, 32, 1);
+        nk_layout_row_dynamic(nk, 0, 1);
         if (nk_chart_begin(nk, NK_CHART_LINES,
                            info->num_samples,
                            0.0f, info->peak))
@@ -173,7 +173,7 @@ static void draw_shader_pass(struct nk_context *nk,
             nk_chart_end(nk);
         }
 
-        nk_layout_row_dynamic(nk, 24, 1);
+        nk_layout_row_dynamic(nk, 0, 1);
         for (int n = 0; n < shader->num_steps; n++)
             nk_labelf(nk, NK_TEXT_LEFT, "%d. %s", n + 1, shader->steps[n]);
         nk_tree_pop(nk);
@@ -224,7 +224,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
     if (nk_begin(nk, "Settings", nk_rect(100, 100, 600, 600), win_flags)) {
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Window settings", NK_MAXIMIZED)) {
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
 
             bool fullscreen = window_is_fullscreen(p->win);
             p->toggle_fullscreen = nk_checkbox_label(nk, "Fullscreen", &fullscreen);
@@ -237,10 +237,10 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 1.0 - par->background_transparency,
             };
 
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             nk_label(nk, "Background color:", NK_TEXT_LEFT);
             if (nk_combo_begin_color(nk, nk_rgb_cf(bg), nk_vec2(nk_widget_width(nk), 300))) {
-                nk_layout_row_dynamic(nk, 200, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 nk_color_pick(nk, &bg, NK_RGBA);
                 nk_combo_end(nk);
 
@@ -250,11 +250,11 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 par->background_transparency = 1.0 - bg.a;
             }
 
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->blend_against_tiles = nk_check_label(nk, "Blend against tiles", par->blend_against_tiles);
             nk_property_int(nk, "Tile size", 2, &par->tile_size, 256, 1, 1);
 
-            nk_layout_row(nk, NK_DYNAMIC, 24, 3, (float[]){ 0.4, 0.3, 0.3 });
+            nk_layout_row(nk, NK_DYNAMIC, 0, 3, (float[]){ 0.4, 0.3, 0.3 });
             nk_label(nk, "Tile colors:", NK_TEXT_LEFT);
             for (int i = 0; i < 2; i++) {
                 bg = (struct nk_colorf) {
@@ -264,7 +264,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 };
 
                 if (nk_combo_begin_color(nk, nk_rgb_cf(bg), nk_vec2(nk_widget_width(nk), 300))) {
-                    nk_layout_row_dynamic(nk, 200, 1);
+                    nk_layout_row_dynamic(nk, 0, 1);
                     nk_color_pick(nk, &bg, NK_RGB);
                     nk_combo_end(nk);
 
@@ -281,7 +281,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 [PL_ROTATION_270] = "270°",
             };
 
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             nk_label(nk, "Display orientation:", NK_TEXT_LEFT);
             p->target_rot = nk_combo(nk, rotations, 4, p->target_rot,
                                      16, nk_vec2(nk_widget_width(nk), 100));
@@ -308,7 +308,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 [ZOOM_25]         = " 25% zoom",
             };
 
-            nk_layout_row(nk, NK_DYNAMIC, 24, 2, (float[]){ 0.3, 0.7 });
+            nk_layout_row(nk, NK_DYNAMIC, 0, 2, (float[]){ 0.3, 0.7 });
             nk_label(nk, "Zoom mode:", NK_TEXT_LEFT);
             int zoom = nk_combo(nk, zoom_modes, ZOOM_COUNT, p->target_zoom, 16, nk_vec2(nk_widget_width(nk), 500));
             if (zoom != p->target_zoom) {
@@ -319,7 +319,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
             nk_label(nk, "Upscaler:", NK_TEXT_LEFT);
             if (nk_combo_begin_label(nk, SCALE_DESC(upscaler, scale_none), nk_vec2(nk_widget_width(nk), 500))) {
-                nk_layout_row_dynamic(nk, 16, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 if (nk_combo_item_label(nk, scale_none, NK_TEXT_LEFT))
                     par->upscaler = NULL;
                 for (int i = 0; i < pl_num_filter_configs; i++) {
@@ -338,7 +338,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
             nk_label(nk, "Downscaler:", NK_TEXT_LEFT);
             if (nk_combo_begin_label(nk, SCALE_DESC(downscaler, scale_none), nk_vec2(nk_widget_width(nk), 500))) {
-                nk_layout_row_dynamic(nk, 16, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 if (nk_combo_item_label(nk, scale_none, NK_TEXT_LEFT))
                     par->downscaler = NULL;
                 for (int i = 0; i < pl_num_filter_configs; i++) {
@@ -357,7 +357,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
             nk_label(nk, "Plane scaler:", NK_TEXT_LEFT);
             if (nk_combo_begin_label(nk, SCALE_DESC(plane_upscaler, pscale_none), nk_vec2(nk_widget_width(nk), 500))) {
-                nk_layout_row_dynamic(nk, 16, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 if (nk_combo_item_label(nk, pscale_none, NK_TEXT_LEFT))
                     par->downscaler = NULL;
                 for (int i = 0; i < pl_num_filter_configs; i++) {
@@ -376,7 +376,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
             nk_label(nk, "Frame mixing:", NK_TEXT_LEFT);
             if (nk_combo_begin_label(nk, SCALE_DESC(frame_mixer, tscale_none), nk_vec2(nk_widget_width(nk), 300))) {
-                nk_layout_row_dynamic(nk, 16, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 if (nk_combo_item_label(nk, tscale_none, NK_TEXT_LEFT))
                     par->frame_mixer = NULL;
                 for (int i = 0; i < pl_num_filter_configs; i++) {
@@ -393,12 +393,12 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 nk_combo_end(nk);
             }
 
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->skip_anti_aliasing = !nk_check_label(nk, "Anti-aliasing", !par->skip_anti_aliasing);
             nk_property_float(nk, "Antiringing", 0, &par->antiringing_strength, 1.0, 0.05, 0.001);
 
             struct pl_sigmoid_params *spar = &opts->sigmoid_params;
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->sigmoid_params = nk_check_label(nk, "Sigmoidization", par->sigmoid_params) ? spar : NULL;
             if (nk_button_label(nk, "Default values"))
                 *spar = pl_sigmoid_default_params;
@@ -409,7 +409,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Deinterlacing", NK_MINIMIZED)) {
             struct pl_deinterlace_params *dpar = &opts->deinterlace_params;
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->deinterlace_params = nk_check_label(nk, "Enable", par->deinterlace_params) ? dpar : NULL;
             if (nk_button_label(nk, "Reset settings"))
                 *dpar = pl_deinterlace_default_params;
@@ -438,7 +438,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Debanding", NK_MINIMIZED)) {
             struct pl_deband_params *dpar = &opts->deband_params;
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->deband_params = nk_check_label(nk, "Enable", par->deband_params) ? dpar : NULL;
             if (nk_button_label(nk, "Reset settings"))
                 *dpar = pl_deband_default_params;
@@ -451,7 +451,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Distortion", NK_MINIMIZED)) {
             struct pl_distort_params *dpar = &opts->distort_params;
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->distort_params = nk_check_label(nk, "Enable", par->distort_params) ? dpar : NULL;
             if (nk_button_label(nk, "Reset settings"))
                 *dpar = pl_distort_default_params;
@@ -515,7 +515,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Color adjustment", NK_MINIMIZED)) {
             struct pl_color_adjustment *adj = &opts->color_adjustment;
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->color_adjustment = nk_check_label(nk, "Enable", par->color_adjustment) ? adj : NULL;
             if (nk_button_label(nk, "Default values"))
                 *adj = pl_color_adjustment_neutral;
@@ -536,11 +536,11 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             adj->temperature = (temp - 6500) / 3500.0;
 
             struct pl_cone_params *cpar = &opts->cone_params;
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->cone_params = nk_check_label(nk, "Color blindness", par->cone_params) ? cpar : NULL;
             if (nk_button_label(nk, "Default values"))
                 *cpar = pl_vision_normal;
-            nk_layout_row(nk, NK_DYNAMIC, 24, 5, (float[]){ 0.25, 0.25/3, 0.25/3, 0.25/3, 0.5 });
+            nk_layout_row(nk, NK_DYNAMIC, 0, 5, (float[]){ 0.25, 0.25/3, 0.25/3, 0.25/3, 0.5 });
             nk_label(nk, "Cone model:", NK_TEXT_LEFT);
             unsigned int cones = cpar->cones;
             nk_checkbox_flags_label(nk, "L", &cones, PL_CONE_L);
@@ -553,7 +553,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
         if (nk_tree_push(nk, NK_TREE_NODE, "HDR peak detection", NK_MINIMIZED)) {
             struct pl_peak_detect_params *ppar = &opts->peak_detect_params;
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->peak_detect_params = nk_check_label(nk, "Enable", par->peak_detect_params) ? ppar : NULL;
             if (nk_button_label(nk, "Reset settings"))
                 *ppar = pl_peak_detect_default_params;
@@ -566,7 +566,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
             struct pl_hdr_metadata metadata;
             if (pl_renderer_get_hdr_metadata(p->renderer, &metadata)) {
-                nk_layout_row_dynamic(nk, 24, 2);
+                nk_layout_row_dynamic(nk, 0, 2);
                 nk_label(nk, "Detected max luminance:", NK_TEXT_LEFT);
                 nk_labelf(nk, NK_TEXT_LEFT, "%.2f cd/m² (%.2f%% PQ)",
                           pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, metadata.max_pq_y),
@@ -583,7 +583,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
         if (nk_tree_push(nk, NK_TREE_NODE, "Tone mapping", NK_MINIMIZED)) {
             struct pl_color_map_params *cpar = &opts->color_map_params;
             static const struct pl_color_map_params null_settings = {0};
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->color_map_params = nk_check_label(nk, "Enable",
                 par->color_map_params == cpar) ? cpar : &null_settings;
             if (nk_button_label(nk, "Reset settings"))
@@ -593,7 +593,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             if (nk_combo_begin_label(nk, cpar->gamut_mapping->description,
                                      nk_vec2(nk_widget_width(nk), 500)))
             {
-                nk_layout_row_dynamic(nk, 16, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 for (int i = 0; i < pl_num_gamut_map_functions; i++) {
                     const struct pl_gamut_map_function *f = pl_gamut_map_functions[i];
                     if (nk_combo_item_label(nk, f->description, NK_TEXT_LEFT))
@@ -606,7 +606,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             if (nk_combo_begin_label(nk, cpar->tone_mapping_function->description,
                                      nk_vec2(nk_widget_width(nk), 500)))
             {
-                nk_layout_row_dynamic(nk, 16, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 for (int i = 0; i < pl_num_tone_map_functions; i++) {
                     const struct pl_tone_map_function *f = pl_tone_map_functions[i];
                     if (nk_combo_item_label(nk, f->description, NK_TEXT_LEFT))
@@ -645,7 +645,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             nk_checkbox_label(nk, "Visualize LUT", &cpar->visualize_lut);
 
             if (cpar->visualize_lut) {
-                nk_layout_row_dynamic(nk, 24, 2);
+                nk_layout_row_dynamic(nk, 0, 2);
                 const float huerange = 2 * M_PI;
                 nk_property_float(nk, "Hue",   -1, &cpar->visualize_hue, huerange + 1.0, 0.1, 0.01);
                 nk_property_float(nk, "Theta", 0.0, &cpar->visualize_theta, M_PI_2, 0.1, 0.01);
@@ -655,7 +655,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             if (nk_tree_push(nk, NK_TREE_NODE, "Fine-tune constants (advanced)", NK_MINIMIZED)) {
                 struct pl_tone_map_constants  *tc = &cpar->tone_constants;
                 struct pl_gamut_map_constants *gc = &cpar->gamut_constants;
-                nk_layout_row_dynamic(nk, 20, 2);
+                nk_layout_row_dynamic(nk, 0, 2);
                 nk_property_float(nk, "Perceptual deadzone", 0.0, &gc->perceptual_deadzone, 1.0, 0.05, 0.001);
                 nk_property_float(nk, "Perceptual strength", 0.0, &gc->perceptual_strength, 1.0, 0.05, 0.001);
                 nk_property_float(nk, "Colorimetric gamma", 0.0, &gc->colorimetric_gamma, 10.0, 0.05, 0.001);
@@ -675,7 +675,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 nk_tree_pop(nk);
             }
 
-            nk_layout_row_dynamic(nk, 50, 1);
+            nk_layout_row_dynamic(nk, 0, 1);
             if (ui_widget_hover(nk, "Drop .cube file here...") && dropped_file) {
                 uint8_t *buf;
                 size_t size;
@@ -697,7 +697,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 [PL_LUT_CONVERSION] = "Gamut conversion (native)",
             };
 
-            nk_layout_row(nk, NK_DYNAMIC, 24, 3, (float[]){ 0.2, 0.3, 0.5 });
+            nk_layout_row(nk, NK_DYNAMIC, 0, 3, (float[]){ 0.2, 0.3, 0.5 });
             if (nk_button_label(nk, "Reset LUT")) {
                 pl_lut_free((struct pl_custom_lut **) &par->lut);
                 par->lut_type = PL_LUT_UNKNOWN;
@@ -712,7 +712,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Dithering", NK_MINIMIZED)) {
             struct pl_dither_params *dpar = &opts->dither_params;
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             par->dither_params = nk_check_label(nk, "Enable", par->dither_params) ? dpar : NULL;
             if (nk_button_label(nk, "Reset settings"))
                 *dpar = pl_dither_default_params;
@@ -751,11 +751,11 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
             nk_checkbox_label(nk, "Temporal dithering", &dpar->temporal);
 
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             nk_label(nk, "Error diffusion:", NK_TEXT_LEFT);
             const char *name = par->error_diffusion ? par->error_diffusion->description : "(None)";
             if (nk_combo_begin_label(nk, name, nk_vec2(nk_widget_width(nk), 500))) {
-                nk_layout_row_dynamic(nk, 16, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 if (nk_combo_item_label(nk, "(None)", NK_TEXT_LEFT))
                     par->error_diffusion = NULL;
                 for (int i = 0; i < pl_num_error_diffusion_kernels; i++) {
@@ -770,13 +770,13 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
         }
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Output color space", NK_MINIMIZED)) {
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             nk_checkbox_label(nk, "Enable", &p->target_override);
             bool reset = nk_button_label(nk, "Reset settings");
             bool reset_icc = reset;
             char buf[64] = {0};
 
-            nk_layout_row(nk, NK_DYNAMIC, 24, 2, (float[]){ 0.3, 0.7 });
+            nk_layout_row(nk, NK_DYNAMIC, 0, 2, (float[]){ 0.3, 0.7 });
 
             const char *primaries[PL_COLOR_PRIM_COUNT] = {
                 [PL_COLOR_PRIM_UNKNOWN]     = "Auto (unknown)",
@@ -837,12 +837,12 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             p->force_trc = nk_combo(nk, transfers, PL_COLOR_TRC_COUNT, p->force_trc,
                                       16, nk_vec2(nk_widget_width(nk), 200));
 
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             nk_checkbox_label(nk, "Override HDR levels", &p->force_hdr_enable);
 
             // Ensure these values are always legal by going through
             // pl_color_space_infer
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
             struct pl_color_space fix = target->color;
             apply_csp_overrides(p, &fix);
             pl_color_space_infer(&fix);
@@ -859,7 +859,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             p->force_hdr = fix.hdr;
 
             struct pl_color_repr *trepr = &p->force_repr;
-            nk_layout_row(nk, NK_DYNAMIC, 24, 2, (float[]){ 0.3, 0.7 });
+            nk_layout_row(nk, NK_DYNAMIC, 0, 2, (float[]){ 0.3, 0.7 });
 
             const char *systems[PL_COLOR_SYSTEM_COUNT] = {
                 [PL_COLOR_SYSTEM_UNKNOWN]       = "Auto (unknown)",
@@ -939,7 +939,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 trepr->bits.bit_shift = 0;
             }
 
-            nk_layout_row_dynamic(nk, 24, 1);
+            nk_layout_row_dynamic(nk, 0, 1);
             nk_checkbox_label(nk, "Forward input color space to display", &p->colorspace_hint);
 
             if (p->colorspace_hint && !p->force_hdr_enable) {
@@ -947,7 +947,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                                   &p->colorspace_hint_dynamic);
             }
 
-            nk_layout_row_dynamic(nk, 50, 1);
+            nk_layout_row_dynamic(nk, 0, 1);
             if (ui_widget_hover(nk, "Drop ICC profile here...") && dropped_file) {
                 struct pl_icc_profile profile;
                 int ret = av_file_map(dropped_file, (uint8_t **) &profile.data,
@@ -969,7 +969,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             }
 
             if (p->icc) {
-                nk_layout_row_dynamic(nk, 24, 2);
+                nk_layout_row_dynamic(nk, 0, 2);
                 nk_labelf(nk, NK_TEXT_LEFT, "Loaded: %s",
                           p->icc_name ? p->icc_name : "(unknown)");
                 reset_icc |= nk_button_label(nk, "Reset ICC");
@@ -997,7 +997,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Custom shaders", NK_MINIMIZED)) {
 
-            nk_layout_row_dynamic(nk, 50, 1);
+            nk_layout_row_dynamic(nk, 0, 1);
             if (ui_widget_hover(nk, "Drop .hook/.glsl files here...") && dropped_file) {
                 uint8_t *buf;
                 size_t size;
@@ -1062,7 +1062,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 }
 
                 if (nk_combo_begin_label(nk, p->shader_paths[i], nk_vec2(nk_widget_width(nk), 500))) {
-                    nk_layout_row_dynamic(nk, 32, 1);
+                    nk_layout_row_dynamic(nk, 0, 1);
                     for (int j = 0; j < p->shader_hooks[i]->num_parameters; j++) {
                         const struct pl_hook_par *hp = &p->shader_hooks[i]->parameters[j];
                         const char *name = hp->description ? hp->description : hp->name;
@@ -1099,7 +1099,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
         }
 
         if (nk_tree_push(nk, NK_TREE_NODE, "Debug", NK_MINIMIZED)) {
-            nk_layout_row_dynamic(nk, 24, 1);
+            nk_layout_row_dynamic(nk, 0, 1);
             nk_checkbox_label(nk, "Preserve mixing cache", &par->preserve_mixing_cache);
             nk_checkbox_label(nk, "Bypass mixing cache", &par->skip_caching_single_frame);
             nk_checkbox_label(nk, "Show all scaler presets", &p->advanced_scalers);
@@ -1119,7 +1119,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 p->ignore_dovi = !p->ignore_dovi;
             }
 
-            nk_layout_row_dynamic(nk, 24, 2);
+            nk_layout_row_dynamic(nk, 0, 2);
 
             double prev_fps = p->fps;
             bool fps_changed = nk_checkbox_label(nk, "Override display FPS", &p->fps_override);
@@ -1135,12 +1135,12 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             }
 
             if (nk_tree_push(nk, NK_TREE_NODE, "Shader passes / GPU timing", NK_MINIMIZED)) {
-                nk_layout_row_dynamic(nk, 26, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 nk_label(nk, "Full frames:", NK_TEXT_LEFT);
                 for (int i = 0; i < p->num_frame_passes; i++)
                     draw_shader_pass(nk, &p->frame_info[i]);
 
-                nk_layout_row_dynamic(nk, 26, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 nk_label(nk, "Output blending:", NK_TEXT_LEFT);
                 for (int j = 0; j < MAX_BLEND_FRAMES; j++) {
                     for (int i = 0; i < p->num_blend_passes[j]; i++)
@@ -1151,7 +1151,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             }
 
             if (nk_tree_push(nk, NK_TREE_NODE, "Frame statistics / CPU timing", NK_MINIMIZED)) {
-                nk_layout_row_dynamic(nk, 24, 2);
+                nk_layout_row_dynamic(nk, 0, 2);
                 nk_label(nk, "Current PTS:", NK_TEXT_LEFT);
                 nk_labelf(nk, NK_TEXT_LEFT, "%.3f", p->stats.current_pts);
                 nk_label(nk, "Estimated FPS:", NK_TEXT_LEFT);
@@ -1189,19 +1189,19 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
 
             if (nk_tree_push(nk, NK_TREE_NODE, "Settings dump", NK_MINIMIZED)) {
 
-                nk_layout_row_dynamic(nk, 24, 2);
+                nk_layout_row_dynamic(nk, 0, 2);
                 if (nk_button_label(nk, "Copy to clipboard"))
                     window_set_clipboard(p->win, pl_options_save(opts));
                 if (nk_button_label(nk, "Load from clipboard"))
                     pl_options_load(opts, window_get_clipboard(p->win));
 
-                nk_layout_row_dynamic(nk, 24, 1);
+                nk_layout_row_dynamic(nk, 0, 1);
                 pl_options_iterate(opts, draw_opt_data, nk);
                 nk_tree_pop(nk);
             }
 
             if (nk_tree_push(nk, NK_TREE_NODE, "Cache statistics", NK_MINIMIZED)) {
-                nk_layout_row_dynamic(nk, 24, 2);
+                nk_layout_row_dynamic(nk, 0, 2);
                 nk_label(nk, "Cached objects:", NK_TEXT_LEFT);
                 nk_labelf(nk, NK_TEXT_LEFT, "%d", pl_cache_objects(p->cache));
                 nk_label(nk, "Total size:", NK_TEXT_LEFT);
@@ -1222,7 +1222,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 }
 
                 if (nk_tree_push(nk, NK_TREE_NODE, "Object list", NK_MINIMIZED)) {
-                    nk_layout_row_dynamic(nk, 24, 1);
+                    nk_layout_row_dynamic(nk, 0, 1);
                     pl_cache_iterate(p->cache, draw_cache_line, nk);
                     nk_tree_pop(nk);
                 }
