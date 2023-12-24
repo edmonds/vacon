@@ -362,11 +362,27 @@ static bool setup_input(const char *device)
 	AVDictionary *options = NULL;
 
 	int ret;
-	ret = av_dict_set(&options, "framerate", "60", 0);
+	char *env;
+
+	if ((env = getenv("VACON_V4L2_FRAMERATE"))) {
+		ret = av_dict_set(&options, "framerate", env, 0);
+	} else {
+		ret = av_dict_set(&options, "framerate", "60", 0);
+	}
 	assert(ret >= 0);
-	ret = av_dict_set(&options, "video_size", "1920x1080", 0);
+
+	if ((env = getenv("VACON_V4L2_VIDEO_SIZE"))) {
+		ret = av_dict_set(&options, "video_size", env, 0);
+	} else {
+		ret = av_dict_set(&options, "video_size", "1920x1080", 0);
+	}
 	assert(ret >= 0);
-	ret = av_dict_set(&options, "pixel_format", "nv12", 0);
+
+	if ((env = getenv("VACON_V4L2_PIXEL_FORMAT"))) {
+		ret = av_dict_set(&options, "pixel_format", env, 0);
+	} else {
+		ret = av_dict_set(&options, "pixel_format", "yuyv422", 0);
+	}
 	assert(ret >= 0);
 
 	// Open input device and allocate format context.
