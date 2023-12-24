@@ -49,22 +49,9 @@ static shared_ptr<rtc::WebSocket> g_ws;
 static AVFormatContext *rtp_fctx;
 static unsigned char *rtp_buf;
 static AVIOContext *rtp_ioctx;
-static int rtp_video_stream;
 
-static AVBufferRef *hw_device_ctx = NULL;
-static AVCodecContext *decoder_ctx = NULL;
-
-static enum AVPixelFormat getVaapiFormat(AVCodecContext *ctx __attribute__((unused)),
-					 const enum AVPixelFormat *pix_fmts)
-{
-	for (const enum AVPixelFormat *p = pix_fmts; *p != AV_PIX_FMT_NONE; p++) {
-		if (*p == AV_PIX_FMT_VAAPI) {
-			return *p;
-		}
-	}
-
-	std::cerr << "Unable to decode this content using VA-API." << std::endl;
-	return AV_PIX_FMT_NONE;
+extern "C" {
+int plplay_play(AVFormatContext *);
 }
 
 static int readAvioPacketRTP(void *ptr __attribute__((unused)),
@@ -72,8 +59,8 @@ static int readAvioPacketRTP(void *ptr __attribute__((unused)),
 			     int buf_size)
 {
 	rtc::binary message;
-	long count_rtp_packets = 0;
-	long count_rtp_bytes = 0;
+	static long count_rtp_packets = 0;
+	static long count_rtp_bytes = 0;
 
 	g_rtp_packet_queue.wait_dequeue(message);
 
@@ -84,7 +71,9 @@ static int readAvioPacketRTP(void *ptr __attribute__((unused)),
 	count_rtp_bytes += message.size();
 	if ((count_rtp_packets % 10000) == 0) {
 		std::cout
-			<< "[runFfmpeg] Received "
+			<< "[readAvioPacketRTP] [Thread "
+			<< std::this_thread::get_id()
+			<< "] Received "
 			<< count_rtp_packets
 			<< " packets, "
 			<< count_rtp_bytes
@@ -129,7 +118,7 @@ static int readAvioPacketString(void *ptr, uint8_t *buf, int buf_size)
 	return buf_size;
 }
 
-static bool setupFfmpeg(void)
+static bool setupFfmpeg()
 {
 	int ret;
 
@@ -205,207 +194,16 @@ static bool setupFfmpeg(void)
 	// AVFormatContext.
 	rtp_fctx->pb = rtp_ioctx;
 
-	// Read packets of a media file to get stream information. The logical
-	// file position is not changed by this function; examined packets may
-	// be buffered for later processing.
-	if ((ret = avformat_find_stream_info(rtp_fctx, NULL)) < 0) {
-		std::cerr
-			<< "Cannot find input stream information. Error code: "
-			<< av_err2str(ret)
-			<< std::endl;
-		return false;
-	}
-
-	// ???
-	const AVCodec *decoder = NULL;
-	ret = av_find_best_stream(rtp_fctx, AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
-	if (ret < 0) {
-		std::cerr
-			<< "Cannot find a video stream in the input. Error code: "
-			<< ret
-			<< std::endl;
-		return false;
-	}
-	// ???
-	rtp_video_stream = ret;
-
-	// Log detailed information about the video stream.
-	av_dump_format(rtp_fctx, rtp_video_stream, "(custom in-memory I/O)", 0 /* is_output */);
-
-	// Allocate an AVCodecContext and set its fields to default values. The
-	// resulting struct should be freed with avcodec_free_context().
-	if (!(decoder_ctx = avcodec_alloc_context3(decoder))) {
-		std::cerr
-			<< "avcodec_alloc_context3() failed"
-			<< std::endl;
-		return false;
-	}
-
-	// Fill the codec context based on the values from the supplied codec
-	// parameters. Any allocated fields in `codec` (decoder_ctx) that have
-	// a corresponding field in `par` (video->codecpar) are freed and
-	// replaced with duplicates of the corresponding field in `par`. Fields
-	// in `codec` that do not have a counterpart in par are not touched.
-	AVStream *video = rtp_fctx->streams[rtp_video_stream];
-	if ((ret = avcodec_parameters_to_context(decoder_ctx, video->codecpar)) < 0) {
-		std::cerr
-			<< "avcodec_parameters_to_context() failed with error code "
-			<< ret
-			<< std::endl;
-		return false;
-	}
-
-	// Open the VAAPI device and create the AVHWDeviceContext.
-	ret = av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0);
-	if (ret < 0) {
-		std::cerr
-			<< "Failed to open the VAAPI device."
-			<< " av_hwdevice_ctx_create() failed with error code "
-			<< ret
-			<< std::endl;
-		return false;
-	}
-
-	// ???
-	decoder_ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
-	if (!decoder_ctx->hw_device_ctx) {
-		std::cerr << "A hardware device reference create failed" << std::endl;
-		return false;
-	}
-	// ???
-	decoder_ctx->get_format = getVaapiFormat;
-
-	// Initialize the AVCodecContext (decoder_ctx) to use the given AVCodec
-	// (decoder). The AVCodecContext must have been allocated with
-	// avcodec_alloc_context3().
-	if ((ret = avcodec_open2(decoder_ctx, decoder, NULL)) < 0) {
-		std::cerr
-			<< "Failed to open codec for decoding. Error code: "
-			<< ret
-			<< std::endl;
-		return false;
-	}
-
 	return true;
 }
 
-static int decodePacket(AVPacket *pkt)
+static void runPlplay()
 {
-	int ret = 0;
-
-	// Supply raw packet data as input to the decoder. Internally, this
-	// call will copy relevant AVCodecContext fields, which can influence
-	// decoding per-packet, and apply them when the packet is actually
-	// decoded. (For example AVCodecContext.skip_frame, which might direct
-	// the decoder to drop the frame contained by the packet sent with this
-	// function.)
-	ret = avcodec_send_packet(decoder_ctx, pkt);
-	if (ret < 0) {
-		std::cerr
-			<< "[decodePacket] Error during decoding (ignoring). Error code: "
-			<< av_err2str(ret)
-			<< std::endl;
-		//return ret;
-		return 0;
-	}
-
-	static long count_bytes_processed = 0;
-	static long count_frames_processed = 0;
-
-	while (ret >= 0) {
-		// AVFrame for holding the output from the decoder.
-		AVFrame *frame;
-
-		// Allocate the AVFrame and set its fields to default values.
-		// Must be freed using av_frame_free(). This only allocates the
-		// AVFrame itself, not the data buffers.
-		if (!(frame = av_frame_alloc())) {
-			std::cerr << "[decodePacket] av_frame_alloc() failed" << std::endl;
-			return AVERROR(ENOMEM);
-		}
-
-		// Return decoded output data from the decoder into `frame`,
-		// which will contain refcounted video frame data allocated by
-		// the codec.
-		ret = avcodec_receive_frame(decoder_ctx, frame);
-		if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-			// EAGAIN: Output is not available in this state.
-			// Caller must try to send new input.
-			//
-			// EOF: Codec has been fully flushed, and there will be
-			// no more output frames.
-			av_frame_free(&frame);
-			return 0;
-		} else if (ret < 0) {
-			std::cerr
-				<< "[decodePacket] Error while decoding. Error code: "
-				<< av_err2str(ret)
-				<< std::endl;
-			goto fail;
-		}
-
-
-		count_bytes_processed += pkt->size;
-		count_frames_processed += 1;
-
-		if ((count_frames_processed % 60) == 0) {
-			std::cerr
-				<< "[decodePacket] Processed "
-				<< count_frames_processed
-				<< " frames, "
-				<< count_bytes_processed
-				<< " bytes"
-				<< std::endl;
-		}
-
-fail:
-		// Clean up from av_frame_alloc() above.
-		av_frame_free(&frame);
-		if (ret < 0) {
-			return ret;
-		}
-	}
-
-	return 0;
-}
-
-static void runFfmpeg(void)
-{
-	int ret = 0;
-
-	// Allocate an AVPacket and set its fields to default values.
-	// Must be freed with av_packet_free().
-	AVPacket *dec_pkt = av_packet_alloc();
-	if (!dec_pkt) {
-		std::cerr << "Failed to allocate decode packet" << std::endl;
-		return;
-	}
-
-	int count_frames_recv = 0;
-	while (ret >= 0) {
-		if ((ret = av_read_frame(rtp_fctx, dec_pkt)) < 0) {
-			break;
-		}
-
-		if (rtp_video_stream != dec_pkt->stream_index) {
-			continue;
-		}
-
-		count_frames_recv += 1;
-		if ((count_frames_recv % 600) == 0) {
-			std::cerr
-				<< "[runFfmpeg] Received "
-				<< count_frames_recv
-				<< " frames"
-				<< std::endl;
-		}
-
-		ret = decodePacket(dec_pkt);
-
-		av_packet_unref(dec_pkt);
-	}
-
-	std::cerr << "[runFfmpeg] Shutting down: " << av_err2str(ret) << std::endl;
+	int ret = plplay_play(rtp_fctx);
+	std::cerr
+		<< "[runPlplay] plplay_play() exited with return code "
+		<< ret
+		<< std::endl;
 }
 
 static void createPeerConnection(const rtc::Configuration &config,
@@ -489,7 +287,7 @@ static void wsOnMessage(json message,
 		createPeerConnection(config, description, make_weak_ptr(ws));
 
 		if (setupFfmpeg()) {
-			std::jthread thr_ffmpeg_worker(runFfmpeg);
+			std::jthread thr_plplay_worker(runPlplay);
 		} else {
 			std::cerr << "Couldn't setup ffmpeg libraries!" << std::endl;
 		}
