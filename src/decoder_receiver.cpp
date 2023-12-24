@@ -549,9 +549,10 @@ int decoder_receiver(const string& ws_url)
 	std::cout << "Sending WebSocket message: " << message_dump << std::endl;
 	ws->send(message_dump);
 
-	std::cout << "Press any key to exit." << std::endl;
-	char dummy;
-	std::cin >> dummy;
+	for (;;) {
+		char tmp;
+		std::cin >> tmp;
+	}
 
 	return 0;
 }
