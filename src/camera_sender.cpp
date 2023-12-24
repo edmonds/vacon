@@ -195,11 +195,11 @@ int camera_sender(const string& ws_url)
 	std::cout << "Waiting for signaling to be connected..." << std::endl;
 	wsFuture.get();
 
-	start_v4l2_vaapi_encoder("/dev/video0", packet_callback);
-
-	std::cout << "Press any key to exit." << std::endl;
-	char dummy;
-	std::cin >> dummy;
+	int ret = start_v4l2_vaapi_encoder("/dev/video0", packet_callback);
+	if (ret != 0) {
+		std::cerr << "start_v4l2_vaapi_encoder() failed!" << std::endl;
+		return EXIT_FAILURE;
+	}
 
 	return 0;
 }
