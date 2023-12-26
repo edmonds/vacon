@@ -113,6 +113,9 @@ static int open_codec_context(int *stream_idx, AVCodecContext **dec_ctx,
 			return ret;
 		}
 
+		/* Other settings */
+		(*dec_ctx)->thread_count = 1;
+
 		/* Init the decoders */
 		if ((ret = avcodec_open2(*dec_ctx, dec, NULL)) < 0) {
 			fprintf(stderr, "Failed to open %s codec\n",
@@ -447,6 +450,7 @@ int start_v4l2_vaapi_encoder(const char *device, void (*cb)(AVPacket *))
 	}
 
 	// Configure the codec context for the hardware video encoder.
+	avctx->thread_count = 1;
 	avctx->width = width;
 	avctx->height = height;
 	avctx->time_base = (AVRational){ 1, 60 };
