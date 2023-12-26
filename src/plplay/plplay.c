@@ -333,6 +333,7 @@ static PL_THREAD_VOID decode_loop(void *arg)
             av_packet_unref(packet);
             if (ret == AVERROR(EIO)) {
                     /* Ignore decoder errors. */
+                    (void) atomic_fetch_add(&p->stats.decoded_fail, 1);
                     continue;
             }
             break;

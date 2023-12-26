@@ -96,6 +96,7 @@ struct plplay {
     // playback statistics
     struct {
         _Atomic uint32_t decoded;
+        _Atomic uint32_t decoded_fail;
         uint32_t rendered;
         uint32_t mapped;
         uint32_t dropped;
