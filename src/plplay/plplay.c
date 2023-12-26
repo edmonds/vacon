@@ -308,6 +308,31 @@ static void discard_frame(const struct pl_source_frame *src)
     printf("Dropped frame with PTS %.3f\n", src->pts);
 }
 
+static int try_avframe_derive(const AVFrame *frame)
+{
+    if (frame->format != AV_PIX_FMT_VAAPI) {
+        fprintf(stderr, "%s: wrong pixel format %s\n",
+                __func__, av_get_pix_fmt_name(frame->format));
+        return AVERROR(EIO);
+    }
+
+    const int flags = AV_HWFRAME_MAP_READ | AV_HWFRAME_MAP_DIRECT;
+    AVFrame *derived = av_frame_alloc();
+    derived->width = frame->width;
+    derived->height = frame->height;
+    derived->format = AV_PIX_FMT_DRM_PRIME;
+    derived->hw_frames_ctx = av_buffer_ref(frame->hw_frames_ctx);
+
+    int ret = av_hwframe_map(derived, frame, flags);
+    if (ret < 0) {
+        fprintf(stderr, "%s: av_hwframe_map() failed: %s (%d)\n",
+                __func__, av_err2str(ret), ret);
+    }
+
+    av_frame_free(&derived);
+    return ret;
+}
+
 static PL_THREAD_VOID decode_loop(void *arg)
 {
     int ret;
@@ -360,6 +385,13 @@ static PL_THREAD_VOID decode_loop(void *arg)
                 first_pts = last_pts;
             frame->opaque = p;
             (void) atomic_fetch_add(&p->stats.decoded, 1);
+
+            if ((ret = try_avframe_derive(frame)) != 0) {
+                (void) atomic_fetch_add(&p->stats.decoded_fail, 1);
+                ret = AVERROR(EAGAIN);
+                break;
+            }
+
             pl_queue_push_block(p->queue, UINT64_MAX, &(struct pl_source_frame) {
                 .pts = last_pts - first_pts + base_pts,
                 .duration = frame_duration,
