@@ -33,12 +33,12 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <locale.h>
-#include <signal.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 #include <libavcodec/avcodec.h>
@@ -138,6 +138,7 @@ static int set_hwframe_ctx(AVCodecContext *ctx, AVBufferRef *hw_device_ctx)
 	AVBufferRef *hw_frames_ref;
 	AVHWFramesContext *frames_ctx = NULL;
 	int err = 0;
+	char *env;
 
 	if (!(hw_frames_ref = av_hwframe_ctx_alloc(hw_device_ctx))) {
 		fprintf(stderr, "Failed to create VAAPI frame context.\n");
@@ -145,10 +146,24 @@ static int set_hwframe_ctx(AVCodecContext *ctx, AVBufferRef *hw_device_ctx)
 	}
 	frames_ctx = (AVHWFramesContext *)(hw_frames_ref->data);
 	frames_ctx->format = AV_PIX_FMT_VAAPI;
-	frames_ctx->sw_format = AV_PIX_FMT_P010;
 	frames_ctx->width = width;
 	frames_ctx->height = height;
 	frames_ctx->initial_pool_size = 20;
+
+	enum AVPixelFormat format = AV_PIX_FMT_NONE;
+
+	if ((env = getenv("VACON_HW_PIXEL_FORMAT"))) {
+		if (strcasecmp(env, "nv12") == 0) {
+			format = AV_PIX_FMT_NV12;
+		}
+	}
+
+	if (format == AV_PIX_FMT_NONE) {
+		format = AV_PIX_FMT_P010;
+	}
+
+	frames_ctx->sw_format = format;
+
 	if ((err = av_hwframe_ctx_init(hw_frames_ref)) < 0) {
 		fprintf(stderr,
 			"Failed to initialize VAAPI frame context."
