@@ -119,9 +119,6 @@ plplay_static = static_library('plplay',
   ],
 )
 plplay = declare_dependency(link_with: plplay_static)
-executable('plplay',
-  sources: 'src/plplay/main.c',
-  dependencies: plplay)
 
 vacon_sources = [
   'src/main.cpp',
