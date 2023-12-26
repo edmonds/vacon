@@ -227,6 +227,10 @@ static bool init_codec(struct plplay *p)
     const AVCodecHWConfig *hwcfg = 0;
     if (p->args.hwdec) {
         for (int i = 0; (hwcfg = avcodec_get_hw_config(codec, i)); i++) {
+            fprintf(stderr, "%s: AVHWDeviceType '%s' is available\n", __func__,
+                    av_hwdevice_get_type_name(hwcfg->device_type));
+        }
+        for (int i = 0; (hwcfg = avcodec_get_hw_config(codec, i)); i++) {
             if (!pl_test_pixfmt(p->win->gpu, hwcfg->pix_fmt))
                 continue;
             if (!(hwcfg->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX))
