@@ -147,6 +147,9 @@ static bool setupFfmpeg()
 	// Discard frames marked as corrupt.
 	rtp_fctx->flags |= AVFMT_FLAG_DISCARD_CORRUPT;
 
+	// Latency hacks.
+	rtp_fctx->flags |= AVFMT_FLAG_NOBUFFER | AVFMT_FLAG_FLUSH_PACKETS;
+
 	// Allocate fixed size buffer for readAvioPacketString() to write into.
 	const size_t sdp_ioctx_buf_size = 1024;
 	unsigned char *sdp_ioctx_buf = (unsigned char *)av_malloc(sdp_ioctx_buf_size);

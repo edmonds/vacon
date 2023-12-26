@@ -394,6 +394,9 @@ static bool setup_input(const char *device)
 		return false;
 	}
 
+	// Latency hacks.
+	fmt_ctx->flags = AVFMT_FLAG_NOBUFFER | AVFMT_FLAG_FLUSH_PACKETS;
+
 	// Retrieve stream information.
 	if (avformat_find_stream_info(fmt_ctx, NULL) < 0) {
 		fprintf(stderr, "Could not find stream information\n");
