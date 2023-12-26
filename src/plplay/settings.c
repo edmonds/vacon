@@ -1174,6 +1174,8 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                 nk_label(nk, "Times stalled:", NK_TEXT_LEFT);
                 nk_labelf(nk, NK_TEXT_LEFT, "%"PRIu32" (%.3f ms)",
                           p->stats.stalled, p->stats.stalled_ms);
+                nk_label(nk, "Queued frames:", NK_TEXT_LEFT);
+                nk_labelf(nk, NK_TEXT_LEFT, "%d", pl_queue_num_frames(p->queue));
                 draw_timing(nk, "Acquire FBO:", &p->stats.acquire);
                 draw_timing(nk, "Update queue:", &p->stats.update);
                 draw_timing(nk, "Render frame:", &p->stats.render);
