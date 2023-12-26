@@ -660,10 +660,13 @@ retry:
             pl_gpu_flush(p->win->gpu);
             pl_clock_t ts_wait = pl_clock_now();
             double pts_now = pl_clock_diff(ts_wait, ts_start);
+#if 0
             if (pts_target >= pts_now) {
                 log_time(&p->stats.sleep, pts_target - pts_now);
                 pl_thread_sleep(pts_target - pts_now);
             } else {
+#endif
+            if (pts_target < pts_now) {
                 double missed_ms = 1e3 * (pts_now - pts_target);
                 fprintf(stderr, "Missed PTS target %.3f (%.3f ms in the past)\n",
                         pts_target, missed_ms);
