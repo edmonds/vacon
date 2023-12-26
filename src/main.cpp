@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <csignal>
 #include <cstddef>
 #include <cstring>
 #include <iostream>
@@ -14,6 +15,14 @@ int camera_sender(const string&);
 int decoder_receiver(const string&);
 int sink_receiver(const string&);
 int video_receiver(const string&);
+
+volatile std::sig_atomic_t gSignalUSR1;
+
+void signalHandler(int signal) {
+	if (signal == SIGUSR1) {
+		gSignalUSR1 = 1;
+	}
+}
 
 void setupRealtimePriority()
 {
@@ -41,6 +50,8 @@ void setupRealtimePriority()
 
 int main(int argc, char **argv) try {
 	setupRealtimePriority();
+
+	std::signal(SIGUSR1, signalHandler);
 
 	const char *ws_url_cstr = getenv("VACON_SIGNALING_URL");
 	if (!ws_url_cstr) {

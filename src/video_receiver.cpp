@@ -1,4 +1,5 @@
 #include <cassert>
+#include <csignal>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -29,6 +30,8 @@ using std::weak_ptr;
 
 using moodycamel::BlockingReaderWriterQueue;
 using nlohmann::json;
+
+extern volatile std::sig_atomic_t gSignalUSR1;
 
 #ifdef av_err2str
 #undef av_err2str
@@ -62,7 +65,18 @@ static int readAvioPacketRTP(void *ptr __attribute__((unused)),
 	static long count_rtp_packets = 0;
 	static long count_rtp_bytes = 0;
 
-	g_rtp_packet_queue.wait_dequeue(message);
+	for (;;) {
+		g_rtp_packet_queue.wait_dequeue(message);
+		if (gSignalUSR1) {
+			gSignalUSR1 = 0;
+			std::cout
+				<< "[readAvioPacketRTP] Dropping a packet due to signal!"
+				<< std::endl;
+			continue;
+		} else {
+			break;
+		}
+	}
 
 	assert(message.size() > 0);
 	assert((int)message.size() <= buf_size);
