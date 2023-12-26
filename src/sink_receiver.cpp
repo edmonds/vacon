@@ -1,3 +1,4 @@
+#include <csignal>
 #include <cstddef>
 #include <iostream>
 #include <memory>
@@ -30,6 +31,8 @@ static shared_ptr<rtc::WebSocket> g_ws;
 
 static long g_receiver_count_rtp_packets;
 static long g_receiver_count_rtp_bytes;
+
+extern volatile std::sig_atomic_t gSignalUSR1;
 
 static void createPeerConnection(const rtc::Configuration &config,
 				 const rtc::Description &offer,
@@ -86,6 +89,7 @@ static void createPeerConnection(const rtc::Configuration &config,
 	addr.sin_port = htons(5000);
 
 	track->onMessage([track, sock, addr](rtc::binary message) {
+		static int drop_count = 0;
 		// This is an RTP packet.
 		g_receiver_count_rtp_packets += 1;
 		g_receiver_count_rtp_bytes += message.size();
@@ -98,12 +102,24 @@ static void createPeerConnection(const rtc::Configuration &config,
 				<< " bytes from RTP peer"
 				<< std::endl;
 		}
-		sendto(sock,
-		       reinterpret_cast<const char *>(message.data()),
-		       message.size(),
-		       0 /* flags */,
-		       reinterpret_cast<const struct sockaddr *>(&addr),
-		       sizeof(addr));
+		if (gSignalUSR1) {
+			std::cout
+				<< "Dropping some packets due to signal!"
+				<< std::endl;
+			gSignalUSR1 = 0;
+			drop_count = 10;
+		} else {
+			if (drop_count > 0) {
+				drop_count -= 1;
+			} else {
+				sendto(sock,
+				       reinterpret_cast<const char *>(message.data()),
+				       message.size(),
+				       0 /* flags */,
+				       reinterpret_cast<const struct sockaddr *>(&addr),
+				       sizeof(addr));
+			}
+		}
 	    },
 	    nullptr);
 
