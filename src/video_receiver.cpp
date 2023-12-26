@@ -85,9 +85,7 @@ static int readAvioPacketRTP(void *ptr __attribute__((unused)),
 	count_rtp_bytes += message.size();
 	if ((count_rtp_packets % 10000) == 0) {
 		std::cout
-			<< "[readAvioPacketRTP] [Thread "
-			<< std::this_thread::get_id()
-			<< "] Received "
+			<< "[readAvioPacketRTP] Received "
 			<< count_rtp_packets
 			<< " packets, "
 			<< count_rtp_bytes
