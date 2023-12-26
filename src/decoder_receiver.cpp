@@ -18,6 +18,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
+#include <libavutil/imgutils.h>
 }
 
 using namespace std::chrono_literals;
@@ -143,7 +144,62 @@ static int readAvioPacketString(void *ptr, uint8_t *buf, int buf_size)
 	return buf_size;
 }
 
-static bool setupFfmpeg(void)
+static int setupHW(AVCodecContext *ctx, AVBufferRef *hw_device_ctx, const AVCodecParameters *par)
+{
+	AVBufferRef *hw_frames_ref;
+	AVHWFramesContext *frames_ctx = NULL;
+	int err = 0;
+
+	if (!(hw_frames_ref = av_hwframe_ctx_alloc(hw_device_ctx))) {
+		std::cerr << "Failed to create VAAPI frame context." << std::endl;
+		return -1;
+	}
+	frames_ctx = (AVHWFramesContext *)(hw_frames_ref->data);
+	frames_ctx->format = AV_PIX_FMT_VAAPI;
+	frames_ctx->width = par->width;
+	frames_ctx->height = par->height;
+	frames_ctx->initial_pool_size = 20;
+
+	enum AVPixelFormat format = AV_PIX_FMT_NONE;
+
+	char *env;
+	if ((env = getenv("VACON_HW_PIXEL_FORMAT"))) {
+		if (strcasecmp(env, "nv12") == 0) {
+			format = AV_PIX_FMT_NV12;
+		}
+	}
+
+	if (format == AV_PIX_FMT_NONE) {
+		format = AV_PIX_FMT_P010;
+	}
+
+	frames_ctx->sw_format = format;
+
+	if ((err = av_hwframe_ctx_init(hw_frames_ref)) < 0) {
+		std::cerr
+			<< "Failed to initialize VAAPI frame context. Error code: "
+			<< av_err2str(err) << std::endl;
+		av_buffer_unref(&hw_frames_ref);
+		return err;
+	}
+	ctx->hw_frames_ctx = av_buffer_ref(hw_frames_ref);
+	if (!ctx->hw_frames_ctx) {
+		err = AVERROR(ENOMEM);
+	}
+
+	ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+	if (!ctx->hw_device_ctx) {
+		std::cerr << "A hardware device reference create failed." << std::endl;
+		return -1;
+	}
+
+	ctx->get_format = getVaapiFormat;
+
+	av_buffer_unref(&hw_frames_ref);
+	return err;
+}
+
+static bool setupFfmpeg()
 {
 	int ret;
 
@@ -280,14 +336,10 @@ static bool setupFfmpeg(void)
 		return false;
 	}
 
-	// ???
-	decoder_ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
-	if (!decoder_ctx->hw_device_ctx) {
-		std::cerr << "A hardware device reference create failed" << std::endl;
+	ret = setupHW(decoder_ctx, hw_device_ctx, video->codecpar);
+	if (ret != 0) {
 		return false;
 	}
-	// ???
-	decoder_ctx->get_format = getVaapiFormat;
 
 	// Initialize the AVCodecContext (decoder_ctx) to use the given AVCodec
 	// (decoder). The AVCodecContext must have been allocated with
@@ -329,11 +381,12 @@ static int decodePacket(AVPacket *pkt)
 	while (ret >= 0) {
 		// AVFrame for holding the output from the decoder.
 		AVFrame *frame;
+		AVFrame *sw_frame;
 
 		// Allocate the AVFrame and set its fields to default values.
 		// Must be freed using av_frame_free(). This only allocates the
 		// AVFrame itself, not the data buffers.
-		if (!(frame = av_frame_alloc())) {
+		if (!(frame = av_frame_alloc()) || !(sw_frame = av_frame_alloc())) {
 			std::cerr << "[decodePacket] av_frame_alloc() failed" << std::endl;
 			return AVERROR(ENOMEM);
 		}
@@ -358,6 +411,15 @@ static int decodePacket(AVPacket *pkt)
 			goto fail;
 		}
 
+		ret = av_hwframe_transfer_data(sw_frame, frame, 0);
+		if (ret < 0) {
+			std::cerr
+				<< "[decodePacket] av_hwframe_transfer_data() failed: "
+				<< av_err2str(ret) << "(" << ret << ")"
+				<< std::endl;
+			ret = 0;
+			goto fail;
+		}
 
 		count_bytes_processed += pkt->size;
 		count_frames_processed += 1;
@@ -375,6 +437,7 @@ static int decodePacket(AVPacket *pkt)
 fail:
 		// Clean up from av_frame_alloc() above.
 		av_frame_free(&frame);
+		av_frame_free(&sw_frame);
 		if (ret < 0) {
 			return ret;
 		}
