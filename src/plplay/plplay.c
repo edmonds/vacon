@@ -870,7 +870,7 @@ int plplay_play(AVFormatContext *format)
         .args = {
             .hwdec = true,
             .preset = &pl_render_fast_params,
-            .verbosity = PL_LOG_INFO,
+            .verbosity = PL_LOG_DEBUG,
         },
     };
 
