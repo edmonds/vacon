@@ -155,7 +155,7 @@ static void draw_shader_pass(struct nk_context *nk,
              info->peak / 1e6,
              shader->description);
 
-    if (count >= sizeof(label)) {
+    if (count > 0 && (size_t)count >= sizeof(label)) {
         label[sizeof(label) - 4] = '.';
         label[sizeof(label) - 3] = '.';
         label[sizeof(label) - 2] = '.';
@@ -261,6 +261,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
                     par->tile_colors[i][0],
                     par->tile_colors[i][1],
                     par->tile_colors[i][2],
+                    0.0,
                 };
 
                 if (nk_combo_begin_color(nk, nk_rgb_cf(bg), nk_vec2(nk_widget_width(nk), 300))) {
@@ -1020,7 +1021,7 @@ void update_settings(struct plplay *p, const struct pl_frame *target)
             nk_layout_row_template_push_static(nk, px);
             nk_layout_row_template_push_dynamic(nk);
             nk_layout_row_template_end(nk);
-            for (int i = 0; i < p->shader_num; i++) {
+            for (size_t i = 0; i < p->shader_num; i++) {
 
                 if (i == 0) {
                     nk_label(nk, "·", NK_TEXT_CENTERED);

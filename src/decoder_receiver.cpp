@@ -126,19 +126,14 @@ static int writeAvioPacketRTP(void *ptr __attribute__((unused)),
 static int readAvioPacketString(void *ptr, uint8_t *buf, int buf_size)
 {
 	string &s = *(static_cast<string*>(ptr));
-	buf_size = FFMIN(buf_size, s.length());
+	buf_size = std::min(buf_size, (int)s.length());
 	const char *data = s.c_str();
 
-	// Don't copy the NUL at the end of the string.
-	if (buf_size >= 1 && data[buf_size - 1] == '\0') {
-		buf_size -= 1;
-	}
-
-	if (!buf_size) {
+	if (buf_size == 0) {
 		return AVERROR_EOF;
 	}
 
-	memcpy(buf, data, buf_size);
+	memcpy(buf, data, (size_t)buf_size);
 	s.erase(0, buf_size);
 
 	return buf_size;

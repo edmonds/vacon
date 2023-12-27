@@ -33,7 +33,7 @@ const char *get_cache_dir(char (*buf)[512])
     struct passwd* pw = getpwuid(getuid());
     if (pw) {
         int ret = snprintf(*buf, sizeof(*buf), "%s/%s", pw->pw_dir, "Library/Caches");
-        if (ret > 0 && ret < sizeof(*buf))
+        if (ret > 0 && (size_t)ret < sizeof(*buf))
             return *buf;
     }
 #endif
@@ -41,7 +41,7 @@ const char *get_cache_dir(char (*buf)[512])
     const char* home = getenv("HOME");
     if (home) {
         int ret = snprintf(*buf, sizeof(*buf), "%s/.cache", home);
-        if (ret > 0 && ret < sizeof(*buf))
+        if (ret > 0 && (size_t)ret < sizeof(*buf))
             return *buf;
     }
 

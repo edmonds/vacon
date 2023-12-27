@@ -46,14 +46,14 @@ static void uninit(struct plplay *p)
     pl_renderer_destroy(&p->renderer);
     pl_options_free(&p->opts);
 
-    for (int i = 0; i < p->shader_num; i++) {
+    for (size_t i = 0; i < p->shader_num; i++) {
         pl_mpv_user_shader_destroy(&p->shader_hooks[i]);
         free(p->shader_paths[i]);
     }
 
-    for (int i = 0; i < MAX_FRAME_PASSES; i++)
+    for (size_t i = 0; i < MAX_FRAME_PASSES; i++)
         pl_shader_info_deref(&p->frame_info[i].shader);
-    for (int j = 0; j < MAX_BLEND_FRAMES; j++) {
+    for (size_t j = 0; j < MAX_BLEND_FRAMES; j++) {
         for (int i = 0; i < MAX_BLEND_PASSES; i++)
             pl_shader_info_deref(&p->blend_info[j][i].shader);
     }
@@ -298,7 +298,7 @@ static bool map_frame(pl_gpu gpu, pl_tex *tex,
 }
 
 static void unmap_frame(pl_gpu gpu, struct pl_frame *frame,
-                        const struct pl_source_frame *src)
+                        const struct pl_source_frame *src __attribute__((unused)))
 {
     pl_unmap_avframe(gpu, frame);
 }
@@ -827,7 +827,7 @@ int plplay_main(int argc, char *argv[])
     const char *cache_dir = get_cache_dir(&(char[512]) {0});
     if (cache_dir) {
         int ret = snprintf(p->cache_file, sizeof(p->cache_file), "%s/plplay.cache", cache_dir);
-        if (ret > 0 && ret < sizeof(p->cache_file)) {
+        if (ret > 0 && (size_t)ret < sizeof(p->cache_file)) {
             p->cache = pl_cache_create(pl_cache_params(
                 .log             = p->log,
                 .max_total_size  = 50 << 20, // 50 MB
@@ -924,7 +924,7 @@ int plplay_play(AVFormatContext *format)
     const char *cache_dir = get_cache_dir(&(char[512]) {0});
     if (cache_dir) {
         int ret = snprintf(p->cache_file, sizeof(p->cache_file), "%s/plplay.cache", cache_dir);
-        if (ret > 0 && ret < sizeof(p->cache_file)) {
+        if (ret > 0 && (size_t)ret < sizeof(p->cache_file)) {
             p->cache = pl_cache_create(pl_cache_params(
                 .log             = p->log,
                 .max_total_size  = 50 << 20, // 50 MB

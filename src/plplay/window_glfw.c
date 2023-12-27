@@ -150,7 +150,7 @@ static bool make_current(void *priv)
     return true;
 }
 
-static void release_current(void *priv)
+static void release_current(void *priv __attribute__((unused)))
 {
     glfwMakeContextCurrent(NULL);
 }
@@ -203,17 +203,17 @@ static struct window *glfw_create(pl_log log, const struct window_params *params
         { GLFW_OPENGL_API,    4, 0, 400, GLFW_OPENGL_CORE_PROFILE },
         { GLFW_OPENGL_API,    3, 3, 330, GLFW_OPENGL_CORE_PROFILE },
         { GLFW_OPENGL_API,    3, 2, 150, GLFW_OPENGL_CORE_PROFILE },
-        { GLFW_OPENGL_ES_API, 3, 2, 320, },
-        { GLFW_OPENGL_API,    3, 1, 140, },
-        { GLFW_OPENGL_ES_API, 3, 1, 310, },
-        { GLFW_OPENGL_API,    3, 0, 130, },
-        { GLFW_OPENGL_ES_API, 3, 0, 300, },
-        { GLFW_OPENGL_ES_API, 2, 0, 100, },
-        { GLFW_OPENGL_API,    2, 1, 120, },
-        { GLFW_OPENGL_API,    2, 0, 110, },
+        { GLFW_OPENGL_ES_API, 3, 2, 320, GLFW_OPENGL_ANY_PROFILE },
+        { GLFW_OPENGL_API,    3, 1, 140, GLFW_OPENGL_ANY_PROFILE },
+        { GLFW_OPENGL_ES_API, 3, 1, 310, GLFW_OPENGL_ANY_PROFILE },
+        { GLFW_OPENGL_API,    3, 0, 130, GLFW_OPENGL_ANY_PROFILE },
+        { GLFW_OPENGL_ES_API, 3, 0, 300, GLFW_OPENGL_ANY_PROFILE },
+        { GLFW_OPENGL_ES_API, 2, 0, 100, GLFW_OPENGL_ANY_PROFILE },
+        { GLFW_OPENGL_API,    2, 1, 120, GLFW_OPENGL_ANY_PROFILE },
+        { GLFW_OPENGL_API,    2, 0, 110, GLFW_OPENGL_ANY_PROFILE },
     };
 
-    for (int i = 0; i < PL_ARRAY_SIZE(gl_vers); i++) {
+    for (size_t i = 0; i < PL_ARRAY_SIZE(gl_vers); i++) {
         glfwWindowHint(GLFW_CLIENT_API, gl_vers[i].api);
 #ifdef HAVE_EGL
         glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
@@ -393,7 +393,7 @@ static void glfw_destroy(struct window **window)
     pl_d3d11_destroy(&p->d3d11);
 #endif
 
-    for (int i = 0; i < p->files_num; i++)
+    for (size_t i = 0; i < p->files_num; i++)
         free(p->files[i]);
     free(p->files);
 
@@ -402,7 +402,7 @@ static void glfw_destroy(struct window **window)
     *window = NULL;
 }
 
-static void glfw_poll(struct window *window, bool block)
+static void glfw_poll(struct window *window __attribute__((unused)), bool block)
 {
     if (block) {
         glfwWaitEvents();
