@@ -20,7 +20,16 @@ add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: 'c')
 add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: 'cpp')
 
 cc = meson.get_compiler('c')
+cpp = meson.get_compiler('cpp')
 cmake = import('cmake')
+
+# optional functions
+
+foreach ident : ['pthread_setattr_default_np']
+  if cpp.has_function(ident)
+    add_project_arguments('-DHAVE_' + ident.to_upper(), language: 'cpp')
+  endif
+endforeach
 
 # egl
 
