@@ -70,6 +70,8 @@ libdatachannel = [
 
 argparse = dependency('argparse', version: '>=3')
 
+backward = dependency('backward-cpp')
+
 libplacebo = dependency('libplacebo',
   default_options: {
     'default_library':  'static',
@@ -123,6 +125,7 @@ plplay_static = static_library('plplay',
 plplay = declare_dependency(link_with: plplay_static)
 
 vacon_sources = [
+  'src/backward.cpp',
   'src/main.cpp',
   'src/camera_sender.cpp',
   'src/decoder_receiver.cpp',
@@ -133,6 +136,7 @@ vacon_sources = [
 
 vacon_dependencies = [
   argparse,
+  backward,
   ffmpeg,
   libdatachannel,
   libplacebo,
