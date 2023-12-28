@@ -68,6 +68,8 @@ libdatachannel = [
 
 # other dependencies
 
+argparse = dependency('argparse', version: '>=3')
+
 libplacebo = dependency('libplacebo',
   default_options: {
     'default_library':  'static',
@@ -130,6 +132,7 @@ vacon_sources = [
 ]
 
 vacon_dependencies = [
+  argparse,
   ffmpeg,
   libdatachannel,
   libplacebo,
