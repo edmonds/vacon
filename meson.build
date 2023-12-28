@@ -72,6 +72,8 @@ argparse = dependency('argparse', version: '>=3')
 
 backward = dependency('backward-cpp')
 
+fmt = dependency('fmt', version: '>9', static: true)
+
 libplacebo = dependency('libplacebo',
   default_options: {
     'default_library':  'static',
@@ -138,6 +140,7 @@ vacon_dependencies = [
   argparse,
   backward,
   ffmpeg,
+  fmt,
   libdatachannel,
   libplacebo,
   plplay,
