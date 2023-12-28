@@ -93,6 +93,8 @@ libplacebo = dependency('libplacebo',
 
 nuklear = dependency('nuklear')
 
+plog = dependency('plog')
+
 readerwriterqueue = dependency('readerwriterqueue')
 
 threads = dependency('threads')
@@ -143,6 +145,7 @@ vacon_dependencies = [
   fmt,
   libdatachannel,
   libplacebo,
+  plog,
   plplay,
   readerwriterqueue,
   threads,
