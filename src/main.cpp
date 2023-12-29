@@ -173,7 +173,7 @@ static void runCameraEncoder(std::stop_token st)
     auto ce = CameraEncoder::Create(params);
 
     ce->encodePackets(st, [](const AVPacket *pkt) {
-        PLOG_DEBUG << fmt::format("Got a packet @ %p, size {}", fmt::ptr(pkt), pkt->size);
+        PLOG_VERBOSE << fmt::format("Got a packet @ {}, size {}", fmt::ptr(pkt), pkt->size);
     });
 
     PLOG_DEBUG << fmt::format("Stopping camera encoder thread");

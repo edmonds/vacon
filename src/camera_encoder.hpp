@@ -25,9 +25,14 @@ class CameraEncoder {
         ~CameraEncoder();
 
         bool encodePackets(std::stop_token st, std::function<void(const AVPacket*)> callback);
+        bool processPacket(const AVPacket *packet);
+        bool processFrame(const AVFrame *frame);
+        bool encodeVideoFrame(const AVFrame *hw_frame);
 
     private:
         CameraEncoder() = default;
+        std::function<void(const AVPacket*)> callback;
+
         bool initCameraDevice();
         bool initCodecContext();
         bool initVaapiDevice();
@@ -36,8 +41,8 @@ class CameraEncoder {
         CameraEncoderParams params;
 
         // Video data being processed.
-        AVFrame *frame;
-        AVPacket *pkt;
+        AVFrame *frame, *hw_frame;
+        AVPacket *pkt, *enc_pkt;
 
         // Things to do with the v4l2 input.
         int video_stream_idx;

@@ -48,6 +48,14 @@ std::unique_ptr<CameraEncoder> CameraEncoder::Create(const CameraEncoderParams& 
 CameraEncoder::~CameraEncoder()
 {
     PLOG_DEBUG << fmt::format("Destructor called on {}", fmt::ptr(this));
+    avcodec_free_context(&this->hw_ctx);
+    av_buffer_unref(&this->hw_device_ctx);
+    avcodec_free_context(&this->dec_ctx);
+    avformat_close_input(&this->fmt_ctx);
+    av_packet_free(&this->pkt);
+    av_packet_free(&this->enc_pkt);
+    av_frame_free(&this->hw_frame);
+    av_frame_free(&this->frame);
 }
 
 bool CameraEncoder::initCameraDevice()
@@ -208,9 +216,13 @@ bool CameraEncoder::initVaapiDevice()
 
     // Initialize video data storage.
     this->frame = av_frame_alloc();
+    this->hw_frame = av_frame_alloc();
     this->pkt = av_packet_alloc();
+    this->enc_pkt = av_packet_alloc();
     assert(this->frame);
+    assert(this->hw_frame);
     assert(this->pkt);
+    assert(this->enc_pkt);
 
     // Success.
     return true;
@@ -259,7 +271,155 @@ bool CameraEncoder::initVaapiHwFramePool()
 bool CameraEncoder::encodePackets(std::stop_token st,
                                   std::function<void(const AVPacket*)> callback)
 {
+    this->callback = callback;
+
     while (!st.stop_requested()) {
+        // Read a packet from the camera.
+        int ret = av_read_frame(this->fmt_ctx, this->pkt);
+        if (ret < 0) {
+            PLOG_ERROR << fmt::format("av_read_frame(): {}", av_err2str(ret));
+            break;
+        }
+
+        if (pkt->size <= 0 || pkt->stream_index != this->video_stream_idx) {
+            continue;
+        }
+
+        if (!processPacket(this->pkt)) {
+            break;
+        }
+
+        // Cleanup.
+        av_packet_unref(pkt);
+    }
+
+    // Flush the decoder.
+    if (this->dec_ctx) {
+        processPacket(nullptr);
+    }
+
+    // Flush the encoder.
+    if (this->hw_ctx) {
+        encodeVideoFrame(nullptr);
+    }
+
+    // Success.
+    return true;
+}
+
+bool CameraEncoder::processPacket(const AVPacket *pkt)
+{
+    // Decode the packet from the camera. Usually the camera input is raw so
+    // decoding is pretty simple, unless it's a low end camera that generates
+    // compressed output in H.264 or MJPEG.
+    int ret = avcodec_send_packet(this->dec_ctx, pkt);
+    if (ret < 0) {
+        PLOG_ERROR << fmt::format("avcodec_send_packet(): {}", av_err2str(ret));
+        return false;
+    }
+
+    // Process all the available frames the decoder. Usually this should be a
+    // single video frame, but this API also supports audio data.
+    while (ret >= 0) {
+        // Cleanup.
+        av_frame_unref(this->frame);
+
+        // Get the next frame.
+        ret = avcodec_receive_frame(this->dec_ctx, this->frame);
+        if (ret < 0) {
+            if (ret == AVERROR_EOF || ret == AVERROR(EAGAIN)) {
+                // These two return values are special and mean there is no output
+                // frame available, but there were no errors during decoding.
+                return true;
+            }
+
+            PLOG_ERROR << fmt::format("avcodec_receive_frame(): {}", av_err2str(ret));
+            return false;
+        }
+
+        // Encode this video frame.
+        if (!processFrame(this->frame)) {
+            return false;
+        }
+    }
+
+    // Success.
+    return true;
+}
+
+bool CameraEncoder::processFrame(const AVFrame *frame)
+{
+    // Consistency check. This shouldn't be possible.
+    if (frame->width != this->dec_ctx->width ||
+        frame->height != this->dec_ctx->height ||
+        frame->format != this->dec_ctx->pix_fmt)
+    {
+        PLOG_FATAL << fmt::format(
+            "Camera image parameters changed on captured frame."
+            " Expected: width {}, height {}, format {}."
+            " Actual: width {}, height {}, format {}.",
+            this->dec_ctx->width, this->dec_ctx->height,
+            av_get_pix_fmt_name(this->dec_ctx->pix_fmt),
+            frame->width, frame->height,
+            av_get_pix_fmt_name(static_cast<enum AVPixelFormat>(frame->format)));
+        return false;
+    }
+
+    // Wipe the frame that will be used for uploading the frame to the encoder.
+    av_frame_unref(this->hw_frame);
+
+    // Fill `hw_frame` with newly allocated buffers attached to the
+    // AVHWFramesContext.
+    int ret = av_hwframe_get_buffer(this->hw_ctx->hw_frames_ctx, hw_frame, 0);
+    if (ret < 0) {
+        PLOG_ERROR << fmt::format("av_hwframe_get_buffer(): {}", av_err2str(ret));
+        return false;
+    }
+    assert(hw_frame->hw_frames_ctx);
+
+    // Copy data from the software frame to the hardware frame.
+    ret = av_hwframe_transfer_data(hw_frame,    /* dst */
+                                   frame,       /* src */
+                                   0            /* flags */);
+    if (ret < 0) {
+        PLOG_ERROR << fmt::format("av_hwframe_transfer_data(): {}", av_err2str(ret));
+        return false;
+    }
+
+    // Copy the presentation timestamp from the camera frame so that the
+    // encoded frame will have a valid PTS.
+    hw_frame->pts = frame->pts;
+
+    return encodeVideoFrame(hw_frame);
+}
+
+bool CameraEncoder::encodeVideoFrame(const AVFrame *hw_frame)
+{
+    // Send the raw video frame to the hardware encoder.
+    int ret = avcodec_send_frame(this->hw_ctx, hw_frame);
+    if (ret < 0) {
+        PLOG_ERROR << fmt::format("avcodec_send_frame(): {}", av_err2str(ret));
+        return false;
+    }
+
+    // Read encoded packet from the hardware encoder.
+    for (;;) {
+        // Cleanup.
+        av_packet_unref(this->enc_pkt);
+
+        // Get the next packet.
+        ret = avcodec_receive_packet(this->hw_ctx, enc_pkt);
+        if (ret < 0) {
+            if (ret == AVERROR(EAGAIN)) {
+                // No output packet available, need to send more input.
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        // Write encoded packet using callback.
+        this->callback(enc_pkt);
     }
 
     // Success.
