@@ -139,12 +139,14 @@ plplay = declare_dependency(link_with: plplay_static)
 
 vacon_sources = [
   'src/backward.cpp',
+  'src/common.cpp',
   'src/main.cpp',
-  'src/camera_sender.cpp',
-  'src/decoder_receiver.cpp',
-  'src/sink_receiver.cpp',
-  'src/v4l2_ffmpeg_input_vaapi_encode.c',
-  'src/video_receiver.cpp',
+  'src/camera_encoder.cpp',
+  #'src/camera_sender.cpp',
+  #'src/decoder_receiver.cpp',
+  #'src/sink_receiver.cpp',
+  #'src/v4l2_ffmpeg_input_vaapi_encode.c',
+  #'src/video_receiver.cpp',
 ]
 
 vacon_dependencies = [
