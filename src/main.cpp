@@ -16,17 +16,23 @@
 #include <argparse/argparse.hpp>
 #include <backward.hpp>
 #include <plog/Log.h>
+#include <readerwritercircularbuffer.h>
 
 #include "common.hpp"
 #include "camera_encoder.hpp"
+#include "network_handler.hpp"
+#include "vpacket.hpp"
 
 using std::string;
+
+using namespace std::chrono_literals;
 
 namespace vacon {
 
 backward::SignalHandling gBackwardSignalHandling;
 
 volatile std::sig_atomic_t gSignalUSR1;
+volatile std::sig_atomic_t gShuttingDown;
 
 static argparse::ArgumentParser args("vacon");
 
@@ -38,11 +44,15 @@ static const int kDefaultCameraWidth                = 1920;
 static const int kDefaultCameraHeight               = 1080;
 static const int kDefaultCameraFrameRate            = 60;
 static const int kDefaultCameraBitrateKbps          = 10'000;
-static const char *kDefaultSignalingUrl             = "http://127.0.0.1:8000/v1/ooo";
+static const char *kDefaultSignalingUrl             = "ws://127.0.0.1:8000/v1/ooo";
+static const char *kDefaultStunServer               = "stun:stun.l.google.com:19302";
 
 static int verbosity = 0;
 
-static std::optional<std::jthread> thrCameraEncoder;
+static std::vector<std::jthread> threads = {};
+
+static moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<VPacket>>
+    gOutgoingCameraPacketBuffer(1);
 
 static void parseArgs(int argc, char *argv[])
 {
@@ -110,12 +120,16 @@ static void parseArgs(int argc, char *argv[])
         .scan<'i', int>()
         .nargs(1);
 
-    args.add_argument("-s", "--signaling-secret")
+    args.add_argument("-n", "--network")
+        .help("start network handler")
+        .flag();
+
+    args.add_argument("-s", "--network-signaling-secret")
         .metavar("SECRET")
         .help("signaling shared secret to identify peer")
         .required();
 
-    args.add_argument("-u", "--signaling-url")
+    args.add_argument("-u", "--network-signaling-url")
         .metavar("URL")
         .help("signaling URL for offer/answer exchange")
         .default_value(kDefaultSignalingUrl)
@@ -135,8 +149,10 @@ static void parseArgs(int argc, char *argv[])
 
 static void signalTerminate(int signal __attribute__((unused)))
 {
-    if (thrCameraEncoder) {
-        thrCameraEncoder->request_stop();
+    gShuttingDown = true;
+    // Signal threads to stop.
+    for (auto& thread : threads) {
+        thread.request_stop();
     }
 }
 
@@ -155,30 +171,6 @@ static void setupSignals(const bool want_sigusr1)
     }
 }
 
-static void runCameraEncoder(std::stop_token st)
-{
-    PLOG_DEBUG << "Starting camera encoder thread";
-
-    auto params = CameraEncoderParams {
-        .device                 = args.get<string>("--camera-device"),
-        .codec                  = args.get<string>("--camera-codec"),
-        .camera_pixel_format    = args.get<string>("--camera-pixel-format"),
-        .encoder_pixel_format   = args.get<string>("--camera-encoder-pixel-format"),
-        .width                  = args.get<int>("--camera-width"),
-        .height                 = args.get<int>("--camera-height"),
-        .frame_rate             = args.get<int>("--camera-frame-rate"),
-        .bitrate                = args.get<int>("--camera-bitrate"),
-    };
-
-    auto ce = CameraEncoder::Create(params);
-
-    ce->encodePackets(st, [](const AVPacket *pkt) {
-        PLOG_VERBOSE << fmt::format("Got a packet @ {}, size {}", fmt::ptr(pkt), pkt->size);
-    });
-
-    PLOG_DEBUG << fmt::format("Stopping camera encoder thread");
-}
-
 int main(int argc, char *argv[])
 {
     parseArgs(argc, argv);
@@ -189,18 +181,89 @@ int main(int argc, char *argv[])
         PLOG_ERROR << "Unable to set real-time thread priority, performance may be affected!";
     }
 
-    // Construct the full signaling URL from the base URL and the shared secret.
-    string signalingUrl = fmt::format("{}/{}",
-                                      args.get<string>("--signaling-url"),
-                                      args.get<string>("--signaling-secret"));
-    PLOG_DEBUG << fmt::format("signalingUrl = {}", signalingUrl);
+    // Start network handler on main thread (actual work is done on
+    // libdatachannel thread pool).
+    std::unique_ptr<NetworkHandler> nh = nullptr;
+    if (args["--network"] == true) {
+        PLOG_DEBUG << "Starting network handler";
 
-    if (args["--camera"] == true) {
-        thrCameraEncoder = std::jthread(runCameraEncoder);
+        auto params = NetworkHandlerParams {
+            .signaling_base_url         = args.get<string>("--network-signaling-url"),
+            .signaling_secret           = args.get<string>("--network-signaling-secret"),
+            .stun_server                = kDefaultStunServer,
+        };
+
+        nh = NetworkHandler::Create(params);
+        nh->connectWebRTC();
+    } else {
+        // If the network handler is disabled, start a thread to drain and discard
+        // the camera packet buffer.
+        threads.emplace_back(std::jthread { [](std::stop_token st) {
+            PLOG_DEBUG << "Starting camera packet buffer drain thread";
+            while (!st.stop_requested()) {
+                std::shared_ptr<VPacket> pkt;
+                if (gOutgoingCameraPacketBuffer.wait_dequeue_timed(pkt, 250ms)) {
+                    PLOG_DEBUG << fmt::format("Dequeued packet @ {}", fmt::ptr(pkt->ptr));
+                }
+            }
+            PLOG_DEBUG << "Stopping camera packet buffer drain thread";
+        }});
     }
 
-    if (thrCameraEncoder) {
-        thrCameraEncoder->join();
+    // Start camera encoder thread.
+    if (args["--camera"] == true) {
+        threads.emplace_back(std::jthread { [&](std::stop_token st) {
+            PLOG_DEBUG << "Starting camera encoder thread";
+
+            auto params = CameraEncoderParams {
+                .device                 = args.get<string>("--camera-device"),
+                .codec                  = args.get<string>("--camera-codec"),
+                .camera_pixel_format    = args.get<string>("--camera-pixel-format"),
+                .encoder_pixel_format   = args.get<string>("--camera-encoder-pixel-format"),
+                .width                  = args.get<int>("--camera-width"),
+                .height                 = args.get<int>("--camera-height"),
+                .frame_rate             = args.get<int>("--camera-frame-rate"),
+                .bitrate                = args.get<int>("--camera-bitrate"),
+            };
+
+            auto ce = CameraEncoder::Create(params);
+            if (ce) {
+                ce->encodePackets(st, [st](std::shared_ptr<VPacket> pkt) {
+                    PLOG_DEBUG << fmt::format("Got a packet @ {}, size {}", fmt::ptr(pkt->ptr), pkt->ptr->size);
+                    while (!st.stop_requested()) {
+                        if (gOutgoingCameraPacketBuffer.wait_enqueue_timed(pkt, 250ms)) {
+                            break;
+                        } else {
+                            PLOG_DEBUG << fmt::format("Trying to enqueue packet @ {}", fmt::ptr(pkt->ptr));
+                        }
+                    }
+                    PLOG_DEBUG << fmt::format("Enqueued packet @ {}", fmt::ptr(pkt->ptr));
+
+                });
+            } else {
+                PLOG_FATAL << "Failed to create camera encoder";
+            }
+
+            PLOG_DEBUG << fmt::format("Stopping camera encoder thread");
+        }});
+    }
+
+    if (nh) {
+        while (!nh->isConnected() && !gShuttingDown) {
+            std::this_thread::sleep_for(5ms);
+        }
+        PLOG_FATAL << "READY !!!";
+    }
+
+    while (!gShuttingDown) {
+        std::this_thread::sleep_for(500ms);
+    }
+
+    // Join threads.
+    for (auto& thread : threads) {
+        if (thread.joinable()) {
+            thread.join();
+        }
     }
 
     return EXIT_SUCCESS;
