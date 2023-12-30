@@ -5,8 +5,6 @@
  * License: CC0 / Public Domain
  */
 
-#include <stdatomic.h>
-
 #include <libavutil/cpu.h>
 
 #include "common.h"
@@ -37,7 +35,7 @@ static inline void log_time(struct timing *t, double ts)
 static void uninit(struct plplay *p)
 {
     if (p->decoder_thread_created) {
-        p->exit_thread = true;
+        atomic_store_explicit(&p->exit_thread, true, memory_order_relaxed);
         pl_queue_push(p->queue, NULL); // Signal EOF to wake up thread
         pl_thread_join(p->decoder_thread);
     }
@@ -288,7 +286,7 @@ static PL_THREAD_VOID decode_loop(void *arg)
     double first_pts = 0.0, base_pts = 0.0, last_pts = 0.0;
     uint64_t num_frames = 0;
 
-    while (!p->exit_thread) {
+    while (!atomic_load_explicit(&p->exit_thread, memory_order_relaxed)) {
         switch ((ret = av_read_frame(p->format, packet))) {
         case 0:
             if (packet->stream_index != p->stream->index) {
@@ -782,4 +780,9 @@ int plplay_play(AVFormatContext *format)
 error:
     uninit(p);
     return 1;
+}
+
+void plplay_shutdown(void)
+{
+    atomic_store_explicit(&state.exit_thread, true, memory_order_relaxed);
 }

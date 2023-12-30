@@ -1,4 +1,3 @@
-#include <stdatomic.h>
 #include <getopt.h>
 
 #include <libavutil/file.h>

@@ -1,3 +1,5 @@
+#include <stdatomic.h>
+
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
@@ -54,7 +56,7 @@ struct plplay {
     const AVStream *stream; // points to first video stream of `format`
     pl_thread decoder_thread;
     bool decoder_thread_created;
-    bool exit_thread;
+    _Atomic bool exit_thread;
 
     // settings / ui state
     pl_options opts;
