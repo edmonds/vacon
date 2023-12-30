@@ -30,6 +30,8 @@ class NetworkHandler {
         void closeWebSocket();
         void sendPacket(std::shared_ptr<VPacket>);
 
+        AVFormatContext* getRtpAvfcInput();
+
     private:
         NetworkHandler() = default;
         void receivePacket(rtc::binary);

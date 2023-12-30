@@ -20,6 +20,8 @@ class RtpDepacketizer {
 
         void submitRtpPacket(rtc::binary packet);
 
+        AVFormatContext *fctx;
+
     private:
         RtpDepacketizer() = default;
         bool initFfmpeg();
@@ -34,7 +36,6 @@ class RtpDepacketizer {
         // Queue for incoming RTP packets.
         moodycamel::BlockingReaderWriterQueue<rtc::binary> rtp_packet_queue;
 
-        AVFormatContext *fctx;
         AVIOContext *rtp_ioctx;
         AVIOContext *sdp_ioctx;
 };

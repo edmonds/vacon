@@ -112,6 +112,8 @@ void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>&
 {
     peer = std::make_shared<rtc::PeerConnection>(config);
 
+    rtp_depacketizer = vacon::RtpDepacketizer::Create();
+
     auto wws = make_weak_ptr(ws);
 
     peer->onGatheringStateChange([&](rtc::PeerConnection::GatheringState state) {
@@ -171,8 +173,6 @@ void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>&
     } else {
         peer->setLocalDescription();
     }
-
-    rtp_depacketizer = vacon::RtpDepacketizer::Create();
 }
 
 void NetworkHandler::receivePacket(rtc::binary pkt)
@@ -216,6 +216,15 @@ void NetworkHandler::sendPacket(std::shared_ptr<VPacket> pkt)
         track->send(data, size);
     } catch (const std::exception &e) {
         PLOG_INFO << "Unable to send packet: " << e.what();
+    }
+}
+
+AVFormatContext* NetworkHandler::getRtpAvfcInput()
+{
+    if (rtp_depacketizer) {
+        return rtp_depacketizer->fctx;
+    } else {
+        return nullptr;
     }
 }
 
