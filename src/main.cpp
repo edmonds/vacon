@@ -195,21 +195,6 @@ int main(int argc, char *argv[])
 
         nh = NetworkHandler::Create(params);
         nh->connectWebRTC();
-    } else {
-        // If the network handler is disabled, start a thread to drain and discard
-        // the camera packet buffer.
-        threads.emplace_back(std::jthread { [](std::stop_token st) {
-            PLOG_DEBUG << "Starting camera packet buffer drain thread";
-            setThreadName("VCameraDrain");
-
-            while (!st.stop_requested()) {
-                std::shared_ptr<VPacket> pkt;
-                if (gOutgoingCameraPacketBuffer.wait_dequeue_timed(pkt, 250ms)) {
-                    PLOG_DEBUG << fmt::format("Dequeued packet @ {}", fmt::ptr(pkt->ptr));
-                }
-            }
-            PLOG_DEBUG << "Stopping camera packet buffer drain thread";
-        }});
     }
 
     // Start camera encoder thread.
@@ -245,6 +230,25 @@ int main(int argc, char *argv[])
             }
 
             PLOG_DEBUG << fmt::format("Stopping camera encoder thread");
+        }});
+
+        // Start a thread to drain the camera packet buffer. If the network handler
+        // is started, submit the packet for transmission to the peer, otherwise
+        // discard it.
+        threads.emplace_back(std::jthread { [&](std::stop_token st) {
+            PLOG_DEBUG << "Starting camera packet buffer drain thread";
+            setThreadName("VCameraDrain");
+
+            while (!st.stop_requested()) {
+                std::shared_ptr<VPacket> pkt;
+                if (gOutgoingCameraPacketBuffer.wait_dequeue_timed(pkt, 250ms)) {
+                    if (nh) {
+                        nh->sendPacket(pkt);
+                    }
+                }
+            }
+
+            PLOG_DEBUG << "Stopping camera packet buffer drain thread";
         }});
     }
 
