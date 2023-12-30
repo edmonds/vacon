@@ -24,7 +24,8 @@ class NetworkHandler {
         ~NetworkHandler();
 
         void connectWebRTC();
-        bool isConnected();
+        bool isConnectedToPeer();
+        void closeWebSocket();
 
     private:
         NetworkHandler() = default;

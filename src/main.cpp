@@ -249,10 +249,14 @@ int main(int argc, char *argv[])
     }
 
     if (nh) {
-        while (!nh->isConnected() && !gShuttingDown) {
+        while (!nh->isConnectedToPeer() && !gShuttingDown) {
             std::this_thread::sleep_for(5ms);
         }
         PLOG_FATAL << "READY !!!";
+
+        // Peer-to-peer connection is up, so close the connection to the
+        // signaling server.
+        nh->closeWebSocket();
     }
 
     while (!gShuttingDown) {

@@ -64,12 +64,19 @@ void NetworkHandler::connectWebRTC()
     ws->open(url);
 }
 
-bool NetworkHandler::isConnected()
+bool NetworkHandler::isConnectedToPeer()
 {
     if (peer) {
         return peer->state() == rtc::PeerConnection::State::Connected;
     }
     return false;
+}
+
+void NetworkHandler::closeWebSocket()
+{
+    if (ws->isOpen()) {
+        ws->close();
+    }
 }
 
 void NetworkHandler::onWsMessage(json message)
@@ -98,10 +105,6 @@ void NetworkHandler::onWsMessage(json message)
         auto sdp = message["sdp"].get<std::string>();
         auto description = rtc::Description(sdp, type);
         peer->setRemoteDescription(description);
-
-        // The answer has been received. Close down the WebSocket connection to
-        // the signaling server.
-        ws->close();
     }
 }
 
@@ -122,11 +125,6 @@ void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>&
             PLOG_DEBUG << "[PeerConnection] Sending WebSocket message: " << message_dump;
             if (auto ws = wws.lock()) {
                 ws->send(message_dump);
-                if (offer) {
-                    // The answer has been sent. Close down the WebSocket
-                    // connection to the signaling server.
-                    ws->close();
-                }
             }
         }
     });
