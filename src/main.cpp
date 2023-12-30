@@ -200,6 +200,8 @@ int main(int argc, char *argv[])
         // the camera packet buffer.
         threads.emplace_back(std::jthread { [](std::stop_token st) {
             PLOG_DEBUG << "Starting camera packet buffer drain thread";
+            setThreadName("VCameraDrain");
+
             while (!st.stop_requested()) {
                 std::shared_ptr<VPacket> pkt;
                 if (gOutgoingCameraPacketBuffer.wait_dequeue_timed(pkt, 250ms)) {
@@ -214,6 +216,7 @@ int main(int argc, char *argv[])
     if (args["--camera"] == true) {
         threads.emplace_back(std::jthread { [&](std::stop_token st) {
             PLOG_DEBUG << "Starting camera encoder thread";
+            setThreadName("VCameraEncoder");
 
             auto params = CameraEncoderParams {
                 .device                 = args.get<string>("--camera-device"),

@@ -2,6 +2,10 @@
 
 #include <cstdarg>
 
+#if defined(__linux__)
+# include <sys/prctl.h>
+#endif
+
 #include <plog/Init.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Formatters/TxtFormatter.h>
@@ -157,6 +161,13 @@ bool setupRealtimePriority()
 #endif
 
 	return true;
+}
+
+void setThreadName(const char *name)
+{
+#if defined(__linux__)
+    prctl(PR_SET_NAME, name);
+#endif
 }
 
 } // namespace vacon

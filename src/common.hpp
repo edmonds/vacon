@@ -37,5 +37,6 @@ plog::Severity ffmpegLogLevelToPlogSeverity(const int av_log_level);
 int plogSeverityToFfmpegLogLevel(const plog::Severity plog_severity);
 void setupLogging(const int verbosity);
 bool setupRealtimePriority();
+void setThreadName(const char *name);
 
 } // namespace vacon
