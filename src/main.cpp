@@ -147,7 +147,7 @@ static void parseArgs(int argc, char *argv[])
     }
 }
 
-static void signalTerminate(int signal __attribute__((unused)))
+static void signalTerminate(int signal __attribute__((unused)) = 0)
 {
     gShuttingDown = true;
     // Signal threads to stop.
@@ -156,7 +156,7 @@ static void signalTerminate(int signal __attribute__((unused)))
     }
 }
 
-static void signalUSR1(int signal __attribute__((unused)))
+static void signalUSR1(int signal __attribute__((unused)) = 0)
 {
     gSignalUSR1 = 1;
 }
