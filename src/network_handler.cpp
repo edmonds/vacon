@@ -176,4 +176,39 @@ void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>&
     }
 }
 
+void NetworkHandler::sendPacket(std::shared_ptr<VPacket> pkt)
+{
+    // Only send the packet if the connection is open.
+    if (!track || !track->isOpen()) {
+        return;
+    }
+
+    // Sample time is in microseconds, convert it to seconds.
+    auto elapsedSeconds = double(pkt->ptr->pts) / (1'000'000);
+
+    // Get elapsed time in clock rate.
+    uint32_t elapsedTimestamp = rtp_config->secondsToTimestamp(elapsedSeconds);
+
+    // Set new timestamp.
+    rtp_config->timestamp = rtp_config->startTimestamp + elapsedTimestamp;
+
+    // Get elapsed time in clock rate from last RTCP sender report.
+    auto reportElapsedTimestamp = rtp_config->timestamp - sender_reporter->lastReportedTimestamp();
+
+    // Check if last report was at least 1 second ago.
+    if (rtp_config->timestampToSeconds(reportElapsedTimestamp) > 1) {
+        sender_reporter->setNeedsToReport();
+    }
+
+    // Send the packet.
+    try {
+        auto data = reinterpret_cast<const std::byte *>(pkt->ptr->data);
+        auto size = pkt->ptr->size;
+        PLOG_VERBOSE << fmt::format("Sending packet @ {}, size {}", fmt::ptr(data), size);
+        track->send(data, size);
+    } catch (const std::exception &e) {
+        PLOG_INFO << "Unable to send packet: " << e.what();
+    }
+}
+
 } // namespace vacon

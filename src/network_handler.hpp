@@ -8,6 +8,7 @@
 #include <rtc/rtc.hpp>
 
 #include "common.hpp"
+#include "vpacket.hpp"
 
 namespace vacon {
 
@@ -26,6 +27,7 @@ class NetworkHandler {
         void connectWebRTC();
         bool isConnectedToPeer();
         void closeWebSocket();
+        void sendPacket(std::shared_ptr<VPacket>);
 
     private:
         NetworkHandler() = default;
