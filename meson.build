@@ -143,6 +143,7 @@ vacon_sources = [
   'src/common.cpp',
   'src/main.cpp',
   'src/network_handler.cpp',
+  'src/rtp_depacketizer.cpp',
   #'src/camera_sender.cpp',
   #'src/decoder_receiver.cpp',
   #'src/sink_receiver.cpp',
