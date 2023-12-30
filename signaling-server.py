@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 #
+# Vacon signaling server, based on:
+#
 # Python signaling server example for libdatachannel
 # Copyright (c) 2020 Paul-Louis Ageneau
 #
@@ -19,40 +21,52 @@ logger = logging.getLogger('websockets')
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
-clients = {}
-
+sessions = {}
 
 async def handle_websocket(websocket, path):
-    client_id = None
+    session_id = None
     try:
-        splitted = path.split('/')
-        splitted.pop(0)
-        client_id = splitted.pop(0)
-        print('Client {} connected'.format(client_id))
+        if not path.startswith('/v1/ooo/'):
+            return
+        session_id = path.partition('/v1/ooo/')[-1]
 
-        clients[client_id] = websocket
+        print('Client connected for session {}'.format(session_id))
+
+        if not session_id in sessions:
+            sessions[session_id] = { "peers": [ websocket ], "started": False }
+        else:
+            sessions[session_id]['peers'].append(websocket)
+
         while True:
+            session = sessions.get(session_id)
+            if len(session['peers']) >= 2 and session['started'] == False:
+                session['started'] = True
+                data = json.dumps({"type": "start_session"})
+                first_peer = session['peers'][0]
+                print('Session {}: {} sending {}'.format(session_id, first_peer.remote_address, data))
+                await first_peer.send(data)
             data = await websocket.recv()
-            print('Client {} << {}'.format(client_id, data))
-            message = json.loads(data)
-            destination_id = message['id']
-            destination_websocket = clients.get(destination_id)
-            if destination_websocket:
-                message['id'] = client_id
-                data = json.dumps(message)
-                print('Client {} >> {}'.format(destination_id, data))
-                await destination_websocket.send(data)
-            else:
-                print('Client {} not found'.format(destination_id))
+            print('Session {}: {} received {}'.format(session_id, websocket.remote_address, data))
 
+            for peer in session['peers']:
+                if peer != websocket:
+                    print('Session {}: {} sending {}'.format(session_id, peer.remote_address, data))
+                    await peer.send(data)
+
+    except websockets.exceptions.ConnectionClosedError:
+        print('Peer closed connection')
     except Exception as e:
         traceback.print_exception(e)
 
     finally:
-        if client_id:
-            del clients[client_id]
-            print('Client {} disconnected'.format(client_id))
-
+        if session_id:
+            if session_id in sessions:
+                if websocket in sessions[session_id]['peers']:
+                    print('Removing peer {} from session {}'.format(websocket.remote_address, session_id))
+                    sessions[session_id]['peers'].remove(websocket)
+                if len(sessions[session_id]['peers']) == 0:
+                    print('Deleting session {}, last peer disconnected'.format(session_id))
+                    del sessions[session_id]
 
 async def main():
     # Usage: ./server.py [[host:]port] [SSL certificate file]
@@ -72,7 +86,6 @@ async def main():
 
     server = await websockets.serve(handle_websocket, host, int(port), ssl=ssl_context)
     await server.wait_closed()
-
 
 if __name__ == '__main__':
     asyncio.run(main())
