@@ -1,5 +1,7 @@
 // License: CC0 / Public Domain
 
+#include <unistd.h>
+
 #define NK_IMPLEMENTATION
 #include "ui.h"
 
@@ -72,7 +74,17 @@ struct ui *ui_create(pl_gpu gpu)
     // Initialize font atlas using built-in font
     nk_font_atlas_init_default(&ui->atlas);
     nk_font_atlas_begin(&ui->atlas);
-    struct nk_font *font = nk_font_atlas_add_default(&ui->atlas, 20, NULL);
+
+    struct nk_font *font = NULL;
+
+    static const char *alt_font_fname = "/usr/share/fonts/truetype/croscore/Cousine-Bold.ttf";
+    if (access(alt_font_fname, R_OK) == 0) {
+        font = nk_font_atlas_add_from_file(&ui->atlas, alt_font_fname, 32, 0);
+    } else {
+        fprintf(stderr, "Could not find Cousine-Bold.ttf, falling back to default font\n");
+        font = nk_font_atlas_add_default(&ui->atlas, 32, NULL);
+    }
+
     struct pl_tex_params tparams = {
         .format = pl_find_named_fmt(gpu, "r8"),
         .sampleable = true,
