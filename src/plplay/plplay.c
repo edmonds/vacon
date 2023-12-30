@@ -76,7 +76,7 @@ static void uninit(struct plplay *p)
 
     // Free this before destroying the window to release associated GPU buffers
     avcodec_free_context(&p->codec);
-    avformat_free_context(p->format);
+    //avformat_free_context(p->format);
 
     ui_destroy(&p->ui);
     window_destroy(&p->win);
