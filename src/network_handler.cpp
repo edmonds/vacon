@@ -164,15 +164,23 @@ void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>&
 
     track->setMediaHandler(packetizer);
 
-    track->onMessage([](rtc::binary message) {
-        // This is an RTP packet.
-        PLOG_INFO << fmt::format("RECEIVED AN RTP PACKET !!! length {}", message.size());
-    }, nullptr);
+    track->onMessage([&](rtc::binary pkt) { this->receivePacket(pkt); }, nullptr);
 
     if (offer) {
         peer->setRemoteDescription(offer.value());
     } else {
         peer->setLocalDescription();
+    }
+
+    rtp_depacketizer = vacon::RtpDepacketizer::Create();
+}
+
+void NetworkHandler::receivePacket(rtc::binary pkt)
+{
+    // This is an RTP packet.
+    PLOG_VERBOSE << fmt::format("RECEIVED AN RTP PACKET !!! length {}", pkt.size());
+    if (this->rtp_depacketizer) {
+        this->rtp_depacketizer->submitRtpPacket(pkt);
     }
 }
 

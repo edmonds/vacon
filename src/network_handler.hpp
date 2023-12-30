@@ -8,6 +8,7 @@
 #include <rtc/rtc.hpp>
 
 #include "common.hpp"
+#include "rtp_depacketizer.hpp"
 #include "vpacket.hpp"
 
 namespace vacon {
@@ -31,6 +32,7 @@ class NetworkHandler {
 
     private:
         NetworkHandler() = default;
+        void receivePacket(rtc::binary);
 
         NetworkHandlerParams params;
 
@@ -40,6 +42,8 @@ class NetworkHandler {
         std::shared_ptr<rtc::RtcpSrReporter>            sender_reporter;
         std::shared_ptr<rtc::RtpPacketizationConfig>    rtp_config;
         std::shared_ptr<rtc::Track>                     track;
+
+        std::shared_ptr<vacon::RtpDepacketizer>         rtp_depacketizer;
 
         void onWsMessage(nlohmann::json message);
         void createPeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);
