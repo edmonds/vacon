@@ -12,6 +12,7 @@
 
 #include <pthread.h>
 #include <sched.h>
+#include <unistd.h>
 
 #include <argparse/argparse.hpp>
 #include <backward.hpp>
@@ -151,9 +152,20 @@ static void parseArgs(int argc, char *argv[])
     }
 }
 
-static void signalTerminate(int signal __attribute__((unused)) = 0)
+static void signalTerminate(int signal = 0)
 {
+    static unsigned user_anger = 0;
+    if ((signal == SIGINT || signal == SIGTERM) && ++user_anger > 1) {
+        puts("\nuser anger detected !!!\n");
+        _exit(EXIT_FAILURE);
+    }
+
     gShuttingDown = true;
+
+    // Signal the plplay thread to shut down. This is safe to call even if the
+    // plplay thread wasn't started.
+    plplay_shutdown();
+
     // Signal threads to stop.
     for (auto& thread : threads) {
         thread.request_stop();
@@ -242,7 +254,6 @@ int main(int argc, char *argv[])
         threads.emplace_back(std::jthread { [&](std::stop_token st) {
             PLOG_DEBUG << "Starting camera packet buffer drain thread ID " << std::this_thread::get_id();
             setThreadName("VCameraDrain");
-
             while (!st.stop_requested()) {
                 std::shared_ptr<VPacket> pkt;
                 if (gOutgoingCameraPacketBuffer.wait_dequeue_timed(pkt, 250ms)) {
@@ -251,7 +262,6 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-
             PLOG_DEBUG << "Stopping camera packet buffer drain thread ID " << std::this_thread::get_id();
         }});
     }
@@ -273,18 +283,17 @@ int main(int argc, char *argv[])
         if (auto avfc = nh->getRtpAvfcInput()) {
             // Start a thread to run plplay. This will itself start its own
             // thread to run the decode loop and then run the render loop. The
-            // plplay thread has to be separately signaled to shut down with
-            // plplay_shutdown().
+            // thread that plplay starts has to be separately signaled to shut
+            // down with plplay_shutdown().
             threads.emplace_back(std::jthread { [avfc]() {
                 PLOG_DEBUG << "Starting plplay video player thread ID " << std::this_thread::get_id();
-
                 if (auto ret = plplay_play(avfc)) {
                     PLOG_INFO << "plplay_play() failed with return code " << ret;
                 }
 
                 // If the player exited (e.g. user pressed the escape key),
                 // shut down the rest of the process.
-                signalTerminate();
+                gShuttingDown = true;
 
                 PLOG_DEBUG << "Stopping plplay video player thread ID " << std::this_thread::get_id();
             }});
@@ -295,12 +304,14 @@ int main(int argc, char *argv[])
 
     // Wait until it's time to shut down.
     while (!gShuttingDown) {
+        if (nh && !nh->isConnectedToPeer()) {
+            PLOG_INFO << "Lost connection to peer, shutting down";
+            break;
+        }
         std::this_thread::sleep_for(500ms);
     }
 
-    // Signal the plplay thread to shut down. This is safe to call even if the
-    // plplay thread wasn't started.
-    plplay_shutdown();
+    signalTerminate();
 
     // Join threads.
     PLOG_INFO << "Waiting for threads to exit...";
