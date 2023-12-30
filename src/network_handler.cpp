@@ -36,7 +36,7 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
 
 NetworkHandler::~NetworkHandler()
 {
-    PLOG_DEBUG << fmt::format("Destructor called on {}", fmt::ptr(this));
+    PLOG_VERBOSE << fmt::format("Destructor called on {}", fmt::ptr(this));
 }
 
 void NetworkHandler::connectWebRTC()

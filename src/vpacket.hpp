@@ -15,7 +15,7 @@ struct VPacket {
     {
         ptr = *packet;
         *packet = nullptr;
-        PLOG_DEBUG << fmt::format("Taking ownership of AVPacket @ {}", fmt::ptr(ptr));
+        PLOG_VERBOSE << fmt::format("Taking ownership of AVPacket @ {}", fmt::ptr(ptr));
     }
 
     VPacket(VPacket&& src_packet)
@@ -26,7 +26,7 @@ struct VPacket {
 
     ~VPacket()
     {
-        PLOG_DEBUG << fmt::format("Destroying AVPacket @ {}", fmt::ptr(ptr));
+        PLOG_VERBOSE << fmt::format("Destroying AVPacket @ {}", fmt::ptr(ptr));
         av_packet_free(&ptr);
     }
 };

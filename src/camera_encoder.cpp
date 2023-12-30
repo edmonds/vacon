@@ -48,7 +48,7 @@ std::unique_ptr<CameraEncoder> CameraEncoder::Create(const CameraEncoderParams& 
 
 CameraEncoder::~CameraEncoder()
 {
-    PLOG_DEBUG << fmt::format("Destructor called on {}", fmt::ptr(this));
+    PLOG_VERBOSE << fmt::format("Destructor called on {}", fmt::ptr(this));
     avcodec_free_context(&this->hw_ctx);
     av_buffer_unref(&this->hw_device_ctx);
     avcodec_free_context(&this->dec_ctx);

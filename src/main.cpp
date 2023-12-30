@@ -232,15 +232,12 @@ int main(int argc, char *argv[])
             auto ce = CameraEncoder::Create(params);
             if (ce) {
                 ce->encodePackets(st, [st](std::shared_ptr<VPacket> pkt) {
-                    PLOG_DEBUG << fmt::format("Got a packet @ {}, size {}", fmt::ptr(pkt->ptr), pkt->ptr->size);
+                    PLOG_VERBOSE << fmt::format("Got an encoded packet @ {}, size {}", fmt::ptr(pkt->ptr), pkt->ptr->size);
                     while (!st.stop_requested()) {
                         if (gOutgoingCameraPacketBuffer.wait_enqueue_timed(pkt, 250ms)) {
                             break;
-                        } else {
-                            PLOG_DEBUG << fmt::format("Trying to enqueue packet @ {}", fmt::ptr(pkt->ptr));
                         }
                     }
-                    PLOG_DEBUG << fmt::format("Enqueued packet @ {}", fmt::ptr(pkt->ptr));
 
                 });
             } else {
