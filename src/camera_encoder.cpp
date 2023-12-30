@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 
 #include "common.hpp"
+#include "vpacket.hpp"
 
 namespace vacon {
 
@@ -53,7 +54,6 @@ CameraEncoder::~CameraEncoder()
     avcodec_free_context(&this->dec_ctx);
     avformat_close_input(&this->fmt_ctx);
     av_packet_free(&this->pkt);
-    av_packet_free(&this->enc_pkt);
     av_frame_free(&this->hw_frame);
     av_frame_free(&this->frame);
 }
@@ -218,11 +218,9 @@ bool CameraEncoder::initVaapiDevice()
     this->frame = av_frame_alloc();
     this->hw_frame = av_frame_alloc();
     this->pkt = av_packet_alloc();
-    this->enc_pkt = av_packet_alloc();
     assert(this->frame);
     assert(this->hw_frame);
     assert(this->pkt);
-    assert(this->enc_pkt);
 
     // Success.
     return true;
@@ -269,7 +267,7 @@ bool CameraEncoder::initVaapiHwFramePool()
 }
 
 bool CameraEncoder::encodePackets(std::stop_token st,
-                                  std::function<void(const AVPacket*)> callback)
+                                  std::function<void(std::shared_ptr<VPacket>)> callback)
 {
     this->callback = callback;
 
@@ -403,27 +401,34 @@ bool CameraEncoder::encodeVideoFrame(const AVFrame *hw_frame)
     }
 
     // Read encoded packet from the hardware encoder.
+    AVPacket *enc_pkt = nullptr;
     for (;;) {
-        // Cleanup.
-        av_packet_unref(this->enc_pkt);
+        // Initialize a new packet to hold the encoded contents.
+        if (enc_pkt == nullptr) {
+            enc_pkt = av_packet_alloc();
+            assert(enc_pkt);
+        }
 
         // Get the next packet.
         ret = avcodec_receive_packet(this->hw_ctx, enc_pkt);
-        if (ret < 0) {
-            if (ret == AVERROR(EAGAIN)) {
-                // No output packet available, need to send more input.
-                return true;
-            } else {
-                return false;
-            }
+        if (ret) {
+            break;
         }
 
-        // Write encoded packet using callback.
-        this->callback(enc_pkt);
+        // Write encoded packet using callback. Transfer ownership of `enc_pkt`
+        // to the callback (and erase the pointer on the stack here) by
+        // wrapping it in a VPacket.
+        this->callback(std::make_shared<VPacket>(&enc_pkt));
     }
 
-    // Success.
-    return true;
+    // Cleanup. This `enc_pkt` is left over from avcodec_receive_packet()
+    // returning EAGAIN.
+    av_packet_free(&enc_pkt);
+
+    // If avcodec_receive_packet() above returned a packet or EAGAIN, return
+    // success. If avcodec_receive_packet() failed for another reason besides
+    // EAGAIN, return failure.
+    return (ret == 0) || (ret == AVERROR(EAGAIN));
 }
 
 } // namespace vacon

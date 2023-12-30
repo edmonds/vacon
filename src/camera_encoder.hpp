@@ -1,9 +1,12 @@
+#pragma once
+
 #include <functional>
 #include <memory>
 #include <stop_token>
 #include <string>
 
 #include "common.hpp"
+#include "vpacket.hpp"
 
 namespace vacon {
 
@@ -24,14 +27,15 @@ class CameraEncoder {
         CameraEncoder(CameraEncoder&&) = default;
         ~CameraEncoder();
 
-        bool encodePackets(std::stop_token st, std::function<void(const AVPacket*)> callback);
+        bool encodePackets(std::stop_token st,
+                           std::function<void(std::shared_ptr<VPacket>)> callback);
         bool processPacket(const AVPacket *packet);
         bool processFrame(const AVFrame *frame);
         bool encodeVideoFrame(const AVFrame *hw_frame);
 
     private:
         CameraEncoder() = default;
-        std::function<void(const AVPacket*)> callback;
+        std::function<void(std::shared_ptr<VPacket>)> callback;
 
         bool initCameraDevice();
         bool initCodecContext();
@@ -42,7 +46,7 @@ class CameraEncoder {
 
         // Video data being processed.
         AVFrame *frame, *hw_frame;
-        AVPacket *pkt, *enc_pkt;
+        AVPacket *pkt;
 
         // Things to do with the v4l2 input.
         int video_stream_idx;
