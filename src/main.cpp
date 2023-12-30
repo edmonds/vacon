@@ -200,7 +200,7 @@ int main(int argc, char *argv[])
     // Start camera encoder thread.
     if (args["--camera"] == true) {
         threads.emplace_back(std::jthread { [&](std::stop_token st) {
-            PLOG_DEBUG << "Starting camera encoder thread";
+            PLOG_DEBUG << "Starting camera encoder thread ID " << std::this_thread::get_id();
             setThreadName("VCameraEncoder");
 
             auto params = CameraEncoderParams {
@@ -229,14 +229,14 @@ int main(int argc, char *argv[])
                 PLOG_FATAL << "Failed to create camera encoder";
             }
 
-            PLOG_DEBUG << fmt::format("Stopping camera encoder thread");
+            PLOG_DEBUG << "Stopping camera encoder thread ID " << std::this_thread::get_id();
         }});
 
         // Start a thread to drain the camera packet buffer. If the network handler
         // is started, submit the packet for transmission to the peer, otherwise
         // discard it.
         threads.emplace_back(std::jthread { [&](std::stop_token st) {
-            PLOG_DEBUG << "Starting camera packet buffer drain thread";
+            PLOG_DEBUG << "Starting camera packet buffer drain thread ID " << std::this_thread::get_id();
             setThreadName("VCameraDrain");
 
             while (!st.stop_requested()) {
@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
                 }
             }
 
-            PLOG_DEBUG << "Stopping camera packet buffer drain thread";
+            PLOG_DEBUG << "Stopping camera packet buffer drain thread ID " << std::this_thread::get_id();
         }});
     }
 
@@ -268,9 +268,13 @@ int main(int argc, char *argv[])
     }
 
     // Join threads.
+    PLOG_INFO << "Waiting for threads to exit...";
     for (auto& thread : threads) {
         if (thread.joinable()) {
+            PLOG_DEBUG << "Trying to join thread ID " << thread.get_id();
             thread.join();
+        } else {
+            PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
         }
     }
 

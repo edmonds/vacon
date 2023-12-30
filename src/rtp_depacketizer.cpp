@@ -191,7 +191,7 @@ int RtpDepacketizer::readAvioPacketRTP(void *opaque, uint8_t *buf, int buf_size)
 
     for (;;) {
         rtp_packet_queue.wait_dequeue(packet);
-        PLOG_DEBUG << fmt::format("Dequeued RTP packet size {}", packet.size());
+        PLOG_VERBOSE << fmt::format("Dequeued RTP packet size {}", packet.size());
         if (gSignalUSR1) {
             gSignalUSR1 = 0;
             PLOG_DEBUG << "Dropping a packet due to signal!";
@@ -208,7 +208,7 @@ int RtpDepacketizer::readAvioPacketRTP(void *opaque, uint8_t *buf, int buf_size)
     count_rtp_bytes += packet.size();
     if ((count_rtp_packets % 10000) == 0) {
         PLOG_INFO
-            << fmt::format("Received {} packets, {} bytes from RTP peer, queue size {}, max queue capacity {}",
+            << fmt::format("Received {} RTP packets, {} bytes from peer, queue size {}, max queue capacity {}",
                            count_rtp_packets,
                            count_rtp_bytes,
                            rtp_packet_queue.size_approx(),
@@ -224,7 +224,7 @@ int RtpDepacketizer::writeAvioPacketRTP(void *opaque __attribute__((unused)),
                                         /* const */ uint8_t *buf __attribute__((unused)),
                                         int buf_size)
 {
-    PLOG_DEBUG << fmt::format("ffmpeg wants to write {} bytes to RTP peer, ignoring", buf_size);
+    PLOG_VERBOSE << fmt::format("ffmpeg wants to write {} bytes to RTP peer, ignoring", buf_size);
     return buf_size;
 }
 
