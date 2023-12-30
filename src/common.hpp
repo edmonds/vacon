@@ -2,6 +2,7 @@
 
 #include <cstdarg>
 #include <csignal>
+#include <memory>
 #include <string>
 
 #include <fmt/format.h>
@@ -26,6 +27,8 @@ av_always_inline std::string av_err2string(int errnum) {
 #endif
 
 namespace vacon {
+
+template <class T> std::weak_ptr<T> make_weak_ptr(std::shared_ptr<T> ptr) { return ptr; }
 
 extern volatile std::sig_atomic_t gSignalUSR1;
 
