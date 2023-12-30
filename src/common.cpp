@@ -85,7 +85,7 @@ int plogSeverityToFfmpegLogLevel(const plog::Severity plog_severity)
     case plog::info:    av_log_level = AV_LOG_INFO;     break;
     case plog::debug:   av_log_level = AV_LOG_VERBOSE;  break;
     case plog::verbose: // Fallthrough.
-    default:            av_log_level = AV_LOG_DEBUG;    break;
+    default:            av_log_level = AV_LOG_VERBOSE;  break;
     }
 
     return av_log_level;
