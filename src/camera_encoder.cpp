@@ -29,17 +29,17 @@ std::unique_ptr<CameraEncoder> CameraEncoder::Create(const CameraEncoderParams& 
     ce->params = _params;
 
     if (!ce->initCameraDevice()) {
-        PLOG_DEBUG << "initCameraDevice() failed";
+        PLOG_FATAL << "initCameraDevice() failed";
         return nullptr;
     }
 
     if (!ce->initCodecContext()) {
-        PLOG_DEBUG << "initCodecContext() failed";
+        PLOG_FATAL << "initCodecContext() failed";
         return nullptr;
     }
 
     if (!ce->initVaapiDevice()) {
-        PLOG_DEBUG << "initVaapiDevice() failed";
+        PLOG_FATAL << "initVaapiDevice() failed";
         return nullptr;
     }
 
