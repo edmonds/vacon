@@ -120,6 +120,10 @@ static void parseArgs(int argc, char *argv[])
         .scan<'i', int>()
         .nargs(1);
 
+    args.add_argument("-p", "--player")
+        .help("start video player (requires network handler)")
+        .flag();
+
     args.add_argument("-n", "--network")
         .help("start network handler")
         .flag();
@@ -252,6 +256,7 @@ int main(int argc, char *argv[])
         }});
     }
 
+    // Wait for the NetworkHandler to bring up the peer-to-peer connection.
     if (nh) {
         while (!nh->isConnectedToPeer() && !gShuttingDown) {
             std::this_thread::sleep_for(5ms);
@@ -263,9 +268,39 @@ int main(int argc, char *argv[])
         nh->closeWebSocket();
     }
 
+    // Start video player.
+    if (args["--player"] == true && nh && nh->isConnectedToPeer()) {
+        if (auto avfc = nh->getRtpAvfcInput()) {
+            // Start a thread to run plplay. This will itself start its own
+            // thread to run the decode loop and then run the render loop. The
+            // plplay thread has to be separately signaled to shut down with
+            // plplay_shutdown().
+            threads.emplace_back(std::jthread { [avfc]() {
+                PLOG_DEBUG << "Starting plplay video player thread ID " << std::this_thread::get_id();
+
+                if (auto ret = plplay_play(avfc)) {
+                    PLOG_INFO << "plplay_play() failed with return code " << ret;
+                }
+
+                // If the player exited (e.g. user pressed the escape key),
+                // shut down the rest of the process.
+                signalTerminate();
+
+                PLOG_DEBUG << "Stopping plplay video player thread ID " << std::this_thread::get_id();
+            }});
+        } else {
+            PLOG_FATAL << "NetworkHandler is connected to peer, but no RTP depacketizer ?!";
+        }
+    }
+
+    // Wait until it's time to shut down.
     while (!gShuttingDown) {
         std::this_thread::sleep_for(500ms);
     }
+
+    // Signal the plplay thread to shut down. This is safe to call even if the
+    // plplay thread wasn't started.
+    plplay_shutdown();
 
     // Join threads.
     PLOG_INFO << "Waiting for threads to exit...";

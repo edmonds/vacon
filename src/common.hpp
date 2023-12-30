@@ -9,12 +9,17 @@
 #include <plog/Log.h>
 
 extern "C" {
+
 #include <libavcodec/avcodec.h>
 #include <libavdevice/avdevice.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
 #include <libavutil/pixdesc.h>
-}
+
+extern int plplay_play(AVFormatContext *);
+extern void plplay_shutdown(void);
+
+} // extern "C"
 
 // Replacement for the ffmpeg av_err2str() macro which doesn't work in C++.
 #ifdef av_err2str
