@@ -13,6 +13,7 @@ project(
     'warning_level=2',
     'werror=false',
     'wrap_mode=forcefallback',
+    'glfw:display-api=wayland',
   ]
 )
 
@@ -31,10 +32,6 @@ foreach ident : ['pthread_setattr_default_np']
   endif
 endforeach
 
-# egl
-
-cc.check_header('EGL/egl.h', required: true)
-
 # ffmpeg
 
 ffmpeg = [
@@ -46,16 +43,12 @@ ffmpeg = [
 
 # glfw
 
-glfw_opts = cmake.subproject_options()
-glfw_opts.add_cmake_defines({
-  'GLFW_USE_WAYLAND':     true,
-  'GLFW_BUILD_DOCS':      false,
-  'GLFW_BUILD_EXAMPLES':  false,
-  'GLFW_BUILD_TESTS':     false,
-})
-glfw_cmake = cmake.subproject('glfw', options: glfw_opts)
+cc.check_header('EGL/egl.h', required: true) # For GLFW_EXPOSE_NATIVE_EGL
 
-glfw = glfw_cmake.dependency('glfw')
+glfw = dependency('glfw3', required: false)
+if not glfw.found() # Fallback to the wrap.
+  glfw = dependency('glfw3')
+endif
 
 # libdatachannel
 
