@@ -31,21 +31,22 @@ endforeach
 
 # libdatachannel
 
-libdatachannel_opts = cmake.subproject_options()
-if get_option('default_library') == 'static'
-  libdatachannel_opts.add_cmake_defines({
-    'OPENSSL_USE_STATIC_LIBS': true,
-  })
-endif
-libdatachannel_cmake = cmake.subproject('libdatachannel', options: libdatachannel_opts)
+libdatachannel = dependency('LibDataChannel', required: false)
+if not libdatachannel.found()
+  # Fallback to the wrap.
+  libdatachannel_opts = cmake.subproject_options()
+    libdatachannel_opts.add_cmake_defines({
+      'OPENSSL_USE_STATIC_LIBS': true,
+    })
+  libdatachannel_cmake = cmake.subproject('libdatachannel', options: libdatachannel_opts)
 
-libdatachannel = [
-  libdatachannel_cmake.dependency('datachannel-static'),
-  libdatachannel_cmake.dependency('juice-static'),
-  libdatachannel_cmake.dependency('nlohmann_json'),
-  libdatachannel_cmake.dependency('srtp2'),
-  libdatachannel_cmake.dependency('usrsctp'),
-]
+  libdatachannel = [
+    libdatachannel_cmake.dependency('datachannel-static'),
+    libdatachannel_cmake.dependency('juice-static'),
+    libdatachannel_cmake.dependency('srtp2'),
+    libdatachannel_cmake.dependency('usrsctp'),
+  ]
+endif
 
 # ffmpeg
 
