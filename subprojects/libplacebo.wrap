@@ -3,4 +3,4 @@ url = https://github.com/haasn/libplacebo.git
 revision = head
 depth = 1
 clone-recursive = true
-diff_files = libplacebo/version_h.patch
+diff_files = libplacebo/version_h.patch, libplacebo/glad_compiler_quiet.patch

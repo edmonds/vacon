@@ -1,0 +1,13 @@
+diff --git a/src/opengl/include/glad/meson.build b/src/opengl/include/glad/meson.build
+index 05b3f023..9ba17105 100644
+--- a/src/opengl/include/glad/meson.build
++++ b/src/opengl/include/glad/meson.build
+@@ -17,7 +17,7 @@ glad = custom_target('gl.h',
+   output: 'gl.h',
+   env: python_env,
+   command: [
+-    python, '-m', 'glad', '--out-path=@OUTDIR@/../../',
++    python, '-m', 'glad', '--quiet', '--out-path=@OUTDIR@/../../',
+     '--reproducible', '--merge', '--api=gl:core,gles2,egl',
+     '--extensions=' + ','.join(gl_extensions), 'c', '--header-only', '--mx'
+   ] + (opengl_link.allowed() ? ['--loader'] : [])
