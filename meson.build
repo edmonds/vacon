@@ -17,8 +17,7 @@ project(
   ]
 )
 
-add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: 'c')
-add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: 'cpp')
+add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: ['c', 'cpp'])
 
 cc = meson.get_compiler('c')
 cpp = meson.get_compiler('cpp')
