@@ -71,6 +71,7 @@ backward = dependency('backward-cpp')
 fmt = dependency('fmt', version: '>9', static: true)
 
 libplacebo = dependency('libplacebo',
+  version: '>7',
   default_options: {
     'default_library':  'static',
     'opengl':           'enabled',
