@@ -8,6 +8,7 @@ project(
     'c_std=gnu17',
     'cpp_std=c++20',
     'debug=true',
+    'default_library=static',
     'optimization=3',
     'warning_level=2',
     'werror=false',
