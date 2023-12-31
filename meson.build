@@ -66,7 +66,7 @@ glfw = dependency('glfw3')
 
 argparse = dependency('argparse', version: '>=3')
 
-backward = dependency('backward-cpp')
+backward = dependency('backward-cpp', required: false)
 
 fmt = dependency('fmt', version: '>9')
 
@@ -127,7 +127,6 @@ plplay_static = static_library('plplay',
 plplay = declare_dependency(link_with: plplay_static)
 
 vacon_sources = [
-  'src/backward.cpp',
   'src/camera_encoder.cpp',
   'src/common.cpp',
   'src/main.cpp',
@@ -139,6 +138,10 @@ vacon_sources = [
   #'src/v4l2_ffmpeg_input_vaapi_encode.c',
   #'src/video_receiver.cpp',
 ]
+
+if backward.found()
+  vacon_sources += 'src/backward.cpp'
+endif
 
 vacon_dependencies = [
   argparse,
