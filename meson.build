@@ -34,9 +34,11 @@ endforeach
 # libdatachannel
 
 libdatachannel_opts = cmake.subproject_options()
-libdatachannel_opts.add_cmake_defines({
-  'OPENSSL_USE_STATIC_LIBS': true,
-})
+if get_option('default_library') == 'static'
+  libdatachannel_opts.add_cmake_defines({
+    'OPENSSL_USE_STATIC_LIBS': true,
+  })
+endif
 libdatachannel_cmake = cmake.subproject('libdatachannel', options: libdatachannel_opts)
 
 libdatachannel = [
