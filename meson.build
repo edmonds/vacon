@@ -68,7 +68,7 @@ argparse = dependency('argparse', version: '>=3')
 
 backward = dependency('backward-cpp')
 
-fmt = dependency('fmt', version: '>9', static: true)
+fmt = dependency('fmt', version: '>9')
 
 libplacebo = dependency('libplacebo',
   version: '>7',
