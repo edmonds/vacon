@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstddef>
 #include <memory>
@@ -38,6 +39,10 @@ class RtpDepacketizer {
 
         AVIOContext *rtp_ioctx;
         AVIOContext *sdp_ioctx;
+
+        int count_rtp_packets = -1;
+        int count_rtp_bytes = 0;
+        std::chrono::time_point<std::chrono::steady_clock> t_last;
 };
 
 } // namespace vacon

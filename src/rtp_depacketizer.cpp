@@ -1,6 +1,7 @@
 #include "rtp_depacketizer.hpp"
 
 #include <cassert>
+#include <chrono>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -9,6 +10,8 @@
 #include <rtc/rtc.hpp>
 
 #include "common.hpp"
+
+using namespace std::chrono_literals;
 
 namespace vacon {
 
@@ -143,7 +146,7 @@ bool RtpDepacketizer::initFfmpeg()
             reinterpret_cast<unsigned char*>(this->buf.data()), // buffer
             this->buf.size(),                                   // buffer size
             1,                                                  // write_flag
-            static_cast<void*>(&this->rtp_packet_queue),        // opaque
+            static_cast<void*>(this),                           // opaque
             readAvioPacketRTP,                                  // read_packet
             writeAvioPacketRTP,                                 // write_packet
             nullptr);                                           // seek
@@ -182,15 +185,14 @@ int RtpDepacketizer::readAvioPacketString(void *opaque, uint8_t *buf, int buf_si
 
 int RtpDepacketizer::readAvioPacketRTP(void *opaque, uint8_t *buf, int buf_size)
 {
-    moodycamel::BlockingReaderWriterQueue<rtc::binary> &rtp_packet_queue =
-        *(static_cast<moodycamel::BlockingReaderWriterQueue<rtc::binary>*>(opaque));
+    RtpDepacketizer *dpkt = static_cast<RtpDepacketizer*>(opaque);
+    if (dpkt == nullptr) {
+        return 0;
+    }
 
     rtc::binary packet;
-    static long count_rtp_packets = 0;
-    static long count_rtp_bytes = 0;
-
     for (;;) {
-        rtp_packet_queue.wait_dequeue(packet);
+        dpkt->rtp_packet_queue.wait_dequeue(packet);
         PLOG_VERBOSE << fmt::format("Dequeued RTP packet size {}", packet.size());
         if (gSignalUSR1) {
             gSignalUSR1 = 0;
@@ -201,19 +203,39 @@ int RtpDepacketizer::readAvioPacketRTP(void *opaque, uint8_t *buf, int buf_size)
         }
     }
 
+    auto t_now = std::chrono::steady_clock::now();
+    if (dpkt->count_rtp_packets == -1) {
+        dpkt->count_rtp_packets = 0;
+        dpkt->t_last = t_now;
+    }
+
+    dpkt->count_rtp_packets += 1;
+    dpkt->count_rtp_bytes += packet.size();
+
+    auto t_diff = t_now - dpkt->t_last;
+    if (t_diff >= 1s) {
+        auto td_interval = std::chrono::duration<double>(t_diff).count();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_diff);
+        auto Mbps = (dpkt->count_rtp_bytes / 125000.0) / td_interval;
+
+        PLOG_INFO
+            << "Received "
+            << dpkt->count_rtp_packets
+            << " incoming RTP packets in "
+            << ms
+            << ", "
+            << Mbps
+            << " Mbps, "
+            << dpkt->rtp_packet_queue.size_approx()
+            << " queued packets waiting";
+
+        dpkt->t_last = t_now;
+        dpkt->count_rtp_packets = 0;
+        dpkt->count_rtp_bytes = 0;
+    }
+
     assert(packet.size() > 0);
     assert((int)packet.size() <= buf_size);
-
-    count_rtp_packets += 1;
-    count_rtp_bytes += packet.size();
-    if ((count_rtp_packets % 10000) == 0) {
-        PLOG_INFO
-            << fmt::format("Received {} RTP packets, {} bytes from peer, queue size {}, max queue capacity {}",
-                           count_rtp_packets,
-                           count_rtp_bytes,
-                           rtp_packet_queue.size_approx(),
-                           rtp_packet_queue.max_capacity());
-    }
 
     memcpy(buf, packet.data(), packet.size());
 
