@@ -5,7 +5,6 @@ project(
   version: '0.1.0',
   meson_version: '>=1.2.0',
   default_options: [
-    'b_lto=true',
     'c_std=gnu17',
     'cpp_std=c++20',
     'debug=true',
