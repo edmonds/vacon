@@ -9,7 +9,6 @@
 
 #include "common.h"
 #include "window.h"
-#include "utils.h"
 #include "plplay.h"
 #include "pl_clock.h"
 #include "pl_thread.h"
@@ -742,24 +741,6 @@ int plplay_play(AVFormatContext *format)
 
     if (!init_codec(p))
         goto error;
-
-    const char *cache_dir = get_cache_dir(&(char[512]) {0});
-    if (cache_dir) {
-        int ret = snprintf(p->cache_file, sizeof(p->cache_file), "%s/plplay.cache", cache_dir);
-        if (ret > 0 && (size_t)ret < sizeof(p->cache_file)) {
-            p->cache = pl_cache_create(pl_cache_params(
-                .log             = p->log,
-                .max_total_size  = 50 << 20, // 50 MB
-            ));
-            pl_gpu_set_cache(p->win->gpu, p->cache);
-            FILE *file = fopen(p->cache_file, "rb");
-            if (file) {
-                pl_cache_load_file(p->cache, file);
-                p->cache_sig = pl_cache_signature(p->cache);
-                fclose(file);
-            }
-        }
-    }
 
     p->queue = pl_queue_create(p->win->gpu);
     int ret = pl_thread_create(&p->decoder_thread, decode_loop, p);
