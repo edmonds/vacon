@@ -32,6 +32,22 @@ foreach ident : ['pthread_setattr_default_np']
   endif
 endforeach
 
+# libdatachannel
+
+libdatachannel_opts = cmake.subproject_options()
+libdatachannel_opts.add_cmake_defines({
+  'OPENSSL_USE_STATIC_LIBS': true,
+})
+libdatachannel_cmake = cmake.subproject('libdatachannel', options: libdatachannel_opts)
+
+libdatachannel = [
+  libdatachannel_cmake.dependency('datachannel-static'),
+  libdatachannel_cmake.dependency('juice-static'),
+  libdatachannel_cmake.dependency('nlohmann_json'),
+  libdatachannel_cmake.dependency('srtp2'),
+  libdatachannel_cmake.dependency('usrsctp'),
+]
+
 # ffmpeg
 
 ffmpeg = [
@@ -49,24 +65,6 @@ glfw = dependency('glfw3', required: false)
 if not glfw.found() # Fallback to the wrap.
   glfw = dependency('glfw3')
 endif
-
-# libdatachannel
-
-libdatachannel_opts = cmake.subproject_options()
-libdatachannel_opts.add_cmake_defines({
-  'OPENSSL_USE_STATIC_LIBS': true,
-})
-libdatachannel_cmake = cmake.subproject('libdatachannel', options: libdatachannel_opts)
-
-#message('Available CMake targets in libdatachannel_cmake:\n - ' + '\n - '.join(libdatachannel_cmake.target_list()))
-
-libdatachannel = [
-  libdatachannel_cmake.dependency('datachannel-static'),
-  libdatachannel_cmake.dependency('juice-static'),
-  libdatachannel_cmake.dependency('nlohmann_json'),
-  libdatachannel_cmake.dependency('srtp2'),
-  libdatachannel_cmake.dependency('usrsctp'),
-]
 
 # other dependencies
 
