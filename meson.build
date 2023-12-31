@@ -33,7 +33,6 @@ endforeach
 
 libdatachannel = dependency('LibDataChannel', required: false)
 if not libdatachannel.found()
-  # Fallback to the wrap.
   libdatachannel_opts = cmake.subproject_options()
     libdatachannel_opts.add_cmake_defines({
       'OPENSSL_USE_STATIC_LIBS': true,
@@ -61,11 +60,7 @@ ffmpeg = [
 
 cc.check_header('EGL/egl.h', required: true) # For GLFW_EXPOSE_NATIVE_EGL
 
-glfw = dependency('glfw3', required: false)
-if not glfw.found()
-  # Fallback to the wrap.
-  glfw = dependency('glfw3')
-endif
+glfw = dependency('glfw3')
 
 # other dependencies
 
@@ -92,11 +87,7 @@ libplacebo = dependency('libplacebo',
   }
 )
 
-nlohmann_json = dependency('nlohmann_json', required: false)
-if not nlohmann_json.found()
-  # Fallback to the wrap.
-  nlohmann_json = dependency('nlohmann_json')
-endif
+nlohmann_json = dependency('nlohmann_json')
 
 nuklear = dependency('nuklear')
 
