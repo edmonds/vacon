@@ -147,7 +147,11 @@ static void parseArgs(int argc, char *argv[])
     try {
         args.parse_args(argc, argv);
     } catch (const std::exception& err) {
-        std::cerr << "vacon: Error parsing arguments: " << err.what() << std::endl;
+        std::cerr
+            << "vacon: Error parsing arguments: "
+            << err.what()
+            << std::endl << std::endl
+            << args;
         exit(EXIT_FAILURE);
     }
 }
