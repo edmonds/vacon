@@ -1,10 +1,2 @@
-/argparse-*/
-/backward-cpp-*/
-/fmt-*/
-/glfw/
-/libdatachannel/
-/libplacebo/
-/nuklear/
-/packagecache/
-/plog-*/
-/readerwriterqueue/
+/*/
+!packagefiles/
