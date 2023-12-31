@@ -63,7 +63,8 @@ ffmpeg = [
 cc.check_header('EGL/egl.h', required: true) # For GLFW_EXPOSE_NATIVE_EGL
 
 glfw = dependency('glfw3', required: false)
-if not glfw.found() # Fallback to the wrap.
+if not glfw.found()
+  # Fallback to the wrap.
   glfw = dependency('glfw3')
 endif
 
@@ -91,6 +92,12 @@ libplacebo = dependency('libplacebo',
     'xxhash':           'disabled',
   }
 )
+
+nlohmann_json = dependency('nlohmann_json', required: false)
+if not nlohmann_json.found()
+  # Fallback to the wrap.
+  nlohmann_json = dependency('nlohmann_json')
+endif
 
 nuklear = dependency('nuklear')
 
@@ -149,6 +156,7 @@ vacon_dependencies = [
   fmt,
   libdatachannel,
   libplacebo,
+  nlohmann_json,
   plog,
   plplay,
   readerwriterqueue,
