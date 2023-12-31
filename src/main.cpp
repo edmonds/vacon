@@ -257,8 +257,32 @@ int main(int argc, char *argv[])
             while (!st.stop_requested()) {
                 std::shared_ptr<VPacket> pkt;
                 if (gOutgoingCameraPacketBuffer.wait_dequeue_timed(pkt, 250ms)) {
+                    static auto t_start = std::chrono::steady_clock::now();
+                    static auto t_last = t_start;
+
                     if (nh) {
                         nh->sendPacket(pkt);
+                    }
+
+                    static size_t count_frames = 0;
+                    ++count_frames;
+
+                    auto t_now = std::chrono::steady_clock::now();
+                    auto t_diff = t_now - t_last;
+                    if (t_diff >= 1s) {
+                        auto t_interval = t_now - t_last;
+                        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_interval);
+                        auto fps = count_frames / std::chrono::duration<double>(t_interval).count();
+                        PLOG_INFO
+                            << "Processed "
+                            << count_frames
+                            << " outgoing camera frames in "
+                            << ms
+                            << ", "
+                            << fps
+                            << " fps";
+                        t_last = t_now;
+                        count_frames = 0;
                     }
                 }
             }
