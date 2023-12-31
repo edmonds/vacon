@@ -129,11 +129,6 @@ vacon_sources = [
   'src/main.cpp',
   'src/network_handler.cpp',
   'src/rtp_depacketizer.cpp',
-  #'src/camera_sender.cpp',
-  #'src/decoder_receiver.cpp',
-  #'src/sink_receiver.cpp',
-  #'src/v4l2_ffmpeg_input_vaapi_encode.c',
-  #'src/video_receiver.cpp',
 ]
 
 if backward.found()
