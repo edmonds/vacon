@@ -10,9 +10,7 @@ libdwarf = cpp.find_library(
   required: true,
 )
 
-libunwind = dependency('libunwind', required: true)
-
-deps = [ libelf, libdwarf, libunwind ]
+deps = [ libelf, libdwarf ]
 
 backward_dep = declare_dependency(
   dependencies: deps,
