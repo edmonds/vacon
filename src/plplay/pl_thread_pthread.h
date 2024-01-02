@@ -19,6 +19,7 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <sys/prctl.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -134,4 +135,9 @@ static inline bool pl_thread_sleep(double t)
     ts.tv_nsec = (t - ts.tv_sec) * 1e9;
 
     return nanosleep(&ts, NULL) == 0;
+}
+
+static inline void set_thread_name(const char *name)
+{
+    prctl(PR_SET_NAME, name);
 }

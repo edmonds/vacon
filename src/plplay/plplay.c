@@ -274,6 +274,8 @@ static int try_avframe_derive(const AVFrame *frame)
 
 static PL_THREAD_VOID decode_loop(void *arg)
 {
+    set_thread_name("VPlayerDecode");
+
     int ret;
     struct plplay *p = arg;
     AVPacket *packet = av_packet_alloc();
@@ -497,6 +499,8 @@ static bool render_frame(struct plplay *p, const struct pl_swapchain_frame *fram
 
 static bool render_loop(struct plplay *p)
 {
+    set_thread_name("VPlayerRender");
+
     pl_options opts = p->opts;
 
     struct pl_queue_params qparams = *pl_queue_params(
