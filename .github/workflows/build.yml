@@ -1,0 +1,169 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*.*.*" ]
+
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout Vacon
+      uses: actions/checkout@v4
+
+    - name: Checkout FFmpeg
+      uses: actions/checkout@v4
+      with:
+        repository: FFmpeg/FFmpeg
+        ref: "n6.1.1"
+        path: ffmpeg
+
+    - name: Install meson and ninja
+      run: |
+        sudo pip install meson ninja
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends -V \
+          build-essential \
+          ca-certificates \
+          cmake \
+          debhelper \
+          git \
+          libdrm-dev \
+          libdwarf-dev \
+          libegl-dev \
+          libelf-dev \
+          libssl-dev \
+          libunwind-dev \
+          libva-dev \
+          libwayland-dev \
+          libxkbcommon-dev \
+          linux-libc-dev \
+          meson \
+          ninja-build \
+          pkg-config \
+          wayland-protocols \
+        ;
+
+    - name: Build FFmpeg
+      working-directory: "./ffmpeg"
+      run: |
+        mkdir build
+        cd build
+        $(pwd)/../configure \
+          --prefix=/opt/vacon \
+          --disable-everything \
+          --enable-avcodec \
+          --enable-avdevice \
+          --enable-avfilter \
+          --enable-avformat \
+          --enable-avutil \
+          --enable-demuxer=av1 \
+          --enable-demuxer=h264 \
+          --enable-demuxer=hevc \
+          --enable-demuxer=mjpeg \
+          --enable-demuxer=rawvideo \
+          --enable-demuxer=rtp \
+          --enable-demuxer=rtsp \
+          --enable-encoder=av1_vaapi \
+          --enable-encoder=h264_vaapi \
+          --enable-encoder=hevc_vaapi \
+          --enable-encoder=vp9_vaapi \
+          --enable-filter=hwdownload \
+          --enable-filter=hwmap \
+          --enable-filter=hwupload \
+          --enable-filter=scale_vaapi \
+          --enable-hwaccel=av1_vaapi \
+          --enable-hwaccel=h264_vaapi \
+          --enable-hwaccel=hevc_vaapi \
+          --enable-hwaccel=mjpeg_vaapi \
+          --enable-hwaccel=vp9_vaapi \
+          --enable-indev=v4l2 \
+          --enable-libdrm \
+          --enable-muxer=h264 \
+          --enable-muxer=hevc \
+          --enable-muxer=rawvideo \
+          --enable-muxer=rtp \
+          --enable-muxer=rtsp \
+          --enable-parser=av1 \
+          --enable-parser=h264 \
+          --enable-parser=hevc \
+          --enable-parser=mjpeg \
+          --enable-parser=vp9 \
+          --enable-pixelutils \
+          --enable-protocol=file \
+          --enable-protocol=rtp \
+          --enable-pthreads \
+          --enable-vaapi \
+          --disable-dwt \
+          --disable-error-resilience \
+          --disable-faan \
+          --disable-iconv \
+          --disable-lsp \
+          --disable-postproc \
+          --disable-swresample \
+          --disable-swscale \
+          --disable-x86asm \
+          --disable-doc \
+          --disable-htmlpages \
+          --disable-manpages \
+          --disable-podpages \
+          --disable-txtpages \
+        ;
+        make -j$(nproc)
+        sudo make install
+        sudo rm -vrf /opt/vacon/share/ffmpeg
+
+    - name: Build Vacon
+      env:
+        CC: "gcc-13"
+        CXX: "g++-13"
+        LDFLAGS: "-static-libstdc++ -static-libgcc"
+        PKG_CONFIG_PATH: "/opt/vacon/lib/pkgconfig"
+        CMAKE: "cmake -Wno-dev"
+      run: |
+        meson setup build --default-library static --wrap-mode forcefallback --prefix /opt/vacon --libdir lib
+        meson compile -C build
+        sudo meson install -C build --skip-subprojects
+
+    - name: Prepare Debian packaging
+      run: |
+        if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+          VERSION="$(echo $GITHUB_REF_NAME | sed -e 's/^v//')"
+        else
+          VERSION="0"
+        fi
+        VERSION="$VERSION+git$(git rev-parse --short HEAD)"
+        echo "VERSION is $VERSION"
+        mkdir -p ./deb/vacon/opt
+        cp -av /opt/vacon ./deb/vacon/opt/
+        cp -av .packaging/debian ./deb/vacon
+        sed \
+          -e "s,%VERSION%,$VERSION,g" \
+          -e "s/%USER%/$(whoami)/g" \
+          -e "s/%NODE%/$(uname -n)/g" \
+          -e "s/%DATE%/$(date -R)/g" \
+          ./deb/vacon/debian/changelog.in > ./deb/vacon/debian/changelog
+
+    - name: Build Debian package
+      working-directory: "./deb/vacon"
+      run: |
+        dpkg-buildpackage -B -us -uc
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          ./deb/vacon_*.deb
+        fail_on_unmatched_files: true
