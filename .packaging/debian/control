@@ -1,0 +1,10 @@
+Source: vacon
+Section: video
+Priority: extra
+Maintainer: Robert Edmonds <edmonds@users.noreply.github.com>
+
+Package: vacon
+Architecture: amd64
+Depends: ${shlibs:Depends}
+Description: Hardware accelerated one-on-one video conferencing tool
+ .
