@@ -62,6 +62,9 @@ jobs:
         cd build
         $(pwd)/../configure \
           --prefix=/opt/vacon \
+          --cc=gcc-13 \
+          --cxx=g++-13 \
+          --enable-lto \
           --disable-everything \
           --enable-avcodec \
           --enable-avdevice \
@@ -119,6 +122,12 @@ jobs:
           --disable-manpages \
           --disable-podpages \
           --disable-txtpages \
+          --disable-bzlib \
+          --disable-libxcb \
+          --disable-libxcb_shm \
+          --disable-lzma \
+          --disable-xlib \
+          --disable-zlib \
         ;
         make -j$(nproc)
         sudo make install
