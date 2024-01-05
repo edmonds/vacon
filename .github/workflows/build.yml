@@ -169,10 +169,24 @@ jobs:
       run: |
         dpkg-buildpackage -B -us -uc
 
+    - name: Inspect Debian package
+      working-directory: "./deb"
+      run: |
+        dpkg-deb -I vacon_*.deb
+        dpkg-deb -c vacon_*.deb
+
+    - name: Upload Debian package to artifact storage
+      uses: actions/upload-artifact@v4
+      with:
+        name: binary-vacon-deb
+        path: deb/vacon_*.deb
+        retention-days: 3
+        compression-level: 0
+
     - name: Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: |
-          ./deb/vacon_*.deb
+          deb/vacon_*.deb
         fail_on_unmatched_files: true
