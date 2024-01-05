@@ -14,5 +14,6 @@ override_dh_auto_install:
 	find . -maxdepth 1 -mindepth 1 -not -name debian -print0 | \
 		sed -e s#'./'##g | \
 		xargs -0 -r -i cp -a ./{} debian/$(PACKAGE)/{}
+	dh_link opt/vacon/bin/vacon usr/bin/vacon
 
 override_dh_strip:
