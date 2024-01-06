@@ -73,6 +73,7 @@ jobs:
           --enable-avfilter \
           --enable-avformat \
           --enable-avutil \
+          --enable-decoder=rawvideo \
           --enable-demuxer=av1 \
           --enable-demuxer=h264 \
           --enable-demuxer=hevc \
@@ -83,6 +84,7 @@ jobs:
           --enable-encoder=av1_vaapi \
           --enable-encoder=h264_vaapi \
           --enable-encoder=hevc_vaapi \
+          --enable-encoder=rawvideo \
           --enable-encoder=vp9_vaapi \
           --enable-filter=hwdownload \
           --enable-filter=hwmap \
