@@ -146,7 +146,7 @@ jobs:
         CMAKE: "cmake -Wno-dev"
       run: |
         meson setup build --default-library static --wrap-mode forcefallback --prefix /opt/vacon --libdir lib
-        meson compile -C build
+        meson compile -v -C build
         sudo meson install -C build --skip-subprojects
 
     - name: Prepare Debian packaging
