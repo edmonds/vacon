@@ -182,7 +182,6 @@ jobs:
       with:
         name: binary-vacon-deb
         path: deb/vacon_*.deb
-        retention-days: 3
         compression-level: 0
 
     - name: Release
