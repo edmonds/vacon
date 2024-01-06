@@ -297,10 +297,12 @@ static PL_THREAD_VOID decode_loop(void *arg)
             }
             ret = avcodec_send_packet(p->codec, packet);
             av_packet_unref(packet);
-            if (ret == AVERROR(EIO)) {
-                    /* Ignore decoder errors. */
-                    (void) atomic_fetch_add(&p->stats.decoded_fail, 1);
-                    continue;
+            if (ret == AVERROR(EIO) || ret == AVERROR_INVALIDDATA) {
+                /* Ignore decoder errors. */
+                fprintf(stderr, "avcodec_send_packet() failed (ignoring): %s\n",
+                        av_err2str(ret));
+                (void) atomic_fetch_add(&p->stats.decoded_fail, 1);
+                continue;
             }
             break;
         case AVERROR_EOF:
