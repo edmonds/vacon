@@ -66,7 +66,6 @@ jobs:
           --prefix=/opt/vacon \
           --cc=gcc-13 \
           --cxx=g++-13 \
-          --enable-lto \
           --disable-everything \
           --enable-avcodec \
           --enable-avdevice \
