@@ -15,7 +15,17 @@ project(
   ]
 )
 
-add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: ['c', 'cpp'])
+add_global_arguments([
+  '-fno-omit-frame-pointer',
+  ],
+  language: ['c', 'cpp'],
+)
+
+add_project_arguments([
+  '-D_POSIX_C_SOURCE=200809L',
+  ],
+  language: ['c', 'cpp'],
+)
 
 cc = meson.get_compiler('c')
 cpp = meson.get_compiler('cpp')
