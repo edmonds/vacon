@@ -142,9 +142,11 @@ bool CameraEncoder::initCodecContext()
 
     // Find the decoder for the video stream.
     AVStream *st = this->fmt_ctx->streams[this->video_stream_idx];
-    const AVCodec *dec = avcodec_find_decoder(st->codecpar->codec_id);
+    const enum AVCodecID codec_id = st->codecpar->codec_id;
+    const AVCodec *dec = avcodec_find_decoder(codec_id);
     if (!dec) {
-        PLOG_ERROR << "Failed to find video decoder";
+        PLOG_ERROR << fmt::format("Could not find decoder for codec '{}' ({})",
+                                  avcodec_get_name(codec_id), (int)codec_id);
         return false;
     }
 
