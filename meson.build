@@ -70,6 +70,10 @@ cc.check_header('EGL/egl.h', required: true) # For GLFW_EXPOSE_NATIVE_EGL
 
 glfw = dependency('glfw3')
 
+# v4l2 kernel API
+
+cc.check_header('linux/videodev2.h', required: true)
+
 # other dependencies
 
 argparse = dependency('argparse', version: '>=3')
