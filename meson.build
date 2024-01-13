@@ -55,6 +55,10 @@ if not libdatachannel.found()
   ]
 endif
 
+# vpl
+
+vpl = dependency('vpl', version: '>2')
+
 # ffmpeg
 
 ffmpeg = [
@@ -161,6 +165,7 @@ vacon_dependencies = [
   plplay,
   readerwriterqueue,
   threads,
+  vpl,
 ]
 
 executable('vacon',
