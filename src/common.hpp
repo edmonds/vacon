@@ -58,5 +58,6 @@ int plogSeverityToFfmpegLogLevel(const plog::Severity plog_severity);
 void setupLogging(const int verbosity);
 bool setupRealtimePriority();
 void setThreadName(const char *name);
+std::string FourCcToString(uint32_t);
 
 } // namespace vacon

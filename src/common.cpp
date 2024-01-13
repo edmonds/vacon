@@ -185,4 +185,18 @@ void setThreadName(const char *name)
 #endif
 }
 
+// from v4l-utils
+std::string FourCcToString(uint32_t val)
+{
+    std::string s;
+
+    s += val & 0x7f;
+    s += (val >> 8) & 0x7f;
+    s += (val >> 16) & 0x7f;
+    s += (val >> 24) & 0x7f;
+    if (val & (1U << 31))
+        s += "-BE";
+    return s;
+}
+
 } // namespace vacon
