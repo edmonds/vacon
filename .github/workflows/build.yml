@@ -49,6 +49,7 @@ jobs:
           libunwind-dev \
           libva-dev \
           libvpl-dev \
+          libvpl2 \
           libwayland-dev \
           libxkbcommon-dev \
           linux-libc-dev \
