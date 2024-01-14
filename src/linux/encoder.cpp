@@ -64,6 +64,13 @@ std::shared_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 
 Encoder::~Encoder()
 {
+    if (mfx_session_vpp_) {
+        PLOG_VERBOSE << fmt::format("Closing MFX VPP session @ {}", fmt::ptr(mfx_session_vpp_));
+        MFXVideoENCODE_Close(mfx_session_vpp_);
+        MFXClose(mfx_session_vpp_);
+        mfx_session_vpp_ = nullptr;
+    }
+
     if (mfx_session_encode_) {
         PLOG_VERBOSE << fmt::format("Closing MFX ENCODE session @ {}", fmt::ptr(mfx_session_encode_));
         MFXVideoENCODE_Close(mfx_session_encode_);
@@ -105,6 +112,16 @@ bool Encoder::Init()
 
     if (!InitLibraryEncode()) {
         PLOG_ERROR << "InitLibraryEncode() failed";
+        return false;
+    }
+
+    if (!InitMfxVideoParamVpp()) {
+        PLOG_ERROR << "InitMfxVideoParamVpp() failed";
+        return false;
+    }
+
+    if (!InitLibraryVpp()) {
+        PLOG_ERROR << "InitLibraryVpp() failed";
         return false;
     }
 
@@ -295,6 +312,139 @@ bool Encoder::InitLibraryEncode()
     status = MFXVideoENCODE_Init(mfx_session_encode_, &mfx_videoparam_encode_);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoENCODE_Init() failed: " << status;
+        return false;
+    }
+
+    // Success.
+    return true;
+}
+
+bool Encoder::InitMfxVideoParamVpp()
+{
+    // Input to functions is a video memory surface.
+    mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_IN_SYSTEM_MEMORY;
+    mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
+
+    // Set input pixel format depending on the configured pixel format.
+    if (params_.input_pixel_format == "NV12") {
+        mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
+        mfx_videoparam_vpp_.vpp.In.BitDepthLuma = 8;
+        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+        mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_NV12;
+    } else if (params_.input_pixel_format == "YUY2" ||
+               params_.input_pixel_format == "YUYV422")
+    {
+        mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
+        mfx_videoparam_vpp_.vpp.In.BitDepthLuma = 8;
+        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
+        mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_YUY2;
+    } else if (params_.input_pixel_format == "UYVY" ||
+               params_.input_pixel_format == "UYVY422")
+    {
+        mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
+        mfx_videoparam_vpp_.vpp.In.BitDepthLuma = 8;
+        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
+        mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_UYVY;
+    } else {
+        PLOG_ERROR << "Unknown camera pixel format: " << params_.input_pixel_format;
+        return false;
+    }
+
+    // Hardcode output pixel format.
+    // XXX: This is 10-bit 4:2:0, need to handle 10-bit 4:2:2.
+    mfx_videoparam_vpp_.vpp.Out.BitDepthChroma = 10;
+    mfx_videoparam_vpp_.vpp.Out.BitDepthLuma = 10;
+    mfx_videoparam_vpp_.vpp.Out.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+    mfx_videoparam_vpp_.vpp.Out.FourCC = MFX_FOURCC_P010;
+
+    // CropW
+    mfx_videoparam_vpp_.vpp.In.CropW =
+        mfx_videoparam_vpp_.vpp.Out.CropW = params_.width;
+
+    // CropH
+    mfx_videoparam_vpp_.vpp.In.CropH =
+        mfx_videoparam_vpp_.vpp.Out.CropH = params_.height;
+
+    // Width
+    mfx_videoparam_vpp_.vpp.In.Width =
+        mfx_videoparam_vpp_.vpp.Out.Width = VACON_ALIGN16((mfxU16)params_.width);
+
+    // Height
+    mfx_videoparam_vpp_.vpp.In.Height =
+        mfx_videoparam_vpp_.vpp.Out.Height = VACON_ALIGN16((mfxU16)params_.height);
+
+    // PicStruct
+    mfx_videoparam_vpp_.vpp.In.PicStruct =
+        mfx_videoparam_vpp_.vpp.Out.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
+
+    // FrameRateExtN
+    mfx_videoparam_vpp_.vpp.In.FrameRateExtN =
+        mfx_videoparam_vpp_.vpp.Out.FrameRateExtN = params_.frame_rate;
+
+    // FrameRateExtD
+    mfx_videoparam_vpp_.vpp.In.FrameRateExtD =
+        mfx_videoparam_vpp_.vpp.Out.FrameRateExtD = 1;
+
+    // Success.
+    return true;
+}
+
+bool Encoder::InitLibraryVpp()
+{
+    mfxConfig cfg[3];
+    mfxVariant cfgVal[3];
+
+    // Require a hardware video encoder.
+    cfg[0] = MFXCreateConfig(mfx_loader_);
+    if(!cfg[0]) {
+        PLOG_ERROR << "MFXCreateConfig() failed";
+        return false;
+    }
+    cfgVal[0].Type = MFX_VARIANT_TYPE_U32;
+    cfgVal[0].Data.U32 = MFX_IMPL_TYPE_HARDWARE;
+    auto status = MFXSetConfigFilterProperty(cfg[0], (mfxU8 *)"mfxImplDescription.Impl", cfgVal[0]);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.Impl = MFX_IMPL_TYPE_HARDWARE) failed: " << status;
+        return false;
+    }
+
+    // Require that VPP scaling is supported.
+    cfg[1] = MFXCreateConfig(mfx_loader_);
+    if (!cfg[1]) {
+        PLOG_ERROR << "MFXCreateConfig() failed";
+        return false;
+    }
+    cfgVal[1].Type = MFX_VARIANT_TYPE_U32;
+    cfgVal[1].Data.U32 = MFX_EXTBUFF_VPP_SCALING;
+    status = MFXSetConfigFilterProperty(cfg[1], (mfxU8 *)"mfxImplDescription.mfxVPPDescription.filter.FilterFourCC", cfgVal[1]);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.mfxVPPDescription.filter.FilterFourCC = MFX_EXTBUFF_VPP_SCALING) failed: " << status;
+        return false;
+    }
+
+    // Require API version >= 2.2.
+    cfg[2] = MFXCreateConfig(mfx_loader_);
+    if (!cfg[2]) {
+        PLOG_ERROR << "MFXCreateConfig() failed";
+        return false;
+    }
+    cfgVal[2].Type = MFX_VARIANT_TYPE_U32;
+    cfgVal[2].Data.U32 = ((2 << 16) | 2);
+    status = MFXSetConfigFilterProperty(cfg[2], (mfxU8 *)"mfxImplDescription.ApiVersion.Version", cfgVal[2]);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.ApiVersion.Version >= 2.2) failed: " << status;
+        return false;
+    }
+
+    status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_vpp_);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXCreateSession() failed: " << status;
+        return false;
+    }
+
+    status = MFXVideoVPP_Init(mfx_session_vpp_, &mfx_videoparam_vpp_);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXVideoVPP_Init() failed: " << status;
         return false;
     }
 

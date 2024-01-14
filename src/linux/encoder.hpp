@@ -48,7 +48,9 @@ class Encoder {
         Encoder() = default;
 
         bool InitMfxVideoParamEncode();
+        bool InitMfxVideoParamVpp();
         bool InitLibraryEncode();
+        bool InitLibraryVpp();
 
         EncoderParams       params_;
         mfxLoader           mfx_loader_ = nullptr;
@@ -56,6 +58,8 @@ class Encoder {
         mfxVideoParam       mfx_videoparam_encode_ = {};
         mfxExtCodingOption2 mfx_eco2_ = {};
         mfxExtCodingOption3 mfx_eco3_ = {};
+        mfxSession          mfx_session_vpp_ = nullptr;
+        mfxVideoParam       mfx_videoparam_vpp_ = {};
 };
 
 } // namespace linux
