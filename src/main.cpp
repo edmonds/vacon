@@ -58,7 +58,6 @@ static const int kDefaultCameraWidth                = 1920;
 static const int kDefaultCameraHeight               = 1080;
 static const int kDefaultCameraFrameRate            = 60;
 static const int kDefaultVideoEncoderBitrateKbps    = 10'000;
-static const char *kDefaultVideoEncoderPixelFormat  = "P010";
 static const char *kDefaultSignalingUrl             = "ws://127.0.0.1:8000/v1/ooo";
 static const char *kDefaultStunServer               = "stun:stun.l.google.com:19302";
 
@@ -118,12 +117,6 @@ static void parseArgs(int argc, char *argv[])
         .help("video encoder bitrate (Kbps)")
         .default_value(kDefaultVideoEncoderBitrateKbps)
         .scan<'i', int>()
-        .nargs(1);
-
-    args.add_argument("--video-encoder-pixel-format")
-        .metavar("FMT")
-        .help("video encoder pixel format")
-        .default_value(kDefaultVideoEncoderPixelFormat)
         .nargs(1);
 
     args.add_argument("-p", "--player")
@@ -240,7 +233,7 @@ int main(int argc, char *argv[])
     std::optional<linux::EncoderParams> encoder_params = {};
     if (args["--video-encoder"] == true) {
         encoder_params = { linux::EncoderParams {
-            .input_pixel_format     = args.get<string>("--video-encoder-pixel-format"),
+            .input_pixel_format     = args.get<string>("--camera-pixel-format"),
             .width                  = args.get<int>("--camera-width"),
             .height                 = args.get<int>("--camera-height"),
             .frame_rate             = args.get<int>("--camera-frame-rate"),
