@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -24,7 +26,6 @@
 
 #include "common.hpp"
 #include "rtp_depacketizer.hpp"
-#include "vpacket.hpp"
 
 namespace vacon {
 
@@ -40,30 +41,27 @@ class NetworkHandler {
         NetworkHandler(NetworkHandler&&) = default;
         ~NetworkHandler();
 
-        void connectWebRTC();
-        bool isConnectedToPeer();
-        void closeWebSocket();
-        void sendPacket(std::shared_ptr<VPacket>);
+        void ConnectWebRTC();
+        void CloseWebSocket();
+        bool IsConnectedToPeer();
 
-        AVFormatContext* getRtpAvfcInput();
+        AVFormatContext* GetRtpAvfcInput();
 
     private:
         NetworkHandler() = default;
-        void receivePacket(rtc::binary);
+        void ReceivePacket(rtc::binary);
+        void OnWsMessage(nlohmann::json message);
+        void CreatePeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);
+        void SendVideoFrame(const std::byte *data, size_t size, uint64_t pts);
 
-        NetworkHandlerParams params;
-
-        rtc::Configuration                              config;
-        std::shared_ptr<rtc::WebSocket>                 ws;
-        std::shared_ptr<rtc::PeerConnection>            peer;
-        std::shared_ptr<rtc::RtcpSrReporter>            sender_reporter;
-        std::shared_ptr<rtc::RtpPacketizationConfig>    rtp_config;
-        std::shared_ptr<rtc::Track>                     track;
-
-        std::shared_ptr<vacon::RtpDepacketizer>         rtp_depacketizer;
-
-        void onWsMessage(nlohmann::json message);
-        void createPeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);
+        NetworkHandlerParams                            params_ = {};
+        rtc::Configuration                              config_;
+        std::shared_ptr<rtc::WebSocket>                 ws_;
+        std::shared_ptr<rtc::PeerConnection>            peer_;
+        std::shared_ptr<rtc::RtcpSrReporter>            sender_reporter_;
+        std::shared_ptr<rtc::RtpPacketizationConfig>    rtp_config_;
+        std::shared_ptr<rtc::Track>                     track_;
+        std::shared_ptr<vacon::RtpDepacketizer>         rtp_depacketizer_;
 };
 
 } // namespace vacon

@@ -44,8 +44,9 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
                     params.stun_server);
 
     auto nh = std::make_unique<NetworkHandler>(NetworkHandler {});
-    nh->params = params;
-    nh->config.iceServers.emplace_back(nh->params.stun_server);
+    nh->params_ = params;
+    nh->config_.iceServers.emplace_back(nh->params_.stun_server);
+
     return nh;
 }
 
@@ -54,47 +55,47 @@ NetworkHandler::~NetworkHandler()
     PLOG_VERBOSE << fmt::format("Destructor called on {}", fmt::ptr(this));
 }
 
-void NetworkHandler::connectWebRTC()
+void NetworkHandler::ConnectWebRTC()
 {
-    ws = std::make_shared<rtc::WebSocket>();
+    ws_ = std::make_shared<rtc::WebSocket>();
 
-    ws->onOpen([]() {
+    ws_->onOpen([]() {
         PLOG_INFO << "WebSocket connected, signaling ready";
     });
 
-    ws->onError([](std::string s) {
+    ws_->onError([](std::string s) {
         PLOG_INFO << "WebSocket error: " << s;
     });
 
-    ws->onMessage([&](std::variant<rtc::binary, rtc::string> data) {
+    ws_->onMessage([&](std::variant<rtc::binary, rtc::string> data) {
         if (std::holds_alternative<rtc::string>(data)) {
             auto string_data = std::get<rtc::string>(data);
             json message = json::parse(std::get<rtc::string>(data));
-            this->onWsMessage(message);
+            OnWsMessage(message);
         }
     });
 
-    const std::string url = params.signaling_base_url + "/" + params.signaling_secret;
+    const std::string url = params_.signaling_base_url + "/" + params_.signaling_secret;
     PLOG_INFO << fmt::format("Opening WebSocket URL {}", url);
-    ws->open(url);
+    ws_->open(url);
 }
 
-bool NetworkHandler::isConnectedToPeer()
+bool NetworkHandler::IsConnectedToPeer()
 {
-    if (peer) {
-        return peer->state() == rtc::PeerConnection::State::Connected;
+    if (peer_) {
+        return peer_->state() == rtc::PeerConnection::State::Connected;
     }
     return false;
 }
 
-void NetworkHandler::closeWebSocket()
+void NetworkHandler::CloseWebSocket()
 {
-    if (ws->isOpen()) {
-        ws->close();
+    if (ws_->isOpen()) {
+        ws_->close();
     }
 }
 
-void NetworkHandler::onWsMessage(json message)
+void NetworkHandler::OnWsMessage(json message)
 {
     PLOG_DEBUG << "Received WebSocket message: " << message.dump();
 
@@ -106,7 +107,7 @@ void NetworkHandler::onWsMessage(json message)
 
     if (type == "start_session") {
         PLOG_DEBUG << "Got start_session, creating peer connection and sending offer";
-        createPeerConnection();
+        CreatePeerConnection();
         return;
     }
 
@@ -114,26 +115,26 @@ void NetworkHandler::onWsMessage(json message)
         PLOG_DEBUG << "Got offer, creating peer connection and sending answer";
         auto sdp = message["sdp"].get<std::string>();
         auto description = rtc::Description(sdp, type);
-        createPeerConnection(std::optional<rtc::Description>(description));
+        CreatePeerConnection(std::optional<rtc::Description>(description));
     } else if (type == "answer") {
         PLOG_DEBUG << "Got answer, completing session startup";
         auto sdp = message["sdp"].get<std::string>();
         auto description = rtc::Description(sdp, type);
-        peer->setRemoteDescription(description);
+        peer_->setRemoteDescription(description);
     }
 }
 
-void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>& offer)
+void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>& offer)
 {
-    peer = std::make_shared<rtc::PeerConnection>(config);
+    peer_ = std::make_shared<rtc::PeerConnection>(config_);
 
-    rtp_depacketizer = vacon::RtpDepacketizer::Create();
+    rtp_depacketizer_ = vacon::RtpDepacketizer::Create();
 
-    auto wws = make_weak_ptr(ws);
+    auto wws = make_weak_ptr(ws_);
 
-    peer->onGatheringStateChange([&](rtc::PeerConnection::GatheringState state) {
+    peer_->onGatheringStateChange([&](rtc::PeerConnection::GatheringState state) {
         if (state == rtc::PeerConnection::GatheringState::Complete) {
-            auto description = peer->localDescription();
+            auto description = peer_->localDescription();
             json message = {
                 { "type", description->typeString() },
                 { "sdp", std::string(description.value()) },
@@ -141,13 +142,13 @@ void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>&
             auto message_dump = message.dump();
             PLOG_DEBUG << "[PeerConnection] Sending WebSocket message: " << message_dump;
             if (auto ws = wws.lock()) {
-                ws->send(message_dump);
+                ws_->send(message_dump);
             }
         }
     });
 
     if (offer) {
-        peer->onLocalDescription([](rtc::Description description) {
+        peer_->onLocalDescription([](rtc::Description description) {
             json message = {
                 { "type", description.typeString() },
                 { "sdp", std::string(description) },
@@ -162,16 +163,16 @@ void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>&
     rtc::Description::Video video("video", rtc::Description::Direction::SendRecv);
     video.addH265Codec(video_payload_type);
     video.addSSRC(ssrc, "video");
-    track = peer->addTrack(video);
+    track_ = peer_->addTrack(video);
 
-    rtp_config = std::make_shared<rtc::RtpPacketizationConfig>
+    rtp_config_ = std::make_shared<rtc::RtpPacketizationConfig>
         (ssrc, "video", video_payload_type, rtc::H265RtpPacketizer::defaultClockRate);
 
     auto packetizer = std::make_shared<rtc::H265RtpPacketizer>
-        (rtc::H265RtpPacketizer::Separator::LongStartSequence, rtp_config);
+        (rtc::H265RtpPacketizer::Separator::LongStartSequence, rtp_config_);
 
-    sender_reporter = std::make_shared<rtc::RtcpSrReporter>(rtp_config);
-    packetizer->addToChain(sender_reporter);
+    sender_reporter_ = std::make_shared<rtc::RtcpSrReporter>(rtp_config_);
+    packetizer->addToChain(sender_reporter_);
 
     auto nackResponder = std::make_shared<rtc::RtcpNackResponder>();
     packetizer->addToChain(nackResponder);
@@ -179,65 +180,69 @@ void NetworkHandler::createPeerConnection(const std::optional<rtc::Description>&
     auto session = std::make_shared<rtc::RtcpReceivingSession>();
     packetizer->addToChain(session);
 
-    track->setMediaHandler(packetizer);
+    track_->setMediaHandler(packetizer);
 
-    track->onMessage([&](rtc::binary pkt) { this->receivePacket(pkt); }, nullptr);
+    track_->onMessage([&](rtc::binary pkt) { ReceivePacket(pkt); }, nullptr);
 
     if (offer) {
-        peer->setRemoteDescription(offer.value());
+        peer_->setRemoteDescription(offer.value());
     } else {
-        peer->setLocalDescription();
+        peer_->setLocalDescription();
     }
 }
 
-void NetworkHandler::receivePacket(rtc::binary pkt)
+void NetworkHandler::ReceivePacket(rtc::binary pkt)
 {
     // This is an RTP packet.
     PLOG_VERBOSE << fmt::format("RECEIVED AN RTP PACKET !!! length {}", pkt.size());
-    if (this->rtp_depacketizer) {
-        this->rtp_depacketizer->submitRtpPacket(pkt);
+    if (rtp_depacketizer_) {
+        rtp_depacketizer_->submitRtpPacket(pkt);
     }
 }
 
-void NetworkHandler::sendPacket(std::shared_ptr<VPacket> pkt)
+void NetworkHandler::SendVideoFrame(const std::byte *data, size_t size, uint64_t pts)
 {
     // Only send the packet if the connection is open.
-    if (!track || !track->isOpen()) {
+    if (!track_ || !track_->isOpen()) {
+        return;
+    }
+
+    // Consistency check.
+    if (!data || size == 0) {
+        PLOG_DEBUG << fmt::format("Called with no data or zero length data at PTS {}, ignoring", pts);
         return;
     }
 
     // Sample time is in microseconds, convert it to seconds.
-    auto elapsedSeconds = double(pkt->ptr->pts) / (1'000'000);
+    auto elapsedSeconds = double(pts) / (1'000'000);
 
     // Get elapsed time in clock rate.
-    uint32_t elapsedTimestamp = rtp_config->secondsToTimestamp(elapsedSeconds);
+    uint32_t elapsedTimestamp = rtp_config_->secondsToTimestamp(elapsedSeconds);
 
     // Set new timestamp.
-    rtp_config->timestamp = rtp_config->startTimestamp + elapsedTimestamp;
+    rtp_config_->timestamp = rtp_config_->startTimestamp + elapsedTimestamp;
 
     // Get elapsed time in clock rate from last RTCP sender report.
-    auto reportElapsedTimestamp = rtp_config->timestamp - sender_reporter->lastReportedTimestamp();
+    auto reportElapsedTimestamp = rtp_config_->timestamp - sender_reporter_->lastReportedTimestamp();
 
     // Check if last report was at least 1 second ago.
-    if (rtp_config->timestampToSeconds(reportElapsedTimestamp) > 1) {
-        sender_reporter->setNeedsToReport();
+    if (rtp_config_->timestampToSeconds(reportElapsedTimestamp) > 1) {
+        sender_reporter_->setNeedsToReport();
     }
 
     // Send the packet.
     try {
-        auto data = reinterpret_cast<const std::byte *>(pkt->ptr->data);
-        auto size = pkt->ptr->size;
         PLOG_VERBOSE << fmt::format("Sending packet @ {}, size {}", fmt::ptr(data), size);
-        track->send(data, size);
+        track_->send(data, size);
     } catch (const std::exception &e) {
         PLOG_INFO << "Unable to send packet: " << e.what();
     }
 }
 
-AVFormatContext* NetworkHandler::getRtpAvfcInput()
+AVFormatContext* NetworkHandler::GetRtpAvfcInput()
 {
-    if (rtp_depacketizer) {
-        return rtp_depacketizer->fctx;
+    if (rtp_depacketizer_) {
+        return rtp_depacketizer_->fctx;
     } else {
         return nullptr;
     }
