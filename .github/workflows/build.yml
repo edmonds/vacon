@@ -48,6 +48,7 @@ jobs:
           libssl-dev \
           libunwind-dev \
           libva-dev \
+          libvpl-dev \
           libwayland-dev \
           libxkbcommon-dev \
           linux-libc-dev \
