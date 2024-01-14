@@ -36,8 +36,8 @@
 
 #include "common.hpp"
 #include "camera_encoder.hpp"
+#include "linux/video_handler.hpp"
 #include "network_handler.hpp"
-#include "vpacket.hpp"
 
 using std::string;
 
@@ -54,18 +54,14 @@ volatile std::sig_atomic_t gSignalUSR1;
 volatile std::sig_atomic_t gShuttingDown;
 
 static const char *kDefaultCameraDevice             = "/dev/video0";
-static const char *kDefaultCameraCodec              = "hevc_vaapi";
 static const char *kDefaultCameraPixelFormat        = "";
-static const char *kDefaultCameraEncoderPixelFormat = "p010";
 static const int kDefaultCameraWidth                = 1920;
 static const int kDefaultCameraHeight               = 1080;
 static const int kDefaultCameraFrameRate            = 60;
-static const int kDefaultCameraBitrateKbps          = 10'000;
+static const int kDefaultVideoEncoderBitrateKbps    = 10'000;
+static const char *kDefaultVideoEncoderPixelFormat  = "P010";
 static const char *kDefaultSignalingUrl             = "ws://127.0.0.1:8000/v1/ooo";
 static const char *kDefaultStunServer               = "stun:stun.l.google.com:19302";
-
-static moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<VPacket>>
-    gOutgoingCameraPacketBuffer(1);
 
 static void parseArgs(int argc, char *argv[])
 {
@@ -78,31 +74,13 @@ static void parseArgs(int argc, char *argv[])
         .nargs(0);
 
     args.add_argument("-c", "--camera")
-        .help("start camera encoder")
+        .help("start camera capture")
         .flag();
 
     args.add_argument("--camera-device")
         .metavar("DEVICE")
         .help("camera device node")
         .default_value(kDefaultCameraDevice)
-        .nargs(1);
-
-    args.add_argument("--camera-codec")
-        .metavar("CODEC")
-        .help("camera encoder codec")
-        .default_value(kDefaultCameraCodec)
-        .nargs(1);
-
-    args.add_argument("--camera-pixel-format")
-        .metavar("FMT")
-        .help("camera capture pixel format")
-        .default_value(kDefaultCameraPixelFormat)
-        .nargs(1);
-
-    args.add_argument("--camera-encoder-pixel-format")
-        .metavar("FMT")
-        .help("camera encoder pixel format")
-        .default_value(kDefaultCameraEncoderPixelFormat)
         .nargs(1);
 
     args.add_argument("--camera-width")
@@ -126,11 +104,27 @@ static void parseArgs(int argc, char *argv[])
         .scan<'i', int>()
         .nargs(1);
 
-    args.add_argument("--camera-bitrate")
+    args.add_argument("--camera-pixel-format")
+        .metavar("FMT")
+        .help("camera capture pixel format")
+        .default_value(kDefaultCameraPixelFormat)
+        .nargs(1);
+
+    args.add_argument("-e", "--video-encoder")
+        .help("start video encoder")
+        .flag();
+
+    args.add_argument("--video-encoder-bitrate")
         .metavar("K")
-        .help("camera codec encoder bitrate (Kbps)")
-        .default_value(kDefaultCameraBitrateKbps)
+        .help("video encoder bitrate (Kbps)")
+        .default_value(kDefaultVideoEncoderBitrateKbps)
         .scan<'i', int>()
+        .nargs(1);
+
+    args.add_argument("--video-encoder-pixel-format")
+        .metavar("FMT")
+        .help("video encoder pixel format")
+        .default_value(kDefaultVideoEncoderPixelFormat)
         .nargs(1);
 
     args.add_argument("-p", "--player")
@@ -213,8 +207,7 @@ int main(int argc, char *argv[])
         PLOG_ERROR << "Unable to set real-time thread priority, performance may be affected!";
     }
 
-    // Start network handler on main thread (actual work is done on
-    // libdatachannel thread pool).
+    // Start the network handler.
     std::unique_ptr<NetworkHandler> nh = nullptr;
     if (args["--network"] == true) {
         PLOG_DEBUG << "Starting network handler";
@@ -226,89 +219,57 @@ int main(int argc, char *argv[])
         };
 
         nh = NetworkHandler::Create(params);
-        nh->connectWebRTC();
+        nh->Init();
+
+        // Start connecting to the signaling server and the WebRTC peer.
+        nh->ConnectWebRTC();
     }
 
-    // Start camera encoder thread.
+    // Get camera parameters.
+    std::optional<linux::CameraParams> camera_params = {};
     if (args["--camera"] == true) {
-        threads.emplace_back(std::jthread { [&](std::stop_token st) {
-            PLOG_DEBUG << "Starting camera encoder thread ID " << std::this_thread::get_id();
-            setThreadName("VCameraEncoder");
+        camera_params = { linux::CameraParams {
+            .device         = args.get<string>("--camera-device"),
+            .pixel_format   = args.get<string>("--camera-pixel-format"),
+            .width          = args.get<int>("--camera-width"),
+            .height         = args.get<int>("--camera-height"),
+            .frame_rate     = args.get<int>("--camera-frame-rate"),
+        }};
+    }
 
-            auto params = CameraEncoderParams {
-                .device                 = args.get<string>("--camera-device"),
-                .codec                  = args.get<string>("--camera-codec"),
-                .camera_pixel_format    = args.get<string>("--camera-pixel-format"),
-                .encoder_pixel_format   = args.get<string>("--camera-encoder-pixel-format"),
-                .width                  = args.get<int>("--camera-width"),
-                .height                 = args.get<int>("--camera-height"),
-                .frame_rate             = args.get<int>("--camera-frame-rate"),
-                .bitrate                = args.get<int>("--camera-bitrate"),
-            };
+    // Get video encoder parameters.
+    std::optional<linux::EncoderParams> encoder_params = {};
+    if (args["--video-encoder"] == true) {
+        encoder_params = { linux::EncoderParams {
+            .input_pixel_format     = args.get<string>("--video-encoder-pixel-format"),
+            .width                  = args.get<int>("--camera-width"),
+            .height                 = args.get<int>("--camera-height"),
+            .frame_rate             = args.get<int>("--camera-frame-rate"),
+            .bitrate_kbps           = args.get<int>("--video-encoder-bitrate"),
+        }};
+    }
 
-            auto ce = CameraEncoder::Create(params);
-            if (ce) {
-                ce->encodePackets(st, [st](std::shared_ptr<VPacket> pkt) {
-                    PLOG_VERBOSE << fmt::format("Got an encoded packet @ {}, size {}", fmt::ptr(pkt->ptr), pkt->ptr->size);
-                    while (!st.stop_requested()) {
-                        if (gOutgoingCameraPacketBuffer.wait_enqueue_timed(pkt, 250ms)) {
-                            break;
-                        }
-                    }
+    // Start the video handler if either the camera or the video encoder was
+    // enabled.
+    std::unique_ptr<linux::VideoHandler> vh = nullptr;
+    if (camera_params || encoder_params) {
+        PLOG_DEBUG << "Starting video handler";
 
-                });
-            } else {
-                PLOG_FATAL << "Failed to create camera encoder";
-            }
+        auto params = linux::VideoHandlerParams {
+            .camera_params = camera_params,
+            .encoder_params = encoder_params,
+            .outgoing_video_packet_queue = nh ? nh->outgoing_video_packet_queue_ : nullptr,
+        };
 
-            PLOG_DEBUG << "Stopping camera encoder thread ID " << std::this_thread::get_id();
-        }});
+        vh = linux::VideoHandler::Create(params);
 
-        // Start a thread to drain the camera packet buffer. If the network handler
-        // is started, submit the packet for transmission to the peer, otherwise
-        // discard it.
-        threads.emplace_back(std::jthread { [&](std::stop_token st) {
-            PLOG_DEBUG << "Starting camera packet buffer drain thread ID " << std::this_thread::get_id();
-            setThreadName("VCameraDrain");
-            while (!st.stop_requested()) {
-                std::shared_ptr<VPacket> pkt;
-                if (gOutgoingCameraPacketBuffer.wait_dequeue_timed(pkt, 250ms)) {
-                    static auto t_start = std::chrono::steady_clock::now();
-                    static auto t_last = t_start;
-
-                    if (nh) {
-                        nh->sendPacket(pkt);
-                    }
-
-                    static size_t count_frames = 0;
-                    ++count_frames;
-
-                    auto t_now = std::chrono::steady_clock::now();
-                    auto t_diff = t_now - t_last;
-                    if (t_diff >= 1s) {
-                        auto t_interval = t_now - t_last;
-                        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_interval);
-                        auto fps = count_frames / std::chrono::duration<double>(t_interval).count();
-                        PLOG_INFO
-                            << "Processed "
-                            << count_frames
-                            << " outgoing camera frames in "
-                            << ms
-                            << ", "
-                            << fps
-                            << " fps";
-                        t_last = t_now;
-                        count_frames = 0;
-                    }
-                }
-            }
-            PLOG_DEBUG << "Stopping camera packet buffer drain thread ID " << std::this_thread::get_id();
-        }});
+        // Start the camera and/or video encoder threads.
+        vh->Init();
     }
 
     // Wait for the NetworkHandler to bring up the peer-to-peer connection.
     if (nh) {
-        while (!nh->isConnectedToPeer() && !gShuttingDown) {
+        while (!nh->IsConnectedToPeer() && !gShuttingDown) {
             std::this_thread::sleep_for(5ms);
         }
 
@@ -318,12 +279,12 @@ int main(int argc, char *argv[])
 
         // WebRTC peer connection is up, so close the connection to the
         // signaling server.
-        nh->closeWebSocket();
+        nh->CloseWebSocket();
     }
 
     // Start video player.
-    if (args["--player"] == true && nh && nh->isConnectedToPeer()) {
-        if (auto avfc = nh->getRtpAvfcInput()) {
+    if (args["--player"] == true && nh && nh->IsConnectedToPeer()) {
+        if (auto avfc = nh->GetRtpAvfcInput()) {
             // Start a thread to run plplay. This will itself start its own
             // thread to run the decode loop and then run the render loop. The
             // thread that plplay starts has to be separately signaled to shut
@@ -347,14 +308,19 @@ int main(int argc, char *argv[])
 
     // Wait until it's time to shut down.
     while (!gShuttingDown) {
-        if (nh && !nh->isConnectedToPeer()) {
+        if (nh && !nh->IsConnectedToPeer()) {
             PLOG_INFO << "Lost connection to peer, shutting down";
             break;
         }
-        std::this_thread::sleep_for(500ms);
+        std::this_thread::sleep_for(250ms);
     }
-
     signalTerminate();
+    if (nh) {
+        nh->Stop();
+    }
+    if (vh) {
+        vh->Stop();
+    }
 
     // Join threads.
     PLOG_INFO << "Waiting for threads to exit...";
@@ -365,6 +331,12 @@ int main(int argc, char *argv[])
         } else {
             PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
         }
+    }
+    if (nh) {
+        nh->Join();
+    }
+    if (vh) {
+        vh->Join();
     }
 
     return EXIT_SUCCESS;
