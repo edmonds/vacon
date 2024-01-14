@@ -39,13 +39,13 @@ VideoFrame::~VideoFrame()
             //PLOG_VERBOSE << fmt::format("Unmapping MFX surface @ {}", fmt::ptr(surface));
             auto status = surface->FrameInterface->Unmap(surface);
             if (status != MFX_ERR_NONE) {
-                PLOG_VERBOSE << fmt::format("surface->FrameInterface->Unmap() returned: {}", status);
+                PLOG_VERBOSE << "surface->FrameInterface->Unmap() returned: " << status;
             }
         }
         //PLOG_VERBOSE << fmt::format("Releasing MFX surface @ {}", fmt::ptr(surface));
         auto status = surface->FrameInterface->Release(surface);
         if (status != MFX_ERR_NONE) {
-            PLOG_VERBOSE << fmt::format("surface->FrameInterface->Release() returned: {}", status);
+            PLOG_VERBOSE << "surface->FrameInterface->Release() returned: " << status;
         }
         surface = nullptr;
     }
