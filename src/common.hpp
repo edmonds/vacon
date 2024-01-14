@@ -36,6 +36,8 @@ extern void plplay_shutdown(void);
 
 } // extern "C"
 
+#define VACON_ALIGN16(value) (((value + 15) >> 4) << 4)
+
 // Replacement for the ffmpeg av_err2str() macro which doesn't work in C++.
 #ifdef av_err2str
 #undef av_err2str
