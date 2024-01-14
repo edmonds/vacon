@@ -35,7 +35,6 @@
 #include <readerwritercircularbuffer.h>
 
 #include "common.hpp"
-#include "camera_encoder.hpp"
 #include "linux/video_handler.hpp"
 #include "network_handler.hpp"
 

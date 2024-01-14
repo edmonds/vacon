@@ -144,7 +144,6 @@ plplay = declare_dependency(link_with: plplay_static)
 
 vacon_sources = [
   'src/backward.cpp',
-  'src/camera_encoder.cpp',
   'src/common.cpp',
   'src/linux/camera.cpp',
   'src/linux/camera_frame.cpp',
