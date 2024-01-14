@@ -64,11 +64,11 @@ std::shared_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 
 Encoder::~Encoder()
 {
-    if (mfx_session_) {
-        PLOG_VERBOSE << fmt::format("Closing MFX session @ {}", fmt::ptr(mfx_session_));
-        MFXVideoENCODE_Close(mfx_session_);
-        MFXClose(mfx_session_);
-        mfx_session_ = nullptr;
+    if (mfx_session_encode_) {
+        PLOG_VERBOSE << fmt::format("Closing MFX ENCODE session @ {}", fmt::ptr(mfx_session_encode_));
+        MFXVideoENCODE_Close(mfx_session_encode_);
+        MFXClose(mfx_session_encode_);
+        mfx_session_encode_ = nullptr;
     }
 
     if (mfx_loader_) {
@@ -77,7 +77,7 @@ Encoder::~Encoder()
         mfx_loader_ = nullptr;
     }
 
-    free(mfx_videoparam_.ExtParam);
+    free(mfx_videoparam_encode_.ExtParam);
 }
 
 bool Encoder::Init()
@@ -92,13 +92,13 @@ bool Encoder::Init()
 
     auto t_start = std::chrono::steady_clock::now();
 
-    if (!InitMfxVideoParam()) {
-        PLOG_ERROR << "InitMfxVideoParam() failed";
+    if (!InitMfxVideoParamEncode()) {
+        PLOG_ERROR << "InitMfxVideoParamEncode() failed";
         return false;
     }
 
-    if (!InitLibrary()) {
-        PLOG_ERROR << "InitLibrary() failed";
+    if (!InitLibraryEncode()) {
+        PLOG_ERROR << "InitLibraryEncode() failed";
         return false;
     }
 
@@ -109,86 +109,86 @@ bool Encoder::Init()
     return true;
 }
 
-bool Encoder::InitMfxVideoParam()
+bool Encoder::InitMfxVideoParamEncode()
 {
     // How many asynchronous operations an application performs before the
     // application explicitly synchronizes the result.
-    mfx_videoparam_.AsyncDepth = 1;
+    mfx_videoparam_encode_.AsyncDepth = 1;
 
     // Input to functions is a video memory surface.
-    mfx_videoparam_.IOPattern |= MFX_IOPATTERN_IN_SYSTEM_MEMORY;
+    mfx_videoparam_encode_.IOPattern |= MFX_IOPATTERN_IN_SYSTEM_MEMORY;
 
     // Hint to enable low power consumption mode for encoders.
-    mfx_videoparam_.mfx.LowPower = MFX_CODINGOPTION_ON;
+    mfx_videoparam_encode_.mfx.LowPower = MFX_CODINGOPTION_ON;
 
     // Specifies the codec format identifier in the FourCC code.
-    mfx_videoparam_.mfx.CodecId = MFX_CODEC_HEVC;
+    mfx_videoparam_encode_.mfx.CodecId = MFX_CODEC_HEVC;
 
     // The codec profile.
-    //mfx_videoparam_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN10;
-    //mfx_videoparam_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN;
+    //mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN10;
+    //mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN;
 
     // Balanced quality and speed.
-    mfx_videoparam_.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
+    mfx_videoparam_encode_.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
 
     // Number of pictures within each GOP (Group of Pictures).
-    mfx_videoparam_.mfx.GopPicSize = 60;
+    mfx_videoparam_encode_.mfx.GopPicSize = 60;
 
     // Distance between I- or P (or GPB) - key frames. If GopRefDist is 1,
     // there are no regular B-frames used (only P or GPB).
-    mfx_videoparam_.mfx.GopRefDist = 1;
+    mfx_videoparam_encode_.mfx.GopRefDist = 1;
 
     // The encoder must strictly follow the given GOP structure as defined by
     // the parameters GopPicSize, GopRefDist, etc.
-    mfx_videoparam_.mfx.GopOptFlag |= MFX_GOP_STRICT;
+    mfx_videoparam_encode_.mfx.GopOptFlag |= MFX_GOP_STRICT;
 
     // Every I-frame is an IDR-frame.
-    mfx_videoparam_.mfx.IdrInterval = 1;
+    mfx_videoparam_encode_.mfx.IdrInterval = 1;
 
     // Constant bitrate control algorithm.
-    mfx_videoparam_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
+    mfx_videoparam_encode_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
 
     // Maximum possible size of any compressed frames.
-    mfx_videoparam_.mfx.BufferSizeInKB = 256;
+    mfx_videoparam_encode_.mfx.BufferSizeInKB = 256;
 
     // For CBR, used to estimate the targeted frame size by dividing the frame
     // rate by the bitrate.
-    mfx_videoparam_.mfx.TargetKbps = (mfxU16)params_.bitrate_kbps;
+    mfx_videoparam_encode_.mfx.TargetKbps = (mfxU16)params_.bitrate_kbps;
 
     // Frame rate numerator.
-    mfx_videoparam_.mfx.FrameInfo.FrameRateExtN = (mfxU32)params_.frame_rate;
+    mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtN = (mfxU32)params_.frame_rate;
 
     // Frame rate denominator.
-    mfx_videoparam_.mfx.FrameInfo.FrameRateExtD = 1;
+    mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtD = 1;
 
     // Width of the video frame in pixels. Must be a multiple of 16.
-    mfx_videoparam_.mfx.FrameInfo.Width = VACON_ALIGN16((mfxU16)params_.width);
+    mfx_videoparam_encode_.mfx.FrameInfo.Width = VACON_ALIGN16((mfxU16)params_.width);
 
     // Height of the video frame in pixels. Must be a multiple of 16.
-    mfx_videoparam_.mfx.FrameInfo.Height = VACON_ALIGN16((mfxU16)params_.height);
+    mfx_videoparam_encode_.mfx.FrameInfo.Height = VACON_ALIGN16((mfxU16)params_.height);
 
     // Width in pixels.
-    mfx_videoparam_.mfx.FrameInfo.CropW = (mfxU16)params_.width;
+    mfx_videoparam_encode_.mfx.FrameInfo.CropW = (mfxU16)params_.width;
 
     // Height in pixels.
-    mfx_videoparam_.mfx.FrameInfo.CropH = (mfxU16)params_.height;
+    mfx_videoparam_encode_.mfx.FrameInfo.CropH = (mfxU16)params_.height;
 
     // Pixel color format values dependent on the configured pixel format.
     if (params_.input_pixel_format == "NV12") {
-        mfx_videoparam_.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
-        mfx_videoparam_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+        mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
+        mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
     } else if (params_.input_pixel_format == "YUY2" ||
                params_.input_pixel_format == "YUYV422")
     {
-        //mfx_videoparam_.mfx.FrameInfo.FourCC = MFX_FOURCC_YUY2;
-        //mfx_videoparam_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
+        //mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_YUY2;
+        //mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
         PLOG_ERROR << "Camera pixel format YUY2 not supported right now";
         return false;
     } else if (params_.input_pixel_format == "UYVY" ||
                params_.input_pixel_format == "UYVY422")
     {
-        //mfx_videoparam_.mfx.FrameInfo.FourCC = MFX_FOURCC_UYVY;
-        //mfx_videoparam_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
+        //mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_UYVY;
+        //mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
         PLOG_ERROR << "Camera pixel format UYVY not supported right now";
         return false;
     } else {
@@ -206,17 +206,17 @@ bool Encoder::InitMfxVideoParam()
     mfx_eco3_.Header.BufferSz = sizeof(mfx_eco3_);
     mfx_eco3_.ScenarioInfo = MFX_SCENARIO_VIDEO_CONFERENCE;
 
-    // Attach mfx_eco's to mfx_videoparam_.
-    mfx_videoparam_.ExtParam = (mfxExtBuffer**)calloc(2, sizeof(void *));
-    assert(mfx_videoparam_.ExtParam);
-    mfx_videoparam_.ExtParam[0] = (mfxExtBuffer*)&mfx_eco2_;
-    mfx_videoparam_.ExtParam[1] = (mfxExtBuffer*)&mfx_eco3_;
+    // Attach mfx_eco's to mfx_videoparam_encode_.
+    mfx_videoparam_encode_.ExtParam = (mfxExtBuffer**)calloc(2, sizeof(void *));
+    assert(mfx_videoparam_encode_.ExtParam);
+    mfx_videoparam_encode_.ExtParam[0] = (mfxExtBuffer*)&mfx_eco2_;
+    mfx_videoparam_encode_.ExtParam[1] = (mfxExtBuffer*)&mfx_eco3_;
 
     // Success.
     return true;
 }
 
-bool Encoder::InitLibrary()
+bool Encoder::InitLibraryEncode()
 {
     mfxConfig cfg[3];
     mfxVariant cfgVal[3];
@@ -283,7 +283,7 @@ bool Encoder::InitLibrary()
     }
 
     // MFXCreateSession(): Loads and initializes the implementation.
-    status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_);
+    status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_encode_);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXCreateSession() failed: " << status;
         return false;
@@ -293,9 +293,9 @@ bool Encoder::InitLibrary()
     // necessary structures for encoding. This function also does extensive
     // validation to ensure if the configuration, as specified in the input
     // parameters, is supported.
-    status = MFXVideoENCODE_Init(mfx_session_, &mfx_videoparam_);
+    status = MFXVideoENCODE_Init(mfx_session_encode_, &mfx_videoparam_encode_);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXVideoENCODE_Init failed: " << status;
+        PLOG_ERROR << "MFXVideoENCODE_Init() failed: " << status;
         return false;
     }
 
@@ -308,14 +308,14 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     auto t_start = std::chrono::steady_clock::now();
 
     // Consistency check.
-    assert(camera.fourcc_ == mfx_videoparam_.mfx.FrameInfo.FourCC);
+    assert(camera.fourcc_ == mfx_videoparam_encode_.mfx.FrameInfo.FourCC);
 
     // Initialize the data for the encoded frame.
-    auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_.mfx.BufferSizeInKB);
+    auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
     frame->pts = camera.pts();
 
     // Get a new surface to upload the frame data from the CPU to the GPU.
-    auto status = MFXMemory_GetSurfaceForEncode(mfx_session_, &frame->surface);
+    auto status = MFXMemory_GetSurfaceForEncode(mfx_session_encode_, &frame->surface);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXMemory_GetSurfaceForEncode() failed: " << status;
         return nullptr;
@@ -343,7 +343,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
 
     // Issue the encoding request to the GPU.
     mfxSyncPoint syncp = {};
-    status = MFXVideoENCODE_EncodeFrameAsync(mfx_session_,
+    status = MFXVideoENCODE_EncodeFrameAsync(mfx_session_encode_,
                                              nullptr /* ctrl */,
                                              frame->surface,
                                              &frame->bitstream,
@@ -361,7 +361,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
 
     // Wait for the encoding request to complete and return the encoded frame.
     do {
-        status = MFXVideoCORE_SyncOperation(mfx_session_, syncp, 10 /* wait ms */);
+        status = MFXVideoCORE_SyncOperation(mfx_session_encode_, syncp, 10 /* wait ms */);
     } while (status == MFX_WRN_IN_EXECUTION);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoCORE_SyncOperation() failed: " << status;

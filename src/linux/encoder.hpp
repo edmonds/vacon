@@ -47,13 +47,13 @@ class Encoder {
     private:
         Encoder() = default;
 
-        bool InitMfxVideoParam();
-        bool InitLibrary();
+        bool InitMfxVideoParamEncode();
+        bool InitLibraryEncode();
 
         EncoderParams       params_;
         mfxLoader           mfx_loader_ = nullptr;
-        mfxSession          mfx_session_ = nullptr;
-        mfxVideoParam       mfx_videoparam_ = {};
+        mfxSession          mfx_session_encode_ = nullptr;
+        mfxVideoParam       mfx_videoparam_encode_ = {};
         mfxExtCodingOption2 mfx_eco2_ = {};
         mfxExtCodingOption3 mfx_eco3_ = {};
 };
