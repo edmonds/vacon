@@ -75,6 +75,7 @@ glfw = dependency('glfw3')
 
 # v4l2 kernel API
 
+cc.check_header('linux/version.h', required: true)
 cc.check_header('linux/videodev2.h', required: true)
 
 # other dependencies

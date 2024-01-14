@@ -19,6 +19,7 @@
 #include <chrono>
 #include <cstring>
 
+#include <linux/version.h>
 #include <linux/videodev2.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -40,7 +41,9 @@ void PrintV4L2RequestBuffers(const struct v4l2_requestbuffers *reqbuf)
     PLOG_VERBOSE << fmt::format("type = {}", reqbuf->type);
     PLOG_VERBOSE << fmt::format("memory = {}", reqbuf->memory);
     PLOG_VERBOSE << fmt::format("capabilities = {:#010x}", reqbuf->capabilities);
+#if LINUX_VERSION_MAJOR >= 6
     PLOG_VERBOSE << fmt::format("flags = {}", reqbuf->flags);
+#endif
 }
 
 void PrintV4L2Capability(const struct v4l2_capability *cap)
