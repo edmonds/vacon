@@ -128,8 +128,9 @@ bool Encoder::InitMfxVideoParamEncode()
     // application explicitly synchronizes the result.
     mfx_videoparam_encode_.AsyncDepth = 1;
 
-    // Input to functions is a video memory surface.
-    mfx_videoparam_encode_.IOPattern |= MFX_IOPATTERN_IN_SYSTEM_MEMORY;
+    // Read the uncompressed input data for encoding from video memory. The VPP
+    // step needs to put its output in video memory.
+    mfx_videoparam_encode_.IOPattern |= MFX_IOPATTERN_IN_VIDEO_MEMORY;
 
     // Hint to enable low power consumption mode for encoders.
     mfx_videoparam_encode_.mfx.LowPower = MFX_CODINGOPTION_ON;
@@ -286,9 +287,11 @@ bool Encoder::InitLibraryEncode()
 
 bool Encoder::InitMfxVideoParamVpp()
 {
-    // Input to functions is a video memory surface.
+    // Upload the surface data for the VPP input from system memory and put the
+    // output in video memory. This allows the encoder to read the uncompressed
+    // data from video memory without a roundtrip through system memory.
     mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_IN_SYSTEM_MEMORY;
-    mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
+    mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_OUT_VIDEO_MEMORY;
 
     // Set input pixel format depending on the configured pixel format.
     mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
