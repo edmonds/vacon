@@ -339,6 +339,9 @@ bool Camera::StartCapturing()
             if (buf.sequence >= stream_skip_) {
                 break;
             }
+        } else if (pfd.revents == 0) {
+            PLOG_ERROR << fmt::format("fd {} timed out waiting for data", fd_);
+            return false;
         } else {
             PLOG_ERROR << fmt::format("fd {} is ready but not for data, poll events {:#x}", fd_, pfd.revents);
             return false;
