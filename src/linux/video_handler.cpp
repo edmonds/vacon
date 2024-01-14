@@ -180,6 +180,11 @@ void VideoHandler::RunEncoder(std::stop_token st) {
             // Return the V4L2 buffer to the kernel.
             camera_frame->ReleaseToKernel();
 
+            if (!video_frame) {
+                PLOG_ERROR << "Encoder::EncodeCameraFrame() failed!";
+                continue;
+            }
+
             // Enqueue the compressed video frame for network transport.
             if (params_.outgoing_video_packet_queue) {
                 while (!st.stop_requested()) {
