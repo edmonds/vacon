@@ -21,6 +21,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <variant>
 
 #include <fmt/format.h>
@@ -47,12 +48,77 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
     nh->params_ = params;
     nh->config_.iceServers.emplace_back(nh->params_.stun_server);
 
+    nh->outgoing_video_packet_queue_ =
+        std::make_shared<moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<linux::VideoFrame>>>(2);
+
     return nh;
 }
 
 NetworkHandler::~NetworkHandler()
 {
     PLOG_VERBOSE << fmt::format("Destructor called on {}", fmt::ptr(this));
+}
+
+void NetworkHandler::Init()
+{
+    threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunDrain(st); } });
+}
+
+void NetworkHandler::Stop()
+{
+    for (auto& thread : threads_) {
+        thread.request_stop();
+    }
+}
+
+void NetworkHandler::Join()
+{
+    PLOG_INFO << "Waiting for network handler threads to exit...";
+
+    for (auto& thread : threads_) {
+        if (thread.joinable()) {
+            PLOG_DEBUG << "Trying to join thread ID " << thread.get_id();
+            thread.join();
+        } else {
+            PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
+        }
+    }
+}
+
+void NetworkHandler::RunDrain(std::stop_token st)
+{
+    PLOG_DEBUG << "Starting outgoing video packet queue drain thread ID " << std::this_thread::get_id();
+    setThreadName("VOutVideo");
+
+    auto t_last = std::chrono::steady_clock::now();
+    int count_frames = -1;
+
+    while (!st.stop_requested()) {
+        std::shared_ptr<linux::VideoFrame> frame;
+        if (outgoing_video_packet_queue_->wait_dequeue_timed(frame, 250ms)) {
+            SendVideoFrame(frame->CompressedData(), frame->CompressedDataLength(), frame->pts);
+
+            auto t_now = std::chrono::steady_clock::now();
+            if (count_frames == -1) {
+                t_last = t_now;
+            }
+            ++count_frames;
+            auto t_dur = t_now - t_last;
+
+            if (t_dur >= 1s) {
+                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
+                auto fps = count_frames / std::chrono::duration<double>(t_dur).count();
+                PLOG_INFO << fmt::format("Processed {} outgoing camera frames in {} ms, {:.3f} fps",
+                                         count_frames, ms, fps);
+                t_last = t_now;
+                count_frames = 0;
+            }
+        } else {
+            PLOG_VERBOSE << "Stalled dequeuing packet from outgoing video packet queue, retrying";
+        }
+    }
+
+    PLOG_DEBUG << "Stopping outgoing video packet queue drain thread ID " << std::this_thread::get_id();
 }
 
 void NetworkHandler::ConnectWebRTC()

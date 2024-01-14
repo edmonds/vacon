@@ -20,11 +20,15 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 #include <rtc/rtc.hpp>
+#include <readerwritercircularbuffer.h>
 
 #include "common.hpp"
+#include "linux/video_frame.hpp"
 #include "rtp_depacketizer.hpp"
 
 namespace vacon {
@@ -40,6 +44,9 @@ class NetworkHandler {
         static std::unique_ptr<NetworkHandler> Create(const NetworkHandlerParams& params);
         NetworkHandler(NetworkHandler&&) = default;
         ~NetworkHandler();
+        void Init();
+        void Stop();
+        void Join();
 
         void ConnectWebRTC();
         void CloseWebSocket();
@@ -47,14 +54,22 @@ class NetworkHandler {
 
         AVFormatContext* GetRtpAvfcInput();
 
+        std::shared_ptr
+            <moodycamel::BlockingReaderWriterCircularBuffer
+                <std::shared_ptr
+                    <linux::VideoFrame> > >
+            outgoing_video_packet_queue_ = nullptr;
+
     private:
         NetworkHandler() = default;
+        void RunDrain(std::stop_token);
         void ReceivePacket(rtc::binary);
         void OnWsMessage(nlohmann::json message);
         void CreatePeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);
         void SendVideoFrame(const std::byte *data, size_t size, uint64_t pts);
 
         NetworkHandlerParams                            params_ = {};
+        std::vector<std::jthread>                       threads_ = {};
         rtc::Configuration                              config_;
         std::shared_ptr<rtc::WebSocket>                 ws_;
         std::shared_ptr<rtc::PeerConnection>            peer_;
