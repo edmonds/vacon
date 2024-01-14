@@ -54,12 +54,11 @@ class Encoder {
 
         EncoderParams       params_;
         mfxLoader           mfx_loader_ = nullptr;
-        mfxSession          mfx_session_encode_ = nullptr;
+        mfxSession          mfx_session_ = nullptr;
         mfxVideoParam       mfx_videoparam_encode_ = {};
+        mfxVideoParam       mfx_videoparam_vpp_ = {};
         mfxExtCodingOption2 mfx_eco2_ = {};
         mfxExtCodingOption3 mfx_eco3_ = {};
-        mfxSession          mfx_session_vpp_ = nullptr;
-        mfxVideoParam       mfx_videoparam_vpp_ = {};
 };
 
 } // namespace linux

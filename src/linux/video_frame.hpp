@@ -31,6 +31,7 @@ struct VideoFrame {
     uint64_t pts = 0;
     mfxBitstream bitstream = {};
     mfxFrameSurface1 *surface = nullptr;
+    mfxFrameSurface1 *surface_vpp = nullptr;
 
     VideoFrame(uint32_t max_length = 262144)
     {
@@ -41,11 +42,13 @@ struct VideoFrame {
 
     VideoFrame(VideoFrame&& src)
     {
-        bitstream = src.bitstream;
-        src.bitstream.Data = nullptr;
+        bitstream           = src.bitstream;
+        surface             = src.surface;
+        surface_vpp         = src.surface_vpp;
 
-        surface = src.surface;
-        src.surface = nullptr;
+        src.bitstream.Data  = nullptr;
+        src.surface         = nullptr;
+        src.surface_vpp     = nullptr;
     }
 
     ~VideoFrame();

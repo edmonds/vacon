@@ -25,6 +25,25 @@
 namespace vacon {
 namespace linux {
 
+void FreeMfxSurface(mfxFrameSurface1 **surface)
+{
+    if (*surface) {
+        if ((*surface)->Data.R) {
+            PLOG_VERBOSE << fmt::format("Unmapping MFX surface @ {}", fmt::ptr(*surface));
+            auto status = (*surface)->FrameInterface->Unmap(*surface);
+            if (status != MFX_ERR_NONE) {
+                PLOG_DEBUG << "surface->FrameInterface->Unmap() failed: " << status;
+            }
+        }
+        PLOG_VERBOSE << fmt::format("Releasing MFX surface @ {}", fmt::ptr(*surface));
+        auto status = (*surface)->FrameInterface->Release(*surface);
+        if (status != MFX_ERR_NONE) {
+            PLOG_DEBUG << "surface->FrameInterface->Release() failed: " << status;
+        }
+        *surface = nullptr;
+    }
+}
+
 VideoFrame::~VideoFrame()
 {
     //PLOG_VERBOSE << fmt::format("Destroying VideoFrame @ {}", fmt::ptr(this));
@@ -34,21 +53,8 @@ VideoFrame::~VideoFrame()
         bitstream.Data = nullptr;
     }
 
-    if (surface) {
-        if (surface->Data.R) {
-            //PLOG_VERBOSE << fmt::format("Unmapping MFX surface @ {}", fmt::ptr(surface));
-            auto status = surface->FrameInterface->Unmap(surface);
-            if (status != MFX_ERR_NONE) {
-                PLOG_VERBOSE << "surface->FrameInterface->Unmap() returned: " << status;
-            }
-        }
-        //PLOG_VERBOSE << fmt::format("Releasing MFX surface @ {}", fmt::ptr(surface));
-        auto status = surface->FrameInterface->Release(surface);
-        if (status != MFX_ERR_NONE) {
-            PLOG_VERBOSE << "surface->FrameInterface->Release() returned: " << status;
-        }
-        surface = nullptr;
-    }
+    FreeMfxSurface(&surface);
+    FreeMfxSurface(&surface_vpp);
 }
 
 const std::byte* VideoFrame::CompressedData()
@@ -63,8 +69,8 @@ size_t VideoFrame::CompressedDataLength()
 
 bool VideoFrame::CopyCameraFrameToSurface(const CameraFrame& camera)
 {
-    auto width = surface->Info.CropW;
-    auto height = surface->Info.CropH;
+    auto width = surface_vpp->Info.CropW;
+    auto height = surface_vpp->Info.CropH;
 
     switch (camera.fourcc_) {
     case V4L2_PIX_FMT_NV12: {
@@ -74,16 +80,26 @@ bool VideoFrame::CopyCameraFrameToSurface(const CameraFrame& camera)
         // data split into Y and UV planes.
         size_t bytes_needed = width * height * 3 / 2;
         if (bytes_needed != (size_t)camera.buf_.bytesused) {
-            PLOG_DEBUG << fmt::format("Camera frame is {} bytes, but encoder surface needs {} bytes",
+            PLOG_ERROR << fmt::format("Camera frame is {} bytes, but MFX surface needs {} bytes",
                                       camera.buf_.bytesused, bytes_needed);
             return false;
         }
 
         // Copy the Y plane, (width * height) bytes.
-        memcpy(surface->Data.Y, camera.data_, width * height);
+        if (!surface_vpp->Data.Y) {
+            PLOG_ERROR << fmt::format("MFX surface @ {} has no Data.Y buffer!",
+                                      fmt::ptr(surface_vpp));
+            return false;
+        }
+        memcpy(surface_vpp->Data.Y, camera.data_, width * height);
 
         // Copy the UV plane, (width * height / 2) bytes.
-        memcpy(surface->Data.UV,
+        if (!surface_vpp->Data.UV) {
+            PLOG_ERROR << fmt::format("MFX surface @ {} has no Data.UV buffer!",
+                                      fmt::ptr(surface_vpp));
+            return false;
+        }
+        memcpy(surface_vpp->Data.UV,
                (unsigned char*)camera.data_ + width * height,
                width * height / 2);
 

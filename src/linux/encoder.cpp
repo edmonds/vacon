@@ -64,18 +64,12 @@ std::shared_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 
 Encoder::~Encoder()
 {
-    if (mfx_session_vpp_) {
-        PLOG_VERBOSE << fmt::format("Closing MFX VPP session @ {}", fmt::ptr(mfx_session_vpp_));
-        MFXVideoENCODE_Close(mfx_session_vpp_);
-        MFXClose(mfx_session_vpp_);
-        mfx_session_vpp_ = nullptr;
-    }
-
-    if (mfx_session_encode_) {
-        PLOG_VERBOSE << fmt::format("Closing MFX ENCODE session @ {}", fmt::ptr(mfx_session_encode_));
-        MFXVideoENCODE_Close(mfx_session_encode_);
-        MFXClose(mfx_session_encode_);
-        mfx_session_encode_ = nullptr;
+    if (mfx_session_) {
+        PLOG_VERBOSE << fmt::format("Closing MFX session @ {}", fmt::ptr(mfx_session_));
+        MFXVideoENCODE_Close(mfx_session_);
+        MFXVideoVPP_Close(mfx_session_);
+        MFXClose(mfx_session_);
+        mfx_session_ = nullptr;
     }
 
     if (mfx_loader_) {
@@ -105,23 +99,19 @@ bool Encoder::Init()
         return false;
     }
 
-    if (!InitMfxVideoParamEncode()) {
-        PLOG_ERROR << "InitMfxVideoParamEncode() failed";
-        return false;
-    }
-
-    if (!InitLibraryEncode()) {
-        PLOG_ERROR << "InitLibraryEncode() failed";
-        return false;
-    }
-
-    if (!InitMfxVideoParamVpp()) {
-        PLOG_ERROR << "InitMfxVideoParamVpp() failed";
+    auto status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXCreateSession() failed: " << status;
         return false;
     }
 
     if (!InitLibraryVpp()) {
         PLOG_ERROR << "InitLibraryVpp() failed";
+        return false;
+    }
+
+    if (!InitLibraryEncode()) {
+        PLOG_ERROR << "InitLibraryEncode() failed";
         return false;
     }
 
@@ -148,7 +138,7 @@ bool Encoder::InitMfxVideoParamEncode()
     mfx_videoparam_encode_.mfx.CodecId = MFX_CODEC_HEVC;
 
     // The codec profile.
-    //mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN10;
+    mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN10;
     //mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN;
 
     // Balanced quality and speed.
@@ -196,29 +186,6 @@ bool Encoder::InitMfxVideoParamEncode()
     // Height in pixels.
     mfx_videoparam_encode_.mfx.FrameInfo.CropH = (mfxU16)params_.height;
 
-    // Pixel color format values dependent on the configured pixel format.
-    if (params_.input_pixel_format == "NV12") {
-        mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
-        mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
-    } else if (params_.input_pixel_format == "YUY2" ||
-               params_.input_pixel_format == "YUYV422")
-    {
-        //mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_YUY2;
-        //mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
-        PLOG_ERROR << "Camera pixel format YUY2 not supported right now";
-        return false;
-    } else if (params_.input_pixel_format == "UYVY" ||
-               params_.input_pixel_format == "UYVY422")
-    {
-        //mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_UYVY;
-        //mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
-        PLOG_ERROR << "Camera pixel format UYVY not supported right now";
-        return false;
-    } else {
-        PLOG_ERROR << "Unknown camera pixel format: " << params_.input_pixel_format;
-        return false;
-    }
-
     // Try to enable intra refresh.
     mfx_eco2_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
     mfx_eco2_.Header.BufferSz = sizeof(mfx_eco2_);
@@ -241,6 +208,11 @@ bool Encoder::InitMfxVideoParamEncode()
 
 bool Encoder::InitLibraryEncode()
 {
+    if (!InitMfxVideoParamEncode()) {
+        PLOG_ERROR << "InitMfxVideoParamEncode() failed";
+        return false;
+    }
+
     mfxConfig cfg[3];
     mfxVariant cfgVal[3];
 
@@ -298,18 +270,11 @@ bool Encoder::InitLibraryEncode()
         return false;
     }
 
-    // MFXCreateSession(): Loads and initializes the implementation.
-    status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_encode_);
-    if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXCreateSession() failed: " << status;
-        return false;
-    }
-
     // MFXVideoENCODE_Init(): Allocates memory and prepares tables and
     // necessary structures for encoding. This function also does extensive
     // validation to ensure if the configuration, as specified in the input
     // parameters, is supported.
-    status = MFXVideoENCODE_Init(mfx_session_encode_, &mfx_videoparam_encode_);
+    status = MFXVideoENCODE_Init(mfx_session_, &mfx_videoparam_encode_);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoENCODE_Init() failed: " << status;
         return false;
@@ -326,36 +291,36 @@ bool Encoder::InitMfxVideoParamVpp()
     mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
 
     // Set input pixel format depending on the configured pixel format.
+    mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
+    mfx_videoparam_vpp_.vpp.In.BitDepthLuma = 8;
     if (params_.input_pixel_format == "NV12") {
-        mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
-        mfx_videoparam_vpp_.vpp.In.BitDepthLuma = 8;
-        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
         mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_NV12;
+        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
     } else if (params_.input_pixel_format == "YUY2" ||
                params_.input_pixel_format == "YUYV422")
     {
-        mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
-        mfx_videoparam_vpp_.vpp.In.BitDepthLuma = 8;
-        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
         mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_YUY2;
+        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
     } else if (params_.input_pixel_format == "UYVY" ||
                params_.input_pixel_format == "UYVY422")
     {
-        mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
-        mfx_videoparam_vpp_.vpp.In.BitDepthLuma = 8;
-        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
         mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_UYVY;
+        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
     } else {
         PLOG_ERROR << "Unknown camera pixel format: " << params_.input_pixel_format;
         return false;
     }
 
-    // Hardcode output pixel format.
+    // Hardcode VPP output / encoding pixel format.
     // XXX: This is 10-bit 4:2:0, need to handle 10-bit 4:2:2.
     mfx_videoparam_vpp_.vpp.Out.BitDepthChroma = 10;
     mfx_videoparam_vpp_.vpp.Out.BitDepthLuma = 10;
     mfx_videoparam_vpp_.vpp.Out.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
     mfx_videoparam_vpp_.vpp.Out.FourCC = MFX_FOURCC_P010;
+    mfx_videoparam_encode_.mfx.FrameInfo.BitDepthChroma = 10;
+    mfx_videoparam_encode_.mfx.FrameInfo.BitDepthLuma = 10;
+    mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
+    mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_P010;
 
     // CropW
     mfx_videoparam_vpp_.vpp.In.CropW =
@@ -391,6 +356,11 @@ bool Encoder::InitMfxVideoParamVpp()
 
 bool Encoder::InitLibraryVpp()
 {
+    if (!InitMfxVideoParamVpp()) {
+        PLOG_ERROR << "InitMfxVideoParamVpp() failed";
+        return false;
+    }
+
     mfxConfig cfg[3];
     mfxVariant cfgVal[3];
 
@@ -436,13 +406,7 @@ bool Encoder::InitLibraryVpp()
         return false;
     }
 
-    status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_vpp_);
-    if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXCreateSession() failed: " << status;
-        return false;
-    }
-
-    status = MFXVideoVPP_Init(mfx_session_vpp_, &mfx_videoparam_vpp_);
+    status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoVPP_Init() failed: " << status;
         return false;
@@ -457,46 +421,80 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     auto t_start = std::chrono::steady_clock::now();
 
     // Consistency check.
-    assert(camera.fourcc_ == mfx_videoparam_encode_.mfx.FrameInfo.FourCC);
+    assert(camera.fourcc_ == mfx_videoparam_vpp_.vpp.In.FourCC);
 
-    // Initialize the data for the encoded frame.
+    // Initialize the frame's data.
     auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
     frame->pts = camera.pts();
 
     // Get a new surface to upload the frame data from the CPU to the GPU.
-    auto status = MFXMemory_GetSurfaceForEncode(mfx_session_encode_, &frame->surface);
+    auto status = MFXMemory_GetSurfaceForVPPIn(mfx_session_, &frame->surface_vpp);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXMemory_GetSurfaceForEncode() failed: " << status;
+        PLOG_ERROR << "MFXMemory_GetSurfaceForVPPIn() failed: " << status;
         return nullptr;
     }
 
-    // Map the surface onto the CPU.
-    status = frame->surface->FrameInterface->Map(frame->surface, MFX_MAP_WRITE);
+    // Get a new surface for the scaled VPP output which will also be used as
+    // encoder input.
+    status = MFXMemory_GetSurfaceForVPPOut(mfx_session_, &frame->surface);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXMemory_GetSurfaceForVPPOut() failed: " << status;
+        return nullptr;
+    }
+
+    // Map the VPP input surface onto the CPU.
+    status = frame->surface_vpp->FrameInterface->Map(frame->surface_vpp, MFX_MAP_WRITE);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "mfxFrameSurfaceInterface->Map() failed: " << status;
         return nullptr;
     }
 
-    // Copy the camera frame data to the surface.
+    // Copy the camera frame data to the VPP input surface.
     if (!frame->CopyCameraFrameToSurface(camera)) {
         PLOG_ERROR << "frame->CopyCameraFrameToSurface() failed";
         return nullptr;
     }
 
-    // Unmap the surface from the CPU. This uploads the data to the GPU?
-    status = frame->surface->FrameInterface->Unmap(frame->surface);
+    // Unmap the VPP input surface from the CPU. This uploads the data to the GPU?
+    status = frame->surface_vpp->FrameInterface->Unmap(frame->surface_vpp);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "mfxFrameSurfaceInterface->Unmap() failed: " << status;
         return nullptr;
     }
 
-    // Issue the encoding request to the GPU.
+    // Issue the VPP scaling request to the GPU.
     mfxSyncPoint syncp = {};
-    status = MFXVideoENCODE_EncodeFrameAsync(mfx_session_encode_,
-                                             nullptr /* ctrl */,
-                                             frame->surface,
-                                             &frame->bitstream,
-                                             &syncp);
+    status =
+        MFXVideoVPP_RunFrameVPPAsync(mfx_session_,
+                                     frame->surface_vpp,
+                                     frame->surface,
+                                     nullptr /* aux */,
+                                     &syncp);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed: " << status;
+        return nullptr;
+    }
+
+    status = frame->surface_vpp->FrameInterface->Release(frame->surface_vpp);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "FrameInterface->Release() failed: " << status;
+        return nullptr;
+    }
+
+    // Check status of VPP scaling request.
+    if (!syncp) {
+        PLOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed to return a synchronization point";
+        return nullptr;
+    }
+
+    // Issue the encoding request to the GPU.
+    syncp = {};
+    status =
+        MFXVideoENCODE_EncodeFrameAsync(mfx_session_,
+                                        nullptr /* ctrl */,
+                                        frame->surface,
+                                        &frame->bitstream,
+                                        &syncp);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoENCODE_EncodeFrameAsync() failed: " << status;
         return nullptr;
@@ -509,8 +507,13 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     }
 
     // Wait for the encoding request to complete and return the encoded frame.
+    bool stalled = false;
     do {
-        status = MFXVideoCORE_SyncOperation(mfx_session_encode_, syncp, 10 /* wait ms */);
+        status = MFXVideoCORE_SyncOperation(mfx_session_, syncp, 10 /* wait ms */);
+        if (status == MFX_WRN_IN_EXECUTION) {
+            stalled = true;
+
+        }
     } while (status == MFX_WRN_IN_EXECUTION);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoCORE_SyncOperation() failed: " << status;
@@ -519,7 +522,12 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
 
     auto t_stop = std::chrono::steady_clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_stop - t_start).count();
-    PLOG_VERBOSE << fmt::format("Encoded frame in {} us, {} bytes", micros, frame->bitstream.DataLength);
+    auto msg = fmt::format("Encoded frame in {} us, {} bytes", micros, frame->bitstream.DataLength);
+    if (stalled) {
+        PLOG_DEBUG << msg;
+    } else {
+        PLOG_VERBOSE << msg;
+    }
 
     // Success.
     return frame;
