@@ -92,6 +92,12 @@ bool Encoder::Init()
 
     auto t_start = std::chrono::steady_clock::now();
 
+    mfx_loader_ = MFXLoad();
+    if (!mfx_loader_) {
+        PLOG_ERROR << "MFXLoad() failed";
+        return false;
+    }
+
     if (!InitMfxVideoParamEncode()) {
         PLOG_ERROR << "InitMfxVideoParamEncode() failed";
         return false;
@@ -220,13 +226,6 @@ bool Encoder::InitLibraryEncode()
 {
     mfxConfig cfg[3];
     mfxVariant cfgVal[3];
-
-    // MFXLoad(): Create the loader.
-    mfx_loader_ = MFXLoad();
-    if (!mfx_loader_) {
-        PLOG_ERROR << "MFXLoad() failed";
-        return false;
-    }
 
     // MFXCreateConfig(): Creates the dispatcher internal configuration, which
     // is used to filter out available implementations. This configuration is
