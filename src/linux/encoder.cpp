@@ -315,10 +315,12 @@ bool Encoder::InitMfxVideoParamVpp()
     // XXX: This is 10-bit 4:2:0, need to handle 10-bit 4:2:2.
     mfx_videoparam_vpp_.vpp.Out.BitDepthChroma = 10;
     mfx_videoparam_vpp_.vpp.Out.BitDepthLuma = 10;
+    mfx_videoparam_vpp_.vpp.Out.Shift = 1;
     mfx_videoparam_vpp_.vpp.Out.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
     mfx_videoparam_vpp_.vpp.Out.FourCC = MFX_FOURCC_P010;
     mfx_videoparam_encode_.mfx.FrameInfo.BitDepthChroma = 10;
     mfx_videoparam_encode_.mfx.FrameInfo.BitDepthLuma = 10;
+    mfx_videoparam_encode_.mfx.FrameInfo.Shift = 1;
     mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
     mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_P010;
 
