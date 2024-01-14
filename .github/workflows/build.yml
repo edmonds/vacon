@@ -68,7 +68,6 @@ jobs:
           --cxx=g++-13 \
           --disable-everything \
           --enable-avcodec \
-          --enable-avdevice \
           --enable-avfilter \
           --enable-avformat \
           --enable-avutil \
@@ -94,7 +93,6 @@ jobs:
           --enable-hwaccel=hevc_vaapi \
           --enable-hwaccel=mjpeg_vaapi \
           --enable-hwaccel=vp9_vaapi \
-          --enable-indev=v4l2 \
           --enable-libdrm \
           --enable-muxer=h264 \
           --enable-muxer=hevc \

@@ -63,7 +63,6 @@ vpl = dependency('vpl', version: '>2')
 
 ffmpeg = [
   dependency('libavcodec'),
-  dependency('libavdevice'),
   dependency('libavformat'),
   dependency('libavutil'),
 ]
