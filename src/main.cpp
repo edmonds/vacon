@@ -47,10 +47,11 @@ namespace vacon {
 
 backward::SignalHandling gBackwardSignalHandling;
 
+static argparse::ArgumentParser args("vacon");
+static int gVerbosity = 0;
+static std::vector<std::jthread> gThreads = {};
 volatile std::sig_atomic_t gSignalUSR1;
 volatile std::sig_atomic_t gShuttingDown;
-
-static argparse::ArgumentParser args("vacon");
 
 static const char *kDefaultCameraDevice             = "/dev/video0";
 static const char *kDefaultCameraCodec              = "hevc_vaapi";
@@ -63,10 +64,6 @@ static const int kDefaultCameraBitrateKbps          = 10'000;
 static const char *kDefaultSignalingUrl             = "ws://127.0.0.1:8000/v1/ooo";
 static const char *kDefaultStunServer               = "stun:stun.l.google.com:19302";
 
-static int verbosity = 0;
-
-static std::vector<std::jthread> threads = {};
-
 static moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<VPacket>>
     gOutgoingCameraPacketBuffer(1);
 
@@ -74,7 +71,7 @@ static void parseArgs(int argc, char *argv[])
 {
     args.add_argument("-v", "--verbose")
         .help("increase logging verbosity")
-        .action([](const auto &) { ++verbosity; })
+        .action([](const auto &) { ++gVerbosity; })
         .append()
         .default_value(false)
         .implicit_value(true)
@@ -175,7 +172,7 @@ static void signalTerminate(int signal = 0)
 {
     static unsigned user_anger = 0;
     if ((signal == SIGINT || signal == SIGTERM) && ++user_anger > 1) {
-        puts("\nuser anger detected !!!\n");
+        puts("\n\nUser anger detected, exiting immediately !!!\n");
         _exit(EXIT_FAILURE);
     }
 
@@ -186,7 +183,7 @@ static void signalTerminate(int signal = 0)
     plplay_shutdown();
 
     // Signal threads to stop.
-    for (auto& thread : threads) {
+    for (auto& thread : gThreads) {
         thread.request_stop();
     }
 }
@@ -209,7 +206,7 @@ static void setupSignals(const bool want_sigusr1)
 int main(int argc, char *argv[])
 {
     parseArgs(argc, argv);
-    setupLogging(verbosity);
+    setupLogging(gVerbosity);
     setupSignals(args["--usr1"] == true);
 
     if (!setupRealtimePriority()) {
@@ -314,9 +311,12 @@ int main(int argc, char *argv[])
         while (!nh->isConnectedToPeer() && !gShuttingDown) {
             std::this_thread::sleep_for(5ms);
         }
-        PLOG_FATAL << "READY !!!";
 
-        // Peer-to-peer connection is up, so close the connection to the
+        if (nh->IsConnectedToPeer() && !gShuttingDown) {
+            PLOG_FATAL << "PEER-TO-PEER CONNECTION IS READY !!!";
+        }
+
+        // WebRTC peer connection is up, so close the connection to the
         // signaling server.
         nh->closeWebSocket();
     }
@@ -328,7 +328,7 @@ int main(int argc, char *argv[])
             // thread to run the decode loop and then run the render loop. The
             // thread that plplay starts has to be separately signaled to shut
             // down with plplay_shutdown().
-            threads.emplace_back(std::jthread { [avfc]() {
+            gThreads.emplace_back(std::jthread { [avfc]() {
                 PLOG_DEBUG << "Starting plplay video player thread ID " << std::this_thread::get_id();
                 if (auto ret = plplay_play(avfc)) {
                     PLOG_INFO << "plplay_play() failed with return code " << ret;
@@ -358,7 +358,7 @@ int main(int argc, char *argv[])
 
     // Join threads.
     PLOG_INFO << "Waiting for threads to exit...";
-    for (auto& thread : threads) {
+    for (auto& thread : gThreads) {
         if (thread.joinable()) {
             PLOG_DEBUG << "Trying to join thread ID " << thread.get_id();
             thread.join();
