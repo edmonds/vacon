@@ -57,6 +57,7 @@ class Encoder {
         mfxSession          mfx_session_ = nullptr;
         mfxVideoParam       mfx_videoparam_encode_ = {};
         mfxVideoParam       mfx_videoparam_vpp_ = {};
+        mfxExtCodingOption  mfx_eco1_ = {};
         mfxExtCodingOption2 mfx_eco2_ = {};
         mfxExtCodingOption3 mfx_eco3_ = {};
 };

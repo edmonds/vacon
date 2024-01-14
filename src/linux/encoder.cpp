@@ -125,7 +125,8 @@ bool Encoder::Init()
 bool Encoder::InitMfxVideoParamEncode()
 {
     // How many asynchronous operations an application performs before the
-    // application explicitly synchronizes the result.
+    // application explicitly synchronizes the result. Recommended for low
+    // latency.
     mfx_videoparam_encode_.AsyncDepth = 1;
 
     // Read the uncompressed input data for encoding from video memory. The VPP
@@ -149,8 +150,14 @@ bool Encoder::InitMfxVideoParamEncode()
     mfx_videoparam_encode_.mfx.GopPicSize = 60;
 
     // Distance between I- or P (or GPB) - key frames. If GopRefDist is 1,
-    // there are no regular B-frames used (only P or GPB).
+    // there are no regular B-frames used (only P or GPB). Recommended for low
+    // latency.
     mfx_videoparam_encode_.mfx.GopRefDist = 1;
+
+    // Max number of all available reference frames (for AVC/HEVC, NumRefFrame
+    // defines DPB size), "has the effect of only using previous P-frame as
+    // reference". Recommended for low latency.
+    mfx_videoparam_encode_.mfx.NumRefFrame = 1;
 
     // The encoder must strictly follow the given GOP structure as defined by
     // the parameters GopPicSize, GopRefDist, etc.
@@ -187,21 +194,38 @@ bool Encoder::InitMfxVideoParamEncode()
     // Height in pixels.
     mfx_videoparam_encode_.mfx.FrameInfo.CropH = (mfxU16)params_.height;
 
+    // Limit the number of frames in the Decoded Picture Buffer, "to ensure
+    // that decoded frame gets displayed immediately after decoding". For low
+    // latency.
+    mfx_eco1_.MaxDecFrameBuffering = 1;
+
+    // Enable Reference Picture Marking Repetition SEI messages.
+    //
+    // "The message is used to repeat the decoded reference picture marking
+    // syntax structures in the earlier decoded pictures. Consequently, even
+    // earlier reference pictures were lost, the decoder can still maintain
+    // correct status of the reference picture buffer and reference picture
+    // lists."
+    mfx_eco1_.RefPicMarkRep = MFX_CODINGOPTION_ON;
+
     // Try to enable intra refresh.
-    mfx_eco2_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
-    mfx_eco2_.Header.BufferSz = sizeof(mfx_eco2_);
     mfx_eco2_.IntRefType = MFX_REFRESH_SLICE;
 
     // Try to set the encoding scenario.
-    mfx_eco3_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION3;
-    mfx_eco3_.Header.BufferSz = sizeof(mfx_eco3_);
     mfx_eco3_.ScenarioInfo = MFX_SCENARIO_VIDEO_CONFERENCE;
 
     // Attach mfx_eco's to mfx_videoparam_encode_.
-    mfx_videoparam_encode_.ExtParam = (mfxExtBuffer**)calloc(2, sizeof(void *));
+    mfx_eco1_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION;
+    mfx_eco2_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
+    mfx_eco3_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION3;
+    mfx_eco1_.Header.BufferSz = sizeof(mfx_eco1_);
+    mfx_eco2_.Header.BufferSz = sizeof(mfx_eco2_);
+    mfx_eco3_.Header.BufferSz = sizeof(mfx_eco3_);
+    mfx_videoparam_encode_.ExtParam = (mfxExtBuffer**)calloc(3, sizeof(void *));
     assert(mfx_videoparam_encode_.ExtParam);
-    mfx_videoparam_encode_.ExtParam[0] = (mfxExtBuffer*)&mfx_eco2_;
-    mfx_videoparam_encode_.ExtParam[1] = (mfxExtBuffer*)&mfx_eco3_;
+    mfx_videoparam_encode_.ExtParam[0] = (mfxExtBuffer*)&mfx_eco1_;
+    mfx_videoparam_encode_.ExtParam[1] = (mfxExtBuffer*)&mfx_eco2_;
+    mfx_videoparam_encode_.ExtParam[2] = (mfxExtBuffer*)&mfx_eco3_;
 
     // Success.
     return true;
