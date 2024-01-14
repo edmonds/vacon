@@ -166,14 +166,21 @@ bool Encoder::InitMfxVideoParamEncode()
     // Every I-frame is an IDR-frame.
     mfx_videoparam_encode_.mfx.IdrInterval = 1;
 
-    // Constant bitrate control algorithm.
-    mfx_videoparam_encode_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
+    // Video Conferencing Mode rate control method.
+    //
+    // "This algorithm is similar to VBR and uses the same set of parameters
+    // InitialDelayInKB, TargetKbps, and MaxKbps. It is tuned for IPPP GOP
+    // pattern and streams with strong temporal correlation between frames. It
+    // produces better objective and subjective video quality in these
+    // conditions than other bitrate control algorithms. It does not support
+    // interlaced content, B-frames and produced stream is not HRD compliant."
+    mfx_videoparam_encode_.mfx.RateControlMethod = MFX_RATECONTROL_VCM;
 
     // Maximum possible size of any compressed frames.
     mfx_videoparam_encode_.mfx.BufferSizeInKB = 256;
 
-    // For CBR, used to estimate the targeted frame size by dividing the frame
-    // rate by the bitrate.
+    // For CBR and VCM, used to estimate the targeted frame size by dividing
+    // the frame rate by the bitrate.
     mfx_videoparam_encode_.mfx.TargetKbps = (mfxU16)params_.bitrate_kbps;
 
     // Frame rate numerator.
