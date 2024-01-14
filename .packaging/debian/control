@@ -6,5 +6,6 @@ Maintainer: Robert Edmonds <edmonds@users.noreply.github.com>
 Package: vacon
 Architecture: amd64
 Depends: ${shlibs:Depends}
+Recommends: libmfx-gen1.2
 Description: Hardware accelerated one-on-one video conferencing tool
  .
