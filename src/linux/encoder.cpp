@@ -160,8 +160,8 @@ bool Encoder::InitMfxVideoParams()
     mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN10;
     //mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN;
 
-    // Balanced quality and speed.
-    mfx_videoparam_encode_.mfx.TargetUsage = MFX_TARGETUSAGE_BALANCED;
+    // Best quality.
+    mfx_videoparam_encode_.mfx.TargetUsage = MFX_TARGETUSAGE_BEST_QUALITY;
 
     // Number of pictures within each GOP (Group of Pictures).
     mfx_videoparam_encode_.mfx.GopPicSize = 60;
