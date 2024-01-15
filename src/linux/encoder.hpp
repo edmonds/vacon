@@ -52,6 +52,8 @@ class Encoder {
         bool InitLibraryEncode();
         bool InitLibraryVpp();
 
+        bool CameraFrameToSurface(const CameraFrame&, mfxFrameSurface1&);
+
         EncoderParams       params_;
         mfxLoader           mfx_loader_ = nullptr;
         mfxSession          mfx_session_ = nullptr;

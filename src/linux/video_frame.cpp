@@ -66,35 +66,5 @@ size_t VideoFrame::CompressedDataLength()
     return bitstream.DataLength;
 }
 
-bool VideoFrame::ImportCameraFrame(const CameraFrame& camera, const mfxFrameInfo& info)
-{
-    auto width = info.CropW;
-    auto height = info.CropH;
-
-    surface_ref.Info = info;
-
-    switch (camera.fourcc_) {
-    case V4L2_PIX_FMT_NV12: {
-        size_t bytes_needed = width * height * 3 / 2;
-        if (bytes_needed != (size_t)camera.buf_.bytesused) {
-            PLOG_ERROR << fmt::format("Camera frame is {} bytes, but MFX surface needs {} bytes",
-                                      camera.buf_.bytesused, bytes_needed);
-            return false;
-        }
-        surface_ref.Data.Y = reinterpret_cast<mfxU8*>(camera.data_);
-        surface_ref.Data.UV = surface_ref.Data.Y + width * height;
-        surface_ref.Data.Pitch = width;
-        break;
-    }
-    default:
-        PLOG_ERROR << fmt::format("Unsupported camera frame FourCC {} ({:#010x})",
-                                  FourCcToString(camera.fourcc_), camera.fourcc_);
-        return false;
-    }
-
-    // Success.
-    return true;
-}
-
 } // namespace linux
 } // namespace vacon
