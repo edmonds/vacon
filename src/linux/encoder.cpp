@@ -476,19 +476,45 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
     frame->pts = camera.pts();
 
-    // Create an mfxFrameSurface1 that will be used as VPP input that points
-    // into the camera frame buffer.
-    mfxFrameSurface1 surface_ref = {};
-    if (!CameraFrameToSurface(camera, surface_ref)) {
-        PLOG_ERROR << "Encoder::CameraFrameToSurface() failed";
+    // Get a new surface for storing the copy of the camera frame data.
+    mfxFrameSurface1 *surface_camera = nullptr;
+    auto status = MFXMemory_GetSurfaceForVPPIn(mfx_session_, &surface_camera);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "MFXMemory_GetSurfaceForVPPIn() failed: " << status;
+        return nullptr;
+    }
+
+    // Map the new surface onto the CPU for writing.
+    status = surface_camera->FrameInterface->Map(surface_camera, MFX_MAP_WRITE);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "mfxFrameSurfaceInterface->Map(MFX_MAP_WRITE) failed: " << status;
+        return nullptr;
+    }
+
+    // Copy the camera frame data to the new surface.
+    if (!CopyCameraFrameToSurface(camera, *surface_camera)) {
+        PLOG_ERROR << "Encoder::CopyCameraFrameToSurface() failed";
+        return nullptr;
+    }
+
+    // Unmap the camera surface from the CPU.
+    status = surface_camera->FrameInterface->Unmap(surface_camera);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "mfxFrameSurfaceInterface->Unmap() failed: " << status;
         return nullptr;
     }
 
     // Issue the VPP scaling request to the GPU.
-    auto status =
-        MFXVideoVPP_ProcessFrameAsync(mfx_session_,
-                                      &surface_ref,
-                                      &frame->surface);
+    status = MFXVideoVPP_ProcessFrameAsync(mfx_session_, surface_camera, &frame->surface);
+
+    // Decrement reference count on the camera surface.
+    status = surface_camera->FrameInterface->Release(surface_camera);
+    if (status != MFX_ERR_NONE) {
+        PLOG_ERROR << "mfxFrameSurfaceInterface->Release() failed: " << status;
+        return nullptr;
+    }
+
+    // Check status of the scaling request.
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed: " << status;
         return nullptr;
@@ -507,7 +533,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
         return nullptr;
     }
 
-    // Check status of encoding request.
+    // Check status of the encoding request.
     if (!syncp) {
         PLOG_ERROR << "MFXVideoENCODE_EncodeFrameAsync() failed to return a synchronization point";
         return nullptr;
@@ -540,51 +566,41 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     return frame;
 }
 
-bool Encoder::CameraFrameToSurface(const CameraFrame& camera, mfxFrameSurface1& surface)
+bool Encoder::CopyCameraFrameToSurface(const CameraFrame& camera, mfxFrameSurface1& surface)
 {
     const mfxFrameInfo& info = mfx_videoparam_vpp_.vpp.In;
     auto width = info.CropW;
     auto height = info.CropH;
 
-    size_t bytes_needed = 0;
+    // Copy the frame info parameters from the VPP configuration.
+    surface.Info = info;
 
     switch (camera.fourcc_) {
     case V4L2_PIX_FMT_NV12:
-        bytes_needed = width * height * 3 / 2;
-        surface.Data.Y = reinterpret_cast<mfxU8*>(camera.data_);
-        surface.Data.UV = surface.Data.Y + width * height;
+        memcpy(surface.Data.Y, camera.data_, width * height);
+        memcpy(surface.Data.UV, (char*)camera.data_ + width*height, width*height / 2);
         surface.Data.Pitch = width;
         break;
 
     case V4L2_PIX_FMT_YUYV:
-        bytes_needed = width * height * 2;
-        surface.Data.Y = reinterpret_cast<mfxU8*>(camera.data_);
+        memcpy(surface.Data.Y, camera.data_, width*height * 2);
         surface.Data.U = surface.Data.Y + 1;
         surface.Data.V = surface.Data.Y + 3;
         surface.Data.Pitch = width * 2;
         break;
 
     case V4L2_PIX_FMT_UYVY:
-        bytes_needed = width * height * 2;
-        surface.Data.U = reinterpret_cast<mfxU8*>(camera.data_);
+        memcpy(surface.Data.U, camera.data_, width*height * 2);
         surface.Data.Y = surface.Data.U + 1;
         surface.Data.V = surface.Data.U + 2;
         surface.Data.Pitch = width * 2;
         break;
 
     default:
-        PLOG_ERROR << fmt::format("Unsupported camera frame FourCC {} ({:#010x})",
+        PLOG_ERROR << fmt::format("Unsupported V4L2 camera frame FourCC {} ({:#010x})",
                                   FourCcToString(camera.fourcc_), camera.fourcc_);
         return false;
     }
-
-    if (bytes_needed != (size_t)camera.buf_.bytesused) {
-        PLOG_ERROR << fmt::format("Camera frame is {} bytes, but MFX surface needs {} bytes",
-                                  camera.buf_.bytesused, bytes_needed);
-        return false;
-    }
-
-    surface.Info = info;
 
     // Success.
     return true;
