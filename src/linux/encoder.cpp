@@ -32,6 +32,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include <fmt/format.h>
 
@@ -105,6 +106,11 @@ bool Encoder::Init()
         return false;
     }
 
+    if (!InitMfxVideoParams()) {
+        PLOG_ERROR << "InitMfxVideoParams() failed";
+        return false;
+    }
+
     if (!InitLibraryVpp()) {
         PLOG_ERROR << "InitLibraryVpp() failed";
         return false;
@@ -122,16 +128,27 @@ bool Encoder::Init()
     return true;
 }
 
-bool Encoder::InitMfxVideoParamEncode()
+bool Encoder::InitMfxVideoParams()
 {
-    // How many asynchronous operations an application performs before the
-    // application explicitly synchronizes the result. Recommended for low
-    // latency.
-    mfx_videoparam_encode_.AsyncDepth = 1;
+    if (!SetMfxFourCc()) {
+        PLOG_ERROR << "SetMfxFourCc() failed";
+        return false;
+    }
+
+    // Upload the surface data for the VPP input from system memory and put the
+    // output in video memory. This allows the encoder to read the uncompressed
+    // data from video memory without a roundtrip through system memory.
+    mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_IN_SYSTEM_MEMORY;
+    mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_OUT_VIDEO_MEMORY;
 
     // Read the uncompressed input data for encoding from video memory. The VPP
     // step needs to put its output in video memory.
     mfx_videoparam_encode_.IOPattern |= MFX_IOPATTERN_IN_VIDEO_MEMORY;
+
+    // How many asynchronous operations an application performs before the
+    // application explicitly synchronizes the result. Recommended for low
+    // latency.
+    mfx_videoparam_encode_.AsyncDepth = 1;
 
     // Hint to enable low power consumption mode for encoders.
     mfx_videoparam_encode_.mfx.LowPower = MFX_CODINGOPTION_ON;
@@ -184,22 +201,46 @@ bool Encoder::InitMfxVideoParamEncode()
     mfx_videoparam_encode_.mfx.TargetKbps = (mfxU16)params_.bitrate_kbps;
 
     // Frame rate numerator.
-    mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtN = (mfxU32)params_.frame_rate;
+    mfx_videoparam_vpp_.vpp.In.FrameRateExtN =
+    mfx_videoparam_vpp_.vpp.Out.FrameRateExtN =
+    mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtN =
+        (mfxU32)params_.frame_rate;
 
     // Frame rate denominator.
-    mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtD = 1;
+    mfx_videoparam_vpp_.vpp.In.FrameRateExtD =
+    mfx_videoparam_vpp_.vpp.Out.FrameRateExtD =
+    mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtD =
+        1;
 
     // Width of the video frame in pixels. Must be a multiple of 16.
-    mfx_videoparam_encode_.mfx.FrameInfo.Width = VACON_ALIGN16((mfxU16)params_.width);
+    mfx_videoparam_vpp_.vpp.In.Width =
+    mfx_videoparam_vpp_.vpp.Out.Width =
+    mfx_videoparam_encode_.mfx.FrameInfo.Width =
+        VACON_ALIGN16((mfxU16)params_.width);
 
     // Height of the video frame in pixels. Must be a multiple of 16.
-    mfx_videoparam_encode_.mfx.FrameInfo.Height = VACON_ALIGN16((mfxU16)params_.height);
+    mfx_videoparam_vpp_.vpp.In.Height =
+    mfx_videoparam_vpp_.vpp.Out.Height =
+    mfx_videoparam_encode_.mfx.FrameInfo.Height =
+        VACON_ALIGN16((mfxU16)params_.height);
 
     // Width in pixels.
-    mfx_videoparam_encode_.mfx.FrameInfo.CropW = (mfxU16)params_.width;
+    mfx_videoparam_vpp_.vpp.In.CropW =
+    mfx_videoparam_vpp_.vpp.Out.CropW =
+    mfx_videoparam_encode_.mfx.FrameInfo.CropW =
+        (mfxU16)params_.width;
 
     // Height in pixels.
-    mfx_videoparam_encode_.mfx.FrameInfo.CropH = (mfxU16)params_.height;
+    mfx_videoparam_vpp_.vpp.In.CropH =
+    mfx_videoparam_vpp_.vpp.Out.CropH =
+    mfx_videoparam_encode_.mfx.FrameInfo.CropH =
+        (mfxU16)params_.height;
+
+    // PicStruct
+    mfx_videoparam_vpp_.vpp.In.PicStruct =
+    mfx_videoparam_vpp_.vpp.Out.PicStruct =
+    mfx_videoparam_encode_.mfx.FrameInfo.PicStruct =
+        MFX_PICSTRUCT_PROGRESSIVE;
 
     // Limit the number of frames in the Decoded Picture Buffer, "to ensure
     // that decoded frame gets displayed immediately after decoding". For low
@@ -215,10 +256,10 @@ bool Encoder::InitMfxVideoParamEncode()
     // lists."
     mfx_eco1_.RefPicMarkRep = MFX_CODINGOPTION_ON;
 
-    // Try to enable intra refresh.
+    // Enable intra refresh.
     mfx_eco2_.IntRefType = MFX_REFRESH_SLICE;
 
-    // Try to set the encoding scenario.
+    // Encoding scenario.
     mfx_eco3_.ScenarioInfo = MFX_SCENARIO_VIDEO_CONFERENCE;
 
     // Attach mfx_eco's to mfx_videoparam_encode_.
@@ -238,13 +279,67 @@ bool Encoder::InitMfxVideoParamEncode()
     return true;
 }
 
-bool Encoder::InitLibraryEncode()
+bool Encoder::SetMfxFourCc()
 {
-    if (!InitMfxVideoParamEncode()) {
-        PLOG_ERROR << "InitMfxVideoParamEncode() failed";
+    struct fourcc_mfx_params {
+        mfxU32 FourCC;
+        mfxU16 ChromaFormat;
+        mfxU16 BitDepthChroma;
+        mfxU16 BitDepthLuma;
+        mfxU16 Shift;
+
+        void ToMfxFrameInfo(mfxFrameInfo *fi) {
+            fi->FourCC = FourCC;
+            fi->ChromaFormat = ChromaFormat;
+            fi->BitDepthChroma = BitDepthChroma;
+            fi->BitDepthLuma = BitDepthLuma;
+            fi->Shift = Shift;
+        }
+    };
+
+    std::unordered_map<std::string, fourcc_mfx_params> map;
+    map["NV12"] = { MFX_FOURCC_NV12, MFX_CHROMAFORMAT_YUV420, 8, 8, 0 };
+    map["YUYV"] = { MFX_FOURCC_YUY2, MFX_CHROMAFORMAT_YUV422, 8, 8, 0 };
+    map["YUY2"] = { MFX_FOURCC_YUY2, MFX_CHROMAFORMAT_YUV422, 8, 8, 0 };
+    map["UYVY"] = { MFX_FOURCC_UYVY, MFX_CHROMAFORMAT_YUV422, 8, 8, 0 };
+    map["P010"] = { MFX_FOURCC_P010, MFX_CHROMAFORMAT_YUV420, 10, 10, 1 };
+    map["Y210"] = { MFX_FOURCC_Y210, MFX_CHROMAFORMAT_YUV422, 10, 10, 1 };
+
+    // Set pixel format parameters.
+    auto it = map.find(params_.input_pixel_format);
+    if (it != map.end()) {
+        PLOG_DEBUG << fmt::format("Using {} for video pixel format", it->first);
+
+        // Set VPP input parameters to match the camera format.
+        auto fourcc = it->second;
+        fourcc.ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.In);
+
+        // Set VPP output and encoder input parameters to a pixel format
+        // suitable for 10-bit hardware encoding. Use a FourCC with the same
+        // chroma format as the camera input format.
+        if (fourcc.ChromaFormat == MFX_CHROMAFORMAT_YUV420) {
+            PLOG_DEBUG << "Using P010 for encoder pixel format";
+            map["P010"].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
+            map["P010"].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
+        } else if (fourcc.ChromaFormat == MFX_CHROMAFORMAT_YUV422) {
+            PLOG_DEBUG << "Using Y210 for encoder pixel format";
+            map["Y210"].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
+            map["Y210"].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
+        } else {
+            PLOG_ERROR << "Unhandled chroma format: " << fourcc.ChromaFormat;
+            return false;
+        }
+    } else {
+        PLOG_ERROR << "Unhandled input pixel format: " << params_.input_pixel_format;
         return false;
     }
 
+    // Success.
+    return true;
+}
+
+bool Encoder::InitLibraryEncode()
+{
     mfxConfig cfg[3];
     mfxVariant cfgVal[3];
 
@@ -316,87 +411,8 @@ bool Encoder::InitLibraryEncode()
     return true;
 }
 
-bool Encoder::InitMfxVideoParamVpp()
-{
-    // Upload the surface data for the VPP input from system memory and put the
-    // output in video memory. This allows the encoder to read the uncompressed
-    // data from video memory without a roundtrip through system memory.
-    mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_IN_SYSTEM_MEMORY;
-    mfx_videoparam_vpp_.IOPattern |= MFX_IOPATTERN_OUT_VIDEO_MEMORY;
-
-    // Set input pixel format depending on the configured pixel format.
-    mfx_videoparam_vpp_.vpp.In.BitDepthChroma = 8;
-    mfx_videoparam_vpp_.vpp.In.BitDepthLuma = 8;
-    if (params_.input_pixel_format == "NV12") {
-        mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_NV12;
-        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
-    } else if (params_.input_pixel_format == "YUY2" ||
-               params_.input_pixel_format == "YUYV422")
-    {
-        mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_YUY2;
-        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
-    } else if (params_.input_pixel_format == "UYVY" ||
-               params_.input_pixel_format == "UYVY422")
-    {
-        mfx_videoparam_vpp_.vpp.In.FourCC = MFX_FOURCC_UYVY;
-        mfx_videoparam_vpp_.vpp.In.ChromaFormat = MFX_CHROMAFORMAT_YUV422;
-    } else {
-        PLOG_ERROR << "Unknown camera pixel format: " << params_.input_pixel_format;
-        return false;
-    }
-
-    // Hardcode VPP output / encoding pixel format.
-    // XXX: This is 10-bit 4:2:0, need to handle 10-bit 4:2:2.
-    mfx_videoparam_vpp_.vpp.Out.BitDepthChroma = 10;
-    mfx_videoparam_vpp_.vpp.Out.BitDepthLuma = 10;
-    mfx_videoparam_vpp_.vpp.Out.Shift = 1;
-    mfx_videoparam_vpp_.vpp.Out.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
-    mfx_videoparam_vpp_.vpp.Out.FourCC = MFX_FOURCC_P010;
-    mfx_videoparam_encode_.mfx.FrameInfo.BitDepthChroma = 10;
-    mfx_videoparam_encode_.mfx.FrameInfo.BitDepthLuma = 10;
-    mfx_videoparam_encode_.mfx.FrameInfo.Shift = 1;
-    mfx_videoparam_encode_.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
-    mfx_videoparam_encode_.mfx.FrameInfo.FourCC = MFX_FOURCC_P010;
-
-    // CropW
-    mfx_videoparam_vpp_.vpp.In.CropW =
-        mfx_videoparam_vpp_.vpp.Out.CropW = params_.width;
-
-    // CropH
-    mfx_videoparam_vpp_.vpp.In.CropH =
-        mfx_videoparam_vpp_.vpp.Out.CropH = params_.height;
-
-    // Width
-    mfx_videoparam_vpp_.vpp.In.Width =
-        mfx_videoparam_vpp_.vpp.Out.Width = VACON_ALIGN16((mfxU16)params_.width);
-
-    // Height
-    mfx_videoparam_vpp_.vpp.In.Height =
-        mfx_videoparam_vpp_.vpp.Out.Height = VACON_ALIGN16((mfxU16)params_.height);
-
-    // PicStruct
-    mfx_videoparam_vpp_.vpp.In.PicStruct =
-        mfx_videoparam_vpp_.vpp.Out.PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
-
-    // FrameRateExtN
-    mfx_videoparam_vpp_.vpp.In.FrameRateExtN =
-        mfx_videoparam_vpp_.vpp.Out.FrameRateExtN = params_.frame_rate;
-
-    // FrameRateExtD
-    mfx_videoparam_vpp_.vpp.In.FrameRateExtD =
-        mfx_videoparam_vpp_.vpp.Out.FrameRateExtD = 1;
-
-    // Success.
-    return true;
-}
-
 bool Encoder::InitLibraryVpp()
 {
-    if (!InitMfxVideoParamVpp()) {
-        PLOG_ERROR << "InitMfxVideoParamVpp() failed";
-        return false;
-    }
-
     mfxConfig cfg[3];
     mfxVariant cfgVal[3];
 
@@ -455,9 +471,6 @@ bool Encoder::InitLibraryVpp()
 std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
 {
     auto t_start = std::chrono::steady_clock::now();
-
-    // Consistency check.
-    assert(camera.fourcc_ == mfx_videoparam_vpp_.vpp.In.FourCC);
 
     // Initialize the frame's data.
     auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);

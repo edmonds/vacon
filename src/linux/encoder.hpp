@@ -47,8 +47,8 @@ class Encoder {
     private:
         Encoder() = default;
 
-        bool InitMfxVideoParamEncode();
-        bool InitMfxVideoParamVpp();
+        bool InitMfxVideoParams();
+        bool SetMfxFourCc();
         bool InitLibraryEncode();
         bool InitLibraryVpp();
 
