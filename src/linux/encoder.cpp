@@ -543,30 +543,40 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
 bool Encoder::CameraFrameToSurface(const CameraFrame& camera, mfxFrameSurface1& surface)
 {
     const mfxFrameInfo& info = mfx_videoparam_vpp_.vpp.In;
-
     auto width = info.CropW;
     auto height = info.CropH;
 
-    surface.Info = info;
+    size_t bytes_needed = 0;
 
     switch (camera.fourcc_) {
-    case V4L2_PIX_FMT_NV12: {
-        size_t bytes_needed = width * height * 3 / 2;
-        if (bytes_needed != (size_t)camera.buf_.bytesused) {
-            PLOG_ERROR << fmt::format("Camera frame is {} bytes, but MFX surface needs {} bytes",
-                                      camera.buf_.bytesused, bytes_needed);
-            return false;
-        }
+    case V4L2_PIX_FMT_NV12:
+        bytes_needed = width * height * 3 / 2;
         surface.Data.Y = reinterpret_cast<mfxU8*>(camera.data_);
         surface.Data.UV = surface.Data.Y + width * height;
         surface.Data.Pitch = width;
         break;
-    }
+
+    case V4L2_PIX_FMT_YUYV:
+        bytes_needed = width * height * 2;
+        surface.Data.Y = reinterpret_cast<mfxU8*>(camera.data_);
+        surface.Data.U = surface.Data.Y + 1;
+        surface.Data.V = surface.Data.Y + 3;
+        surface.Data.Pitch = width * 2;
+        break;
+
     default:
         PLOG_ERROR << fmt::format("Unsupported camera frame FourCC {} ({:#010x})",
                                   FourCcToString(camera.fourcc_), camera.fourcc_);
         return false;
     }
+
+    if (bytes_needed != (size_t)camera.buf_.bytesused) {
+        PLOG_ERROR << fmt::format("Camera frame is {} bytes, but MFX surface needs {} bytes",
+                                  camera.buf_.bytesused, bytes_needed);
+        return false;
+    }
+
+    surface.Info = info;
 
     // Success.
     return true;
