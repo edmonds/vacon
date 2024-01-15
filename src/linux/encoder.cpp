@@ -564,6 +564,14 @@ bool Encoder::CameraFrameToSurface(const CameraFrame& camera, mfxFrameSurface1& 
         surface.Data.Pitch = width * 2;
         break;
 
+    case V4L2_PIX_FMT_UYVY:
+        bytes_needed = width * height * 2;
+        surface.Data.U = reinterpret_cast<mfxU8*>(camera.data_);
+        surface.Data.Y = surface.Data.U + 1;
+        surface.Data.V = surface.Data.U + 2;
+        surface.Data.Pitch = width * 2;
+        break;
+
     default:
         PLOG_ERROR << fmt::format("Unsupported camera frame FourCC {} ({:#010x})",
                                   FourCcToString(camera.fourcc_), camera.fourcc_);
