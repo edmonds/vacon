@@ -29,13 +29,13 @@ void FreeMfxSurface(mfxFrameSurface1 **surface)
 {
     if (*surface) {
         if ((*surface)->Data.R) {
-            PLOG_VERBOSE << fmt::format("Unmapping MFX surface @ {}", fmt::ptr(*surface));
+            //PLOG_VERBOSE << fmt::format("Unmapping MFX surface @ {}", fmt::ptr(*surface));
             auto status = (*surface)->FrameInterface->Unmap(*surface);
             if (status != MFX_ERR_NONE) {
                 PLOG_DEBUG << "surface->FrameInterface->Unmap() failed: " << status;
             }
         }
-        PLOG_VERBOSE << fmt::format("Releasing MFX surface @ {}", fmt::ptr(*surface));
+        //PLOG_VERBOSE << fmt::format("Releasing MFX surface @ {}", fmt::ptr(*surface));
         auto status = (*surface)->FrameInterface->Release(*surface);
         if (status != MFX_ERR_NONE) {
             PLOG_DEBUG << "surface->FrameInterface->Release() failed: " << status;

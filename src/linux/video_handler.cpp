@@ -189,7 +189,6 @@ void VideoHandler::RunEncoder(std::stop_token st) {
             if (params_.outgoing_video_packet_queue) {
                 while (!st.stop_requested()) {
                     if (params_.outgoing_video_packet_queue->wait_enqueue_timed(video_frame, 10ms)) {
-                        PLOG_VERBOSE << "Enqueued video packet onto outgoing video packet queue";
                         break;
                     } else {
                         PLOG_VERBOSE << "Stalled enqueuing packet onto outgoing video packet queue, retrying";
