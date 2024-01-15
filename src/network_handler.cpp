@@ -196,9 +196,7 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
 
     rtp_depacketizer_ = vacon::RtpDepacketizer::Create();
 
-    auto wws = make_weak_ptr(ws_);
-
-    peer_->onGatheringStateChange([&](rtc::PeerConnection::GatheringState state) {
+    peer_->onGatheringStateChange([&, wws = make_weak_ptr(ws_)](rtc::PeerConnection::GatheringState state) {
         if (state == rtc::PeerConnection::GatheringState::Complete) {
             auto description = peer_->localDescription();
             json message = {
@@ -208,7 +206,7 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
             auto message_dump = message.dump();
             PLOG_DEBUG << "[PeerConnection] Sending WebSocket message: " << message_dump;
             if (auto ws = wws.lock()) {
-                ws_->send(message_dump);
+                ws->send(message_dump);
             }
         }
     });
