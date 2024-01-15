@@ -476,38 +476,18 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
     frame->pts = camera.pts();
 
-    // Get a new surface to upload the frame data from the CPU to the GPU.
-    auto status = MFXMemory_GetSurfaceForVPPIn(mfx_session_, &frame->surface_vpp);
-    if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXMemory_GetSurfaceForVPPIn() failed: " << status;
-        return nullptr;
-    }
-
     // Get a new surface for the scaled VPP output which will also be used as
     // encoder input.
-    status = MFXMemory_GetSurfaceForVPPOut(mfx_session_, &frame->surface);
+    auto status = MFXMemory_GetSurfaceForVPPOut(mfx_session_, &frame->surface);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXMemory_GetSurfaceForVPPOut() failed: " << status;
         return nullptr;
     }
 
-    // Map the VPP input surface onto the CPU.
-    status = frame->surface_vpp->FrameInterface->Map(frame->surface_vpp, MFX_MAP_WRITE);
-    if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "mfxFrameSurfaceInterface->Map() failed: " << status;
-        return nullptr;
-    }
-
-    // Copy the camera frame data to the VPP input surface.
-    if (!frame->CopyCameraFrameToSurface(camera)) {
+    // Create an mfxFrameSurface1 that will be used as VPP input that points
+    // into the camera frame buffer.
+    if (!frame->ImportCameraFrame(camera, mfx_videoparam_vpp_.vpp.In)) {
         PLOG_ERROR << "frame->CopyCameraFrameToSurface() failed";
-        return nullptr;
-    }
-
-    // Unmap the VPP input surface from the CPU. This uploads the data to the GPU?
-    status = frame->surface_vpp->FrameInterface->Unmap(frame->surface_vpp);
-    if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "mfxFrameSurfaceInterface->Unmap() failed: " << status;
         return nullptr;
     }
 
@@ -515,18 +495,12 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     mfxSyncPoint syncp = {};
     status =
         MFXVideoVPP_RunFrameVPPAsync(mfx_session_,
-                                     frame->surface_vpp,
+                                     &frame->surface_ref,
                                      frame->surface,
                                      nullptr /* aux */,
                                      &syncp);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed: " << status;
-        return nullptr;
-    }
-
-    status = frame->surface_vpp->FrameInterface->Release(frame->surface_vpp);
-    if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "FrameInterface->Release() failed: " << status;
         return nullptr;
     }
 

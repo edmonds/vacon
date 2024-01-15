@@ -31,7 +31,7 @@ struct VideoFrame {
     uint64_t pts = 0;
     mfxBitstream bitstream = {};
     mfxFrameSurface1 *surface = nullptr;
-    mfxFrameSurface1 *surface_vpp = nullptr;
+    mfxFrameSurface1 surface_ref = {};
 
     VideoFrame(uint32_t max_length = 262144)
     {
@@ -44,18 +44,18 @@ struct VideoFrame {
     {
         bitstream           = src.bitstream;
         surface             = src.surface;
-        surface_vpp         = src.surface_vpp;
+        surface_ref         = src.surface_ref;
 
-        src.bitstream.Data  = nullptr;
+        src.bitstream       = {};
         src.surface         = nullptr;
-        src.surface_vpp     = nullptr;
+        src.surface_ref     = {};
     }
 
     ~VideoFrame();
 
     const std::byte* CompressedData();
     size_t CompressedDataLength();
-    bool CopyCameraFrameToSurface(const CameraFrame&);
+    bool ImportCameraFrame(const CameraFrame&, const mfxFrameInfo&);
 };
 
 } // namespace linux

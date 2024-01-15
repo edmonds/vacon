@@ -54,7 +54,6 @@ VideoFrame::~VideoFrame()
     }
 
     FreeMfxSurface(&surface);
-    FreeMfxSurface(&surface_vpp);
 }
 
 const std::byte* VideoFrame::CompressedData()
@@ -67,42 +66,24 @@ size_t VideoFrame::CompressedDataLength()
     return bitstream.DataLength;
 }
 
-bool VideoFrame::CopyCameraFrameToSurface(const CameraFrame& camera)
+bool VideoFrame::ImportCameraFrame(const CameraFrame& camera, const mfxFrameInfo& info)
 {
-    auto width = surface_vpp->Info.CropW;
-    auto height = surface_vpp->Info.CropH;
+    auto width = info.CropW;
+    auto height = info.CropH;
+
+    surface_ref.Info = info;
 
     switch (camera.fourcc_) {
     case V4L2_PIX_FMT_NV12: {
-        // NV12 is a semi-planar 4:2:0 format that has one luminance plane (Y)
-        // and one plane for the two chrominance components (UV). V4L2 returns
-        // NV12 frames packed into a single buffer, but libvpl needs the frame
-        // data split into Y and UV planes.
         size_t bytes_needed = width * height * 3 / 2;
         if (bytes_needed != (size_t)camera.buf_.bytesused) {
             PLOG_ERROR << fmt::format("Camera frame is {} bytes, but MFX surface needs {} bytes",
                                       camera.buf_.bytesused, bytes_needed);
             return false;
         }
-
-        // Copy the Y plane, (width * height) bytes.
-        if (!surface_vpp->Data.Y) {
-            PLOG_ERROR << fmt::format("MFX surface @ {} has no Data.Y buffer!",
-                                      fmt::ptr(surface_vpp));
-            return false;
-        }
-        memcpy(surface_vpp->Data.Y, camera.data_, width * height);
-
-        // Copy the UV plane, (width * height / 2) bytes.
-        if (!surface_vpp->Data.UV) {
-            PLOG_ERROR << fmt::format("MFX surface @ {} has no Data.UV buffer!",
-                                      fmt::ptr(surface_vpp));
-            return false;
-        }
-        memcpy(surface_vpp->Data.UV,
-               (unsigned char*)camera.data_ + width * height,
-               width * height / 2);
-
+        surface_ref.Data.Y = reinterpret_cast<mfxU8*>(camera.data_);
+        surface_ref.Data.UV = surface_ref.Data.Y + width * height;
+        surface_ref.Data.Pitch = width;
         break;
     }
     default:
