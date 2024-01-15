@@ -476,14 +476,6 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
     frame->pts = camera.pts();
 
-    // Get a new surface for the scaled VPP output which will also be used as
-    // encoder input.
-    auto status = MFXMemory_GetSurfaceForVPPOut(mfx_session_, &frame->surface);
-    if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXMemory_GetSurfaceForVPPOut() failed: " << status;
-        return nullptr;
-    }
-
     // Create an mfxFrameSurface1 that will be used as VPP input that points
     // into the camera frame buffer.
     if (!frame->ImportCameraFrame(camera, mfx_videoparam_vpp_.vpp.In)) {
@@ -492,26 +484,17 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     }
 
     // Issue the VPP scaling request to the GPU.
-    mfxSyncPoint syncp = {};
-    status =
-        MFXVideoVPP_RunFrameVPPAsync(mfx_session_,
-                                     &frame->surface_ref,
-                                     frame->surface,
-                                     nullptr /* aux */,
-                                     &syncp);
+    auto status =
+        MFXVideoVPP_ProcessFrameAsync(mfx_session_,
+                                      &frame->surface_ref,
+                                      &frame->surface);
     if (status != MFX_ERR_NONE) {
         PLOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed: " << status;
         return nullptr;
     }
 
-    // Check status of VPP scaling request.
-    if (!syncp) {
-        PLOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed to return a synchronization point";
-        return nullptr;
-    }
-
     // Issue the encoding request to the GPU.
-    syncp = {};
+    mfxSyncPoint syncp = {};
     status =
         MFXVideoENCODE_EncodeFrameAsync(mfx_session_,
                                         nullptr /* ctrl */,
