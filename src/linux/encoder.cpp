@@ -474,7 +474,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
 
     // Initialize the frame's data.
     auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
-    frame->pts = camera.pts();
+    frame->pts = camera.PtsMicros();
 
     // Get a new surface for storing the copy of the camera frame data.
     mfxFrameSurface1 *surface_camera = nullptr;
@@ -555,7 +555,8 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
 
     auto t_stop = std::chrono::steady_clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_stop - t_start).count();
-    auto msg = fmt::format("Encoded frame in {} us, {} bytes", micros, frame->bitstream.DataLength);
+    auto msg = fmt::format("Encoded frame from buffer {}, sequence {} in {} us, {} bytes",
+                           camera.buf_.index, camera.buf_.sequence, micros, frame->bitstream.DataLength);
     if (stalled) {
         PLOG_DEBUG << msg;
     } else {
@@ -566,16 +567,17 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     return frame;
 }
 
-bool Encoder::CopyCameraFrameToSurface(const CameraFrame& camera, mfxFrameSurface1& surface)
+bool Encoder::CopyCameraFrameToSurface(CameraFrame& camera, mfxFrameSurface1& surface)
 {
     const mfxFrameInfo& info = mfx_videoparam_vpp_.vpp.In;
     auto width = info.CropW;
     auto height = info.CropH;
+    auto fourcc = camera.Fmt().pixelformat;
 
     // Copy the frame info parameters from the VPP configuration.
     surface.Info = info;
 
-    switch (camera.fourcc_) {
+    switch (fourcc) {
     case V4L2_PIX_FMT_NV12:
         memcpy(surface.Data.Y, camera.data_, width * height);
         memcpy(surface.Data.UV, (char*)camera.data_ + width*height, width*height / 2);
@@ -598,7 +600,7 @@ bool Encoder::CopyCameraFrameToSurface(const CameraFrame& camera, mfxFrameSurfac
 
     default:
         PLOG_ERROR << fmt::format("Unsupported V4L2 camera frame FourCC {} ({:#010x})",
-                                  FourCcToString(camera.fourcc_), camera.fourcc_);
+                                  FourCcToString(fourcc), fourcc);
         return false;
     }
 
