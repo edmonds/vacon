@@ -58,6 +58,9 @@ std::unique_ptr<VideoHandler> VideoHandler::Create(const VideoHandlerParams& par
 
 VideoHandler::~VideoHandler()
 {
+    Stop();
+    Join();
+
     // Drain any video frames remaining on the outgoing video packet queue, so
     // that ~VideoFrame() never runs after ~Encoder().
     if (params_.outgoing_video_packet_queue) {
@@ -140,21 +143,37 @@ void VideoHandler::RunCamera(std::stop_token st)
         return;
     }
 
+    uint32_t last_sequence = 0;
     while (!st.stop_requested()) {
         // Get the next V4L2 frame from the camera.
         auto frame = camera_->ReadFrame();
+        if (!frame) {
+            continue;
+        }
 
-        // Enqueue the raw camera frame.
-        if (frame && !camera_frame_queue_.wait_enqueue_timed(frame, 10ms)) {
-            PLOG_VERBOSE << "Stalled enqueuing frame onto incoming camera frame queue, discarding!";
-            frame->ReleaseToKernel();
+        uint32_t sequence = frame->buf_.sequence;
+        if (last_sequence > 0 && (sequence != last_sequence + 1)) {
+            PLOG_INFO << fmt::format("Gap in camera frame sequence, current sequence {}, last sequence {}",
+                                     sequence, last_sequence);
+        }
+        last_sequence = sequence;
+
+        // Enqueue the camera frame onto the encoder queue.
+        if (!encoder_queue_.try_enqueue(frame)) {
+            PLOG_INFO << "Failed to enqueue frame onto encoder queue, discarding!";
+        }
+
+        // Enqueue the camera frame onto the preview queue.
+        if (!preview_queue_.try_enqueue(frame)) {
+            PLOG_INFO << "Failed to enqueue frame onto preview queue, discarding!";
         }
     }
 
     PLOG_DEBUG << "Stopping Linux camera capture thread ID " << std::this_thread::get_id();
 }
 
-void VideoHandler::RunEncoder(std::stop_token st) {
+void VideoHandler::RunEncoder(std::stop_token st)
+{
     PLOG_DEBUG << "Starting video encoder thread ID " << std::this_thread::get_id();
 
     // Encoder initialization will start a number of background worker threads
@@ -172,13 +191,14 @@ void VideoHandler::RunEncoder(std::stop_token st) {
 
     while (!st.stop_requested()) {
         // Get the next camera frame from the queue.
-        CameraFrame *camera_frame = nullptr;
-        if (camera_frame_queue_.wait_dequeue_timed(camera_frame, 250ms)) {
+        std::shared_ptr<CameraFrame> camera_frame = nullptr;
+        if (encoder_queue_.wait_dequeue_timed(camera_frame, 250ms)) {
             // Encode the camera frame.
             auto video_frame = encoder_->EncodeCameraFrame(*camera_frame);
 
-            // Return the V4L2 buffer to the kernel.
-            camera_frame->ReleaseToKernel();
+            // Get rid of this CameraFrame as soon as possible so the buffer
+            // can be re-enqueued to the kernel.
+            camera_frame = nullptr;
 
             if (!video_frame) {
                 PLOG_ERROR << "Encoder::EncodeCameraFrame() failed!";
@@ -199,6 +219,13 @@ void VideoHandler::RunEncoder(std::stop_token st) {
     }
 
     PLOG_DEBUG << "Stopping video encoder thread ID " << std::this_thread::get_id();
+}
+
+std::shared_ptr<CameraFrame> VideoHandler::GetNextPreviewFrame()
+{
+    std::shared_ptr<CameraFrame> camera_frame = nullptr;
+    preview_queue_.try_dequeue(camera_frame);
+    return camera_frame;
 }
 
 } // namespace linux
