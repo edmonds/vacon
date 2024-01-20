@@ -17,7 +17,7 @@
 
 #include <cassert>
 #include <cerrno>
-#include <cstring>
+#include <memory>
 
 #include <linux/videodev2.h>
 #include <sys/ioctl.h>
@@ -26,62 +26,47 @@
 #include <fmt/format.h>
 
 #include "../common.hpp"
+#include "camera.hpp"
 
 namespace vacon {
 namespace linux {
 
-bool CameraFrame::Map()
+std::shared_ptr<CameraFrame>
+CameraFrame::Create(const Camera* camera,
+                    struct v4l2_buffer buf,
+                    const void *data)
 {
-    assert(data_ == nullptr);
+    assert(camera);
+    assert(data);
 
-    data_ = mmap(NULL, buf_.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd_, buf_.m.offset);
-    if (data_ == MAP_FAILED) {
-        PLOG_FATAL << fmt::format("mmap() on fd {}, buffer {} failed: {} ({})",
-                                  fd_, buf_.index, errno, strerror(errno));
-        return false;
-    }
+    auto frame      = std::make_shared<CameraFrame>(CameraFrame {});
 
-    // Success.
-    return true;
+    frame->buf_     = buf;
+    frame->data_    = data;
+    frame->camera_  = camera;
+
+    return frame;
 }
 
-bool CameraFrame::Unmap()
+CameraFrame::~CameraFrame()
 {
-    if (data_) {
-        if (munmap(data_, buf_.length) == -1) {
-            PLOG_FATAL << fmt::format("munmap() on fd {}, buffer {} failed: {} ({})",
-                                      fd_, buf_.index, errno, strerror(errno));
-            return false;
-        }
-        data_ = nullptr;
-    }
-
-    // Success.
-    return true;
-}
-
-bool CameraFrame::AcquireFromKernel()
-{
-    if (ioctl(fd_, VIDIOC_DQBUF, &buf_) == -1) {
-        PLOG_FATAL << fmt::format("ioctl(VIDIOC_DQBUF) on fd {}, buffer {} failed: {} ({})",
-                                  fd_, buf_.index, errno, strerror(errno));
-        return false;
-    }
-
-    // Success.
-    return true;
-}
-
-bool CameraFrame::ReleaseToKernel()
-{
-    if (ioctl(fd_, VIDIOC_QBUF, &buf_) == -1) {
+    if (camera_
+        && camera_->fd_ != -1
+        && ioctl(camera_->fd_, VIDIOC_QBUF, &buf_) == -1)
+    {
         PLOG_FATAL << fmt::format("ioctl(VIDIOC_QBUF) on fd {}, buffer {} failed: {} ({})",
-                                  fd_, buf_.index, errno, strerror(errno));
-        return false;
+                                  camera_->fd_, buf_.index, errno, strerror(errno));
     }
+}
 
-    // Success.
-    return true;
+uint64_t CameraFrame::PtsMicros()
+{
+    return buf_.timestamp.tv_sec * 1'000'000 + buf_.timestamp.tv_usec;
+}
+
+struct v4l2_pix_format CameraFrame::Fmt()
+{
+    return camera_->fmt_;
 }
 
 } // namespace linux

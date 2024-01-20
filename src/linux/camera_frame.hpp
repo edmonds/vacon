@@ -16,6 +16,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include <linux/videodev2.h>
 
@@ -24,26 +25,25 @@
 namespace vacon {
 namespace linux {
 
+class Camera;
+
 class CameraFrame {
     public:
-        CameraFrame(struct v4l2_buffer buf, int fd, uint32_t fourcc)
-            : buf_(buf), fourcc_(fourcc), fd_(fd) {};
+        static std::shared_ptr<CameraFrame> Create(const Camera* camera,
+                                                   struct v4l2_buffer buf,
+                                                   const void *data);
         CameraFrame(CameraFrame&&) = default;
-        ~CameraFrame() = default;
+        ~CameraFrame();
 
-        bool Map();
-        bool Unmap();
-        bool AcquireFromKernel();
-        bool ReleaseToKernel();
-
-        uint64_t pts() { return buf_.timestamp.tv_sec * 1'000'000 + buf_.timestamp.tv_usec; }
+        uint64_t PtsMicros();
+        struct v4l2_pix_format Fmt();
 
         struct v4l2_buffer buf_ = {};
-        void *data_ = nullptr;
-        uint32_t fourcc_ = 0;
+        const void *data_ = nullptr;
 
     private:
-        int fd_ = -1;
+        CameraFrame() = default;
+        const Camera* camera_ = nullptr;
 };
 
 } // namespace linux
