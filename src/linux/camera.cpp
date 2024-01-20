@@ -18,6 +18,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <utility>
 
 #include <linux/version.h>
 #include <linux/videodev2.h>
@@ -114,6 +115,15 @@ bool Camera::Init()
 
 Camera::~Camera()
 {
+    // Unmap the V4L2 kernel buffers.
+    for (auto mmap_buffer : mmap_buffers_) {
+        if (munmap(mmap_buffer.first, mmap_buffer.second) == -1) {
+            PLOG_FATAL << fmt::format("munmap() on fd {}, data @ {}, length {} failed: {} ({})",
+                                      fd_, fmt::ptr(mmap_buffer.first), mmap_buffer.second, errno, strerror(errno));
+        }
+    }
+
+    // Close the V4L2 device.
     if (fd_ != -1) {
         if (close(fd_) == 0) {
             PLOG_VERBOSE << fmt::format("close()'d V4L2 device {} (fd {})", params_.device, fd_);
@@ -121,9 +131,6 @@ Camera::~Camera()
             PLOG_ERROR << fmt::format("close() failed on V4L2 device {} (fd {}): {} ({})",
                                       params_.device, fd_, errno, strerror(errno));
         }
-    }
-    for (auto& frame : frames_) {
-        frame.Unmap();
     }
 }
 
@@ -205,9 +212,11 @@ bool Camera::InitV4L2()
         PLOG_ERROR << fmt::format("ioctl(VIDIOC_S_FMT) on fd {} failed: {} ({})", fd_, errno, strerror(errno));
         return false;
     }
-    fourcc_ = force_fmt.fmt.pix.pixelformat;
-    params_.width = force_fmt.fmt.pix.width;
-    params_.height = force_fmt.fmt.pix.height;
+
+    // Save the actual pixel format selected by the V4L2 driver, so we know the
+    // various parameters of the captured camera frames like width, height,
+    // pixel format, and pitch.
+    fmt_ = force_fmt.fmt.pix;
 
     // VIDIOC_S_PARM
     struct v4l2_streamparm parm = {};
@@ -246,37 +255,46 @@ bool Camera::InitKernelBuffers()
         return false;
     }
 
-    // VIDIOC_QUERYBUF
+    size_t n_bytes_mapped = 0;
     for (unsigned i = 0; i < reqbuf.count; ++i) {
         struct v4l2_buffer buffer = {};
         buffer.type = reqbuf.type;
         buffer.memory = V4L2_MEMORY_MMAP;
         buffer.index = i;
 
+        // VIDIOC_QUERYBUF
         if (ioctl(fd_, VIDIOC_QUERYBUF, &buffer) == -1) {
             PLOG_ERROR << fmt::format("ioctl(VIDIOC_QUERYBUF) on fd {}, buffer {} failed: {} ({})",
                                       fd_, buffer.index, errno, strerror(errno));
             return false;
         }
 
-        frames_.emplace_back(CameraFrame(buffer, fd_, fourcc_));
-    }
-
-    // VIDIOC_QBUF
-    size_t n_bytes_mapped = 0;
-    for (auto& frame : frames_) {
-        if (!frame.Map()) {
+        // Allocate a camera frame buffer for this V4L2 buffer index.
+        auto data = mmap(NULL, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd_, buffer.m.offset);
+        if (data == MAP_FAILED) {
+            PLOG_FATAL << fmt::format("mmap() on fd {}, buffer {} failed: {} ({})",
+                                      fd_, buffer.index, errno, strerror(errno));
             return false;
         }
 
-        if (!frame.ReleaseToKernel()) {
+        // Save the mmap()'d buffer pointer and length. The index in this
+        // vector corresponds to the V4L2 buffer index returned by future
+        // VIDIOC_DQBUF ioctl()'s.
+        mmap_buffers_.emplace_back(std::make_pair(data, buffer.length));
+
+        // VIDIOC_QBUF. The kernel can write captured camera frames to the
+        // corresponding mmap()'d buffer now.
+        if (ioctl(fd_, VIDIOC_QBUF, &buffer) == -1) {
+            PLOG_FATAL << fmt::format("ioctl(VIDIOC_QBUF) on fd {}, buffer {} failed: {} ({})",
+                                      fd_, buffer.index, errno, strerror(errno));
             return false;
         }
-        n_bytes_mapped += frame.buf_.length;
+
+        n_bytes_mapped += buffer.length;
     }
 
     PLOG_DEBUG << fmt::format("Successfully mapped V4L2 memory, {} buffers, {:.2f} Mbytes",
-                              frames_.size(), n_bytes_mapped / 1048576.0);
+                              mmap_buffers_.size(), n_bytes_mapped / 1048576.0);
 
     // Success.
     return true;
@@ -332,11 +350,17 @@ bool Camera::StartCapturing()
             }
             t_last_ = std::chrono::steady_clock::now();
 
-            // VIDIOC_QBUF
-            auto frame = &frames_.at(buf.index);
-            frame->ReleaseToKernel();
+            // Save the sequence number because the VIDIOC_QBUF ioctl() below will clobber it.
+            auto sequence = buf.sequence;
 
-            if (buf.sequence >= stream_skip_) {
+            // VIDIOC_QBUF
+            if (ioctl(fd_, VIDIOC_QBUF, &buf) == -1) {
+                PLOG_FATAL << fmt::format("ioctl(VIDIOC_QBUF) on fd {}, buffer {} failed: {} ({})",
+                                          fd_, buf.index, errno, strerror(errno));
+            }
+
+            // Break out of the loop if enough frames have been skipped.
+            if (sequence >= params_.n_initial_stream_skip_frames_) {
                 break;
             }
         } else if (pfd.revents == 0) {
@@ -362,13 +386,14 @@ bool Camera::StartCapturing()
     return true;
 }
 
-CameraFrame* Camera::ReadFrame()
+std::shared_ptr<CameraFrame> Camera::ReadFrame()
 {
     struct v4l2_buffer buf = {};
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
 
     for (;;) {
+        // VIDIOC_DQBUF
         if (ioctl(fd_, VIDIOC_DQBUF, &buf) == -1) {
             PLOG_ERROR << fmt::format("ioctl(VIDIOC_DQBUF) on fd {} failed: {} ({})", fd_, errno, strerror(errno));
             return nullptr;
@@ -380,16 +405,21 @@ CameraFrame* Camera::ReadFrame()
         PLOG_VERBOSE << fmt::format("Received frame on fd {}, buffer {}, sequence {}, delta {} us",
                                     fd_, buf.index, buf.sequence, micros);
 
-        auto frame = &frames_.at(buf.index);
-        frame->buf_ = buf;
+        // Retrieve the mmap()'d buffer that corresponds to the buffer index.
+        auto mmap_buffer = &mmap_buffers_.at(buf.index);
 
+        // Construct a reference counted CameraFrame to contain the buffer
+        // information and data pointer. When this object is destroyed, the
+        // buffer will be VIDIOC_QBUF'd to the kernel.
+        //auto frame = CameraFrame::Create(buf, fd_, fourcc_, mmap_buffer->first);
+        auto frame = CameraFrame::Create(this, buf, mmap_buffer->first);
+
+        // If there are any errors, get another frame.
         bool is_empty_frame = buf.bytesused == 0;
         bool is_error_frame = buf.flags & V4L2_BUF_FLAG_ERROR;
-
         if (is_empty_frame || is_error_frame) {
             PLOG_VERBOSE << fmt::format("Discarding frame: is_empty_frame {}, is_error_frame {}",
                                         is_empty_frame, is_error_frame);
-            frame->ReleaseToKernel();
             continue;
         }
 

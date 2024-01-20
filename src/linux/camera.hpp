@@ -16,8 +16,13 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <utility>
 #include <vector>
+
+#include <linux/videodev2.h>
 
 #include "../common.hpp"
 #include "camera_frame.hpp"
@@ -31,10 +36,13 @@ struct CameraParams {
     int width;
     int height;
     int frame_rate;
-    uint32_t n_kernel_buffers = 4;
+    uint32_t n_kernel_buffers = 8;
+    uint32_t n_initial_stream_skip_frames_ = 15;
 };
 
 class Camera {
+    friend class CameraFrame;
+
     public:
         static std::shared_ptr<Camera> Create(const CameraParams&);
         Camera(Camera&&) = default;
@@ -42,7 +50,7 @@ class Camera {
         bool Init();
         bool StartCapturing();
 
-        CameraFrame* ReadFrame();
+        std::shared_ptr<CameraFrame> ReadFrame();
 
     private:
         Camera() = default;
@@ -54,10 +62,12 @@ class Camera {
         CameraParams params_;
 
         int fd_ = -1;
-        uint32_t fourcc_ = 0;
-        unsigned stream_skip_ = 15;
-        std::vector<CameraFrame> frames_;
+        struct v4l2_pix_format fmt_ = {};
         std::chrono::time_point<std::chrono::steady_clock> t_last_;
+
+        // Camera frame buffer data and length pairs. The pointer is mmap()'d
+        // V4L2 memory.
+        std::vector<std::pair<void*, size_t>> mmap_buffers_;
 };
 
 } // namespace linux
