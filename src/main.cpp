@@ -30,7 +30,6 @@
 #include <unistd.h>
 
 #include <argparse/argparse.hpp>
-#include <backward.hpp>
 #include <plog/Log.h>
 #include <readerwritercircularbuffer.h>
 
@@ -43,8 +42,6 @@ using std::string;
 using namespace std::chrono_literals;
 
 namespace vacon {
-
-backward::SignalHandling gBackwardSignalHandling;
 
 static argparse::ArgumentParser args("vacon");
 static int gVerbosity = 0;

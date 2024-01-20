@@ -39,6 +39,17 @@ foreach ident : ['pthread_setattr_default_np']
   endif
 endforeach
 
+# backward, but only if no sanitizers are enabled
+
+if get_option('b_sanitize') == 'none'
+  backward = dependency('backward-cpp')
+  backward_sources = ['src/backward.cpp']
+  add_project_arguments('-DVACON_USE_BACKWARD', language: ['c', 'cpp'])
+else
+  backward = []
+  backward_sources = []
+endif
+
 # libdatachannel
 
 libdatachannel = dependency('LibDataChannel', required: false)
@@ -81,8 +92,6 @@ cc.check_header('linux/videodev2.h', required: true)
 # other dependencies
 
 argparse = dependency('argparse', version: '>=3')
-
-backward = dependency('backward-cpp')
 
 fmt = dependency('fmt', version: '>9')
 
@@ -143,7 +152,7 @@ plplay_static = static_library('plplay',
 plplay = declare_dependency(link_with: plplay_static)
 
 vacon_sources = [
-  'src/backward.cpp',
+  backward_sources,
   'src/common.cpp',
   'src/linux/camera.cpp',
   'src/linux/camera_frame.cpp',

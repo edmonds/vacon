@@ -21,11 +21,19 @@
 # include <sys/prctl.h>
 #endif
 
+#if defined(VACON_USE_BACKWARD)
+# include <backward.hpp>
+#endif
+
 #include <plog/Init.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Formatters/TxtFormatter.h>
 
 namespace vacon {
+
+#if defined(VACON_USE_BACKWARD)
+backward::SignalHandling gBackwardSignalHandling;
+#endif
 
 void ffmpegLogCallback(void *ptr __attribute__((unused)),
                        int level, const char *fmt, std::va_list vl_orig)
