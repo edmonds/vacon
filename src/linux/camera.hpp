@@ -24,8 +24,8 @@
 
 #include <linux/videodev2.h>
 
-#include "../common.hpp"
-#include "camera_frame.hpp"
+#include "common.hpp"
+#include "linux/camera_frame.hpp"
 
 namespace vacon {
 namespace linux {

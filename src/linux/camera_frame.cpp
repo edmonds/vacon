@@ -25,8 +25,8 @@
 
 #include <fmt/format.h>
 
-#include "../common.hpp"
-#include "camera.hpp"
+#include "common.hpp"
+#include "linux/camera.hpp"
 
 namespace vacon {
 namespace linux {

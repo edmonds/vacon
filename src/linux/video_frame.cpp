@@ -18,9 +18,9 @@
 #include <fmt/format.h>
 #include <mfx.h>
 
-#include "../common.hpp"
-#include "camera_frame.hpp"
-#include "video_frame.hpp"
+#include "common.hpp"
+#include "linux/camera_frame.hpp"
+#include "linux/video_frame.hpp"
 
 namespace vacon {
 namespace linux {

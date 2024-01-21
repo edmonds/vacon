@@ -20,7 +20,7 @@
 
 #include <linux/videodev2.h>
 
-#include "../common.hpp"
+#include "common.hpp"
 
 namespace vacon {
 namespace linux {

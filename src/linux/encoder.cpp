@@ -22,7 +22,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#include "encoder.hpp"
+#include "linux/encoder.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -38,8 +38,8 @@
 
 #include <mfx.h>
 
-#include "../common.hpp"
-#include "video_frame.hpp"
+#include "common.hpp"
+#include "linux/video_frame.hpp"
 
 namespace vacon {
 namespace linux {

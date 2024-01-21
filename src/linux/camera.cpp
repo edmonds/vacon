@@ -29,7 +29,7 @@
 
 #include <fmt/format.h>
 
-#include "../common.hpp"
+#include "common.hpp"
 
 using namespace std::chrono_literals;
 

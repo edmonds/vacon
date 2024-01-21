@@ -143,4 +143,5 @@ vacon_dependencies = [
 executable('vacon',
   vacon_sources,
   dependencies: vacon_dependencies,
+  include_directories: 'src',
   install: true)

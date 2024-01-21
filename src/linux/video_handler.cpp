@@ -24,9 +24,9 @@
 #include <fmt/format.h>
 #include <readerwritercircularbuffer.h>
 
-#include "../common.hpp"
-#include "camera.hpp"
-#include "encoder.hpp"
+#include "common.hpp"
+#include "linux/camera.hpp"
+#include "linux/encoder.hpp"
 
 using namespace std::chrono_literals;
 
