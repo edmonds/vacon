@@ -120,6 +120,8 @@ vacon_sources = [
   'src/main.cpp',
   'src/network_handler.cpp',
   'src/rtp_depacketizer.cpp',
+  'src/sdl/app.cpp',
+  'src/sdl/texture.cpp',
   'src/vacon.cpp',
 ]
 

@@ -188,6 +188,8 @@ void App::ParseArgs(int argc, char *argv[])
 
     args.add_argument("--xxx-force-start-video-handler").flag();
 
+    args.add_argument("--xxx-headless").flag();
+
     try {
         args.parse_args(argc, argv);
     } catch (const std::exception& err) {

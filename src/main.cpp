@@ -19,23 +19,37 @@
 
 #include <plog/Log.h>
 
+#define SDL_MAIN_HANDLED
+#define SDL_MAIN_USE_CALLBACKS
+#include <SDL3/SDL_main.h>
+#undef main
+#include <SDL3/SDL.h>
+
 #include "vacon.hpp"
+#include "sdl/app.hpp"
 
 using namespace std::chrono_literals;
 
 int main(int argc, char *argv[])
 {
+    int ret = EXIT_SUCCESS;
+
     if (!vacon::gApp.Setup(argc, argv)) {
         PLOG_FATAL << "Failed to setup Vacon app!";
         return EXIT_FAILURE;
     }
 
-    while (!vacon::gShuttingDown) {
-        std::this_thread::sleep_for(250ms);
+    if (vacon::gApp.args["--xxx-headless"] == true) {
+        while (!vacon::gShuttingDown) {
+            std::this_thread::sleep_for(250ms);
+        }
+    } else {
+        PLOG_INFO << "Starting SDL app!";
+        ret = SDL_RunApp(0, NULL, vacon::sdl::main, NULL);
     }
 
     PLOG_INFO << "Shutting down!";
     vacon::gApp.Shutdown();
 
-    return EXIT_SUCCESS;
+    return ret;
 }
