@@ -165,12 +165,12 @@ void VideoHandler::RunCamera(std::stop_token st)
 
         // Enqueue the camera frame onto the encoder queue.
         if (!encoder_queue_.try_enqueue(frame)) {
-            PLOG_INFO << "Failed to enqueue frame onto encoder queue, discarding!";
+            PLOG_VERBOSE << "Failed to enqueue frame onto encoder queue, discarding!";
         }
 
         // Enqueue the camera frame onto the preview queue.
         if (!preview_queue_.try_enqueue(frame)) {
-            PLOG_INFO << "Failed to enqueue frame onto preview queue, discarding!";
+            PLOG_VERBOSE << "Failed to enqueue frame onto preview queue, discarding!";
         }
     }
 
