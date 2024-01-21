@@ -45,6 +45,7 @@ jobs:
           libdwarf-dev \
           libegl-dev \
           libelf-dev \
+          libopengl-dev \
           libssl-dev \
           libunwind-dev \
           libva-dev \
