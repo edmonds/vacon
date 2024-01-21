@@ -69,7 +69,7 @@ bool App::InitSDL()
 
     // Make the window visible.
     if (SDL_ShowWindow(sdl_window_) != 0) {
-        PLOG_FATAL << "SDL_GL_CreateContext() failed: " << SDL_GetError();
+        PLOG_FATAL << "SDL_ShowWindow() failed: " << SDL_GetError();
         return false;
     }
 
