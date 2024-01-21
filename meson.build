@@ -96,8 +96,18 @@ readerwriterqueue = dependency('readerwriterqueue')
 
 threads = dependency('threads')
 
-# targets
+egl = dependency('egl')
+if egl.found()
+  add_project_arguments('-DHAVE_EGL', language: ['c', 'cpp'])
+endif
 
+opengl = dependency('opengl')
+
+sdl3 = dependency('sdl3')
+
+imgui = dependency('imgui', static: true)
+
+# targets
 
 vacon_sources = [
   backward_sources,
@@ -116,12 +126,16 @@ vacon_sources = [
 vacon_dependencies = [
   argparse,
   backward,
+  egl,
   ffmpeg,
   fmt,
+  imgui,
   libdatachannel,
   nlohmann_json,
+  opengl,
   plog,
   readerwriterqueue,
+  sdl3,
   threads,
   vpl,
 ]
