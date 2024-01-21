@@ -58,6 +58,10 @@ std::unique_ptr<VideoHandler> VideoHandler::Create(const VideoHandlerParams& par
 
 VideoHandler::~VideoHandler()
 {
+    if (threads_.size() == 0) {
+        return;
+    }
+
     Stop();
     Join();
 
@@ -87,6 +91,7 @@ void VideoHandler::Stop()
     for (auto& thread : threads_) {
         thread.request_stop();
     }
+    threads_.clear();
 }
 
 void VideoHandler::Join()
