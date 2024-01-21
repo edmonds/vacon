@@ -146,8 +146,8 @@ bool setupRealtimePriority()
 		.sched_priority = min_fifo_prio + 1,
 	};
 
-    PLOG_DEBUG << fmt::format("Attempting to set scheduling policy SCHED_FIFO, priority {}",
-                         param.sched_priority);
+    PLOG_VERBOSE << fmt::format("Attempting to set scheduling policy SCHED_FIFO, priority {}",
+                                param.sched_priority);
 
 	if (sched_setscheduler(0, SCHED_FIFO, &param) != 0) {
         PLOG_DEBUG << fmt::format("sched_setscheduler() failed: {}", std::strerror(errno));
