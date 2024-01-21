@@ -60,6 +60,9 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
 NetworkHandler::~NetworkHandler()
 {
     PLOG_VERBOSE << fmt::format("Destructor called on {}", fmt::ptr(this));
+
+    peer_ = nullptr;
+    track_ = nullptr;
 }
 
 void NetworkHandler::Init()
