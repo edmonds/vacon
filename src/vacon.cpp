@@ -51,8 +51,7 @@ static const char *kDefaultStunServer               = "stun:stun.l.google.com:19
 
 void App::Shutdown()
 {
-    // Drain any video frames remaining on the outgoing video packet queue, so
-    // that ~linux::VideoFrame() never runs after ~linux::Encoder().
+    // Drain any video frames remaining on the outgoing video packet queue.
     if (outgoing_video_packet_queue) {
         std::shared_ptr<linux::VideoFrame> frame = {};
         while (outgoing_video_packet_queue->try_dequeue(frame)) {

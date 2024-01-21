@@ -49,6 +49,7 @@ struct VideoFrame {
     }
 
     ~VideoFrame();
+    void FreeMfxSurface();
 
     const std::byte* CompressedData();
     size_t CompressedDataLength();

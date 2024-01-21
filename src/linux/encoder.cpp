@@ -553,6 +553,9 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
         return nullptr;
     }
 
+    // Deallocate the uncompressed surface data.
+    frame->FreeMfxSurface();
+
     auto t_stop = std::chrono::steady_clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_stop - t_start).count();
     auto msg = fmt::format("Encoded frame from buffer {}, sequence {} in {} us, {} bytes",
