@@ -110,6 +110,7 @@ vacon_sources = [
   'src/main.cpp',
   'src/network_handler.cpp',
   'src/rtp_depacketizer.cpp',
+  'src/vacon.cpp',
 ]
 
 vacon_dependencies = [

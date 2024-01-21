@@ -29,6 +29,7 @@
 #include <rtc/rtc.hpp>
 
 #include "common.hpp"
+#include "vacon.hpp"
 
 using namespace std::chrono_literals;
 
@@ -44,12 +45,14 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
                     params.signaling_secret,
                     params.stun_server);
 
+    if (!params.outgoing_video_packet_queue) {
+        PLOG_ERROR << "NetworkHandlerParams.outgoing_video_packet_queue must be set";
+        return nullptr;
+    }
+
     auto nh = std::make_unique<NetworkHandler>(NetworkHandler {});
     nh->params_ = params;
     nh->config_.iceServers.emplace_back(nh->params_.stun_server);
-
-    nh->outgoing_video_packet_queue_ =
-        std::make_shared<moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<linux::VideoFrame>>>(2);
 
     return nh;
 }
@@ -95,7 +98,7 @@ void NetworkHandler::RunDrain(std::stop_token st)
 
     while (!st.stop_requested()) {
         std::shared_ptr<linux::VideoFrame> frame;
-        if (outgoing_video_packet_queue_->wait_dequeue_timed(frame, 250ms)) {
+        if (params_.outgoing_video_packet_queue->wait_dequeue_timed(frame, 250ms)) {
             SendVideoFrame(frame->CompressedData(), frame->CompressedDataLength(), frame->pts);
 
             auto t_now = std::chrono::steady_clock::now();

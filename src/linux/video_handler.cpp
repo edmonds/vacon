@@ -64,15 +64,6 @@ VideoHandler::~VideoHandler()
 
     Stop();
     Join();
-
-    // Drain any video frames remaining on the outgoing video packet queue, so
-    // that ~VideoFrame() never runs after ~Encoder().
-    if (params_.outgoing_video_packet_queue) {
-        std::shared_ptr<linux::VideoFrame> frame = {};
-        while (params_.outgoing_video_packet_queue->wait_dequeue_timed(frame, 10ms)) {
-            PLOG_VERBOSE << fmt::format("Drained VideoFrame @ {}", fmt::ptr(frame.get()));
-        }
-    }
 }
 
 void VideoHandler::Init()

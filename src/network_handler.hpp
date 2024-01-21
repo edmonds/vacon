@@ -33,10 +33,14 @@
 
 namespace vacon {
 
+typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<linux::VideoFrame>>
+    VideoPacketQueue;
+
 struct NetworkHandlerParams {
     std::string signaling_base_url;
     std::string signaling_secret;
     std::string stun_server;
+    std::shared_ptr<vacon::VideoPacketQueue> outgoing_video_packet_queue;
 };
 
 class NetworkHandler {
@@ -53,12 +57,6 @@ class NetworkHandler {
         bool IsConnectedToPeer();
 
         AVFormatContext* GetRtpAvfcInput();
-
-        std::shared_ptr
-            <moodycamel::BlockingReaderWriterCircularBuffer
-                <std::shared_ptr
-                    <linux::VideoFrame> > >
-            outgoing_video_packet_queue_ = nullptr;
 
     private:
         NetworkHandler() = default;
