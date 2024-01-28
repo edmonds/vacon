@@ -99,20 +99,13 @@ cc.check_header('linux/videodev2.h', required: true)
 # other dependencies
 
 argparse = dependency('argparse', version: '>=3')
-
 fmt = dependency('fmt', version: '>9')
-
-nlohmann_json = dependency('nlohmann_json')
-
-plog = dependency('plog')
-
-readerwriterqueue = dependency('readerwriterqueue')
-
-threads = dependency('threads')
-
-sdl3 = dependency('sdl3')
-
 imgui = dependency('imgui', static: true)
+nlohmann_json = dependency('nlohmann_json')
+plog = dependency('plog')
+readerwriterqueue = dependency('readerwriterqueue')
+sdl3 = dependency('sdl3')
+threads = dependency('threads')
 
 # targets
 
@@ -135,9 +128,9 @@ vacon_sources = [
 vacon_dependencies = [
   argparse,
   backward,
-  graphics_deps,
   ffmpeg,
   fmt,
+  graphics_deps,
   imgui,
   libdatachannel,
   nlohmann_json,
