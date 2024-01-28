@@ -30,24 +30,25 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <format>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-#include <fmt/format.h>
-
 #include <mfx.h>
+#include <plog/Log.h>
 
-#include "common.hpp"
+#include "linux/camera.hpp"
 #include "linux/video_frame.hpp"
+#include "util.hpp"
 
 namespace vacon {
 namespace linux {
 
 std::shared_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 {
-    if (params.input_pixel_format == "") {
-        PLOG_ERROR << "Camera pixel format must be specified";
+    if (params.pixel_format == "") {
+        LOG_ERROR << "Camera pixel format must be specified";
         return nullptr;
     }
 
@@ -55,9 +56,9 @@ std::shared_ptr<Encoder> Encoder::Create(const EncoderParams& params)
     enc->params_ = params;
 
     // Convert pixel format parameter to uppercase.
-    std::transform(enc->params_.input_pixel_format.begin(),
-                   enc->params_.input_pixel_format.end(),
-                   enc->params_.input_pixel_format.begin(),
+    std::transform(enc->params_.pixel_format.begin(),
+                   enc->params_.pixel_format.end(),
+                   enc->params_.pixel_format.begin(),
                    ::toupper);
 
     return enc;
@@ -66,7 +67,7 @@ std::shared_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 Encoder::~Encoder()
 {
     if (mfx_session_) {
-        PLOG_VERBOSE << fmt::format("Closing MFX session @ {}", fmt::ptr(mfx_session_));
+        LOG_VERBOSE << std::format("Closing MFX session @ {}", (void*)mfx_session_);
         MFXVideoENCODE_Close(mfx_session_);
         MFXVideoVPP_Close(mfx_session_);
         MFXClose(mfx_session_);
@@ -74,7 +75,7 @@ Encoder::~Encoder()
     }
 
     if (mfx_loader_) {
-        PLOG_VERBOSE << fmt::format("Unloading MFX loader @ {}", fmt::ptr(mfx_loader_));
+        LOG_VERBOSE << std::format("Unloading MFX loader @ {}", (void*)mfx_loader_);
         MFXUnload(mfx_loader_);
         mfx_loader_ = nullptr;
     }
@@ -84,9 +85,9 @@ Encoder::~Encoder()
 
 bool Encoder::Init()
 {
-    PLOG_DEBUG <<
-        fmt::format("EncoderParams: input pixel format '{}', width {}, height {}, frame rate {}, bitrate {}",
-                    params_.input_pixel_format,
+    LOG_DEBUG <<
+        std::format("EncoderParams: pixel format '{}', width {}, height {}, frame rate {}, bitrate {}",
+                    params_.pixel_format,
                     params_.width,
                     params_.height,
                     params_.frame_rate,
@@ -96,34 +97,34 @@ bool Encoder::Init()
 
     mfx_loader_ = MFXLoad();
     if (!mfx_loader_) {
-        PLOG_ERROR << "MFXLoad() failed";
+        LOG_ERROR << "MFXLoad() failed";
         return false;
     }
 
     auto status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXCreateSession() failed: " << status;
+        LOG_ERROR << "MFXCreateSession() failed: " << status;
         return false;
     }
 
     if (!InitMfxVideoParams()) {
-        PLOG_ERROR << "InitMfxVideoParams() failed";
+        LOG_ERROR << "InitMfxVideoParams() failed";
         return false;
     }
 
     if (!InitLibraryVpp()) {
-        PLOG_ERROR << "InitLibraryVpp() failed";
+        LOG_ERROR << "InitLibraryVpp() failed";
         return false;
     }
 
     if (!InitLibraryEncode()) {
-        PLOG_ERROR << "InitLibraryEncode() failed";
+        LOG_ERROR << "InitLibraryEncode() failed";
         return false;
     }
 
     auto t_end = std::chrono::steady_clock::now();
     auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
-    PLOG_INFO << fmt::format("Initialized video encoder in {} ms", millis);
+    LOG_INFO << std::format("Initialized video encoder in {} ms", millis);
 
     return true;
 }
@@ -131,7 +132,7 @@ bool Encoder::Init()
 bool Encoder::InitMfxVideoParams()
 {
     if (!SetMfxFourCc()) {
-        PLOG_ERROR << "SetMfxFourCc() failed";
+        LOG_ERROR << "SetMfxFourCc() failed";
         return false;
     }
 
@@ -198,13 +199,13 @@ bool Encoder::InitMfxVideoParams()
 
     // For CBR and VCM, used to estimate the targeted frame size by dividing
     // the frame rate by the bitrate.
-    mfx_videoparam_encode_.mfx.TargetKbps = (mfxU16)params_.bitrate_kbps;
+    mfx_videoparam_encode_.mfx.TargetKbps = params_.bitrate_kbps;
 
     // Frame rate numerator.
     mfx_videoparam_vpp_.vpp.In.FrameRateExtN =
     mfx_videoparam_vpp_.vpp.Out.FrameRateExtN =
     mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtN =
-        (mfxU32)params_.frame_rate;
+        params_.frame_rate;
 
     // Frame rate denominator.
     mfx_videoparam_vpp_.vpp.In.FrameRateExtD =
@@ -216,25 +217,25 @@ bool Encoder::InitMfxVideoParams()
     mfx_videoparam_vpp_.vpp.In.Width =
     mfx_videoparam_vpp_.vpp.Out.Width =
     mfx_videoparam_encode_.mfx.FrameInfo.Width =
-        VACON_ALIGN16((mfxU16)params_.width);
+        VACON_ALIGN16(params_.width);
 
     // Height of the video frame in pixels. Must be a multiple of 16.
     mfx_videoparam_vpp_.vpp.In.Height =
     mfx_videoparam_vpp_.vpp.Out.Height =
     mfx_videoparam_encode_.mfx.FrameInfo.Height =
-        VACON_ALIGN16((mfxU16)params_.height);
+        VACON_ALIGN16(params_.height);
 
     // Width in pixels.
     mfx_videoparam_vpp_.vpp.In.CropW =
     mfx_videoparam_vpp_.vpp.Out.CropW =
     mfx_videoparam_encode_.mfx.FrameInfo.CropW =
-        (mfxU16)params_.width;
+        params_.width;
 
     // Height in pixels.
     mfx_videoparam_vpp_.vpp.In.CropH =
     mfx_videoparam_vpp_.vpp.Out.CropH =
     mfx_videoparam_encode_.mfx.FrameInfo.CropH =
-        (mfxU16)params_.height;
+        params_.height;
 
     // PicStruct
     mfx_videoparam_vpp_.vpp.In.PicStruct =
@@ -306,9 +307,9 @@ bool Encoder::SetMfxFourCc()
     map["Y210"] = { MFX_FOURCC_Y210, MFX_CHROMAFORMAT_YUV422, 10, 10, 1 };
 
     // Set pixel format parameters.
-    auto it = map.find(params_.input_pixel_format);
+    auto it = map.find(params_.pixel_format);
     if (it != map.end()) {
-        PLOG_DEBUG << fmt::format("Using {} for video pixel format", it->first);
+        LOG_DEBUG << std::format("Using {} for video pixel format", it->first);
 
         // Set VPP input parameters to match the camera format.
         auto fourcc = it->second;
@@ -318,19 +319,19 @@ bool Encoder::SetMfxFourCc()
         // suitable for 10-bit hardware encoding. Use a FourCC with the same
         // chroma format as the camera input format.
         if (fourcc.ChromaFormat == MFX_CHROMAFORMAT_YUV420) {
-            PLOG_DEBUG << "Using P010 for encoder pixel format";
+            LOG_DEBUG << "Using P010 for encoder pixel format";
             map["P010"].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
             map["P010"].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
         } else if (fourcc.ChromaFormat == MFX_CHROMAFORMAT_YUV422) {
-            PLOG_DEBUG << "Using Y210 for encoder pixel format";
+            LOG_DEBUG << "Using Y210 for encoder pixel format";
             map["Y210"].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
             map["Y210"].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
         } else {
-            PLOG_ERROR << "Unhandled chroma format: " << fourcc.ChromaFormat;
+            LOG_ERROR << "Unhandled chroma format: " << fourcc.ChromaFormat;
             return false;
         }
     } else {
-        PLOG_ERROR << "Unhandled input pixel format: " << params_.input_pixel_format;
+        LOG_ERROR << "Unhandled input pixel format: " << params_.pixel_format;
         return false;
     }
 
@@ -358,42 +359,42 @@ bool Encoder::InitLibraryEncode()
     // Require a hardware video encoder.
     cfg[0] = MFXCreateConfig(mfx_loader_);
     if(!cfg[0]) {
-        PLOG_ERROR << "MFXCreateConfig() failed";
+        LOG_ERROR << "MFXCreateConfig() failed";
         return false;
     }
     cfgVal[0].Type = MFX_VARIANT_TYPE_U32;
     cfgVal[0].Data.U32 = MFX_IMPL_TYPE_HARDWARE;
     auto status = MFXSetConfigFilterProperty(cfg[0], (mfxU8 *)"mfxImplDescription.Impl", cfgVal[0]);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.Impl = MFX_IMPL_TYPE_HARDWARE) failed: " << status;
+        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.Impl = MFX_IMPL_TYPE_HARDWARE) failed: " << status;
         return false;
     }
 
     // Require a particular codec.
     cfg[1] = MFXCreateConfig(mfx_loader_);
     if (!cfg[1]) {
-        PLOG_ERROR << "MFXCreateConfig() failed";
+        LOG_ERROR << "MFXCreateConfig() failed";
         return false;
     }
     cfgVal[1].Type = MFX_VARIANT_TYPE_U32;
     cfgVal[1].Data.U32 = MFX_CODEC_HEVC;
     status = MFXSetConfigFilterProperty(cfg[1], (mfxU8 *)"mfxImplDescription.mfxEncoderDescription.encoder.CodecID", cfgVal[1]);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.mfxEncoderDescription.encoder.CodecID = MFX_CODEC_HEVC) failed: " << status;
+        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.mfxEncoderDescription.encoder.CodecID = MFX_CODEC_HEVC) failed: " << status;
         return false;
     }
 
     // Require API version >= 2.2.
     cfg[2] = MFXCreateConfig(mfx_loader_);
     if (!cfg[2]) {
-        PLOG_ERROR << "MFXCreateConfig() failed";
+        LOG_ERROR << "MFXCreateConfig() failed";
         return false;
     }
     cfgVal[2].Type = MFX_VARIANT_TYPE_U32;
     cfgVal[2].Data.U32 = ((2 << 16) | 2);
     status = MFXSetConfigFilterProperty(cfg[2], (mfxU8 *)"mfxImplDescription.ApiVersion.Version", cfgVal[2]);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.ApiVersion.Version >= 2.2) failed: " << status;
+        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.ApiVersion.Version >= 2.2) failed: " << status;
         return false;
     }
 
@@ -403,7 +404,7 @@ bool Encoder::InitLibraryEncode()
     // parameters, is supported.
     status = MFXVideoENCODE_Init(mfx_session_, &mfx_videoparam_encode_);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXVideoENCODE_Init() failed: " << status;
+        LOG_ERROR << "MFXVideoENCODE_Init() failed: " << status;
         return false;
     }
 
@@ -419,48 +420,48 @@ bool Encoder::InitLibraryVpp()
     // Require a hardware video encoder.
     cfg[0] = MFXCreateConfig(mfx_loader_);
     if(!cfg[0]) {
-        PLOG_ERROR << "MFXCreateConfig() failed";
+        LOG_ERROR << "MFXCreateConfig() failed";
         return false;
     }
     cfgVal[0].Type = MFX_VARIANT_TYPE_U32;
     cfgVal[0].Data.U32 = MFX_IMPL_TYPE_HARDWARE;
     auto status = MFXSetConfigFilterProperty(cfg[0], (mfxU8 *)"mfxImplDescription.Impl", cfgVal[0]);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.Impl = MFX_IMPL_TYPE_HARDWARE) failed: " << status;
+        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.Impl = MFX_IMPL_TYPE_HARDWARE) failed: " << status;
         return false;
     }
 
     // Require that VPP scaling is supported.
     cfg[1] = MFXCreateConfig(mfx_loader_);
     if (!cfg[1]) {
-        PLOG_ERROR << "MFXCreateConfig() failed";
+        LOG_ERROR << "MFXCreateConfig() failed";
         return false;
     }
     cfgVal[1].Type = MFX_VARIANT_TYPE_U32;
     cfgVal[1].Data.U32 = MFX_EXTBUFF_VPP_SCALING;
     status = MFXSetConfigFilterProperty(cfg[1], (mfxU8 *)"mfxImplDescription.mfxVPPDescription.filter.FilterFourCC", cfgVal[1]);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.mfxVPPDescription.filter.FilterFourCC = MFX_EXTBUFF_VPP_SCALING) failed: " << status;
+        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.mfxVPPDescription.filter.FilterFourCC = MFX_EXTBUFF_VPP_SCALING) failed: " << status;
         return false;
     }
 
     // Require API version >= 2.2.
     cfg[2] = MFXCreateConfig(mfx_loader_);
     if (!cfg[2]) {
-        PLOG_ERROR << "MFXCreateConfig() failed";
+        LOG_ERROR << "MFXCreateConfig() failed";
         return false;
     }
     cfgVal[2].Type = MFX_VARIANT_TYPE_U32;
     cfgVal[2].Data.U32 = ((2 << 16) | 2);
     status = MFXSetConfigFilterProperty(cfg[2], (mfxU8 *)"mfxImplDescription.ApiVersion.Version", cfgVal[2]);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.ApiVersion.Version >= 2.2) failed: " << status;
+        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.ApiVersion.Version >= 2.2) failed: " << status;
         return false;
     }
 
     status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXVideoVPP_Init() failed: " << status;
+        LOG_ERROR << "MFXVideoVPP_Init() failed: " << status;
         return false;
     }
 
@@ -468,39 +469,39 @@ bool Encoder::InitLibraryVpp()
     return true;
 }
 
-std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
+std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& cref)
 {
     auto t_start = std::chrono::steady_clock::now();
 
     // Initialize the frame's data.
     auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
-    frame->pts = camera.PtsMicros();
+    frame->pts = cref.buf_.PtsMicros();
 
     // Get a new surface for storing the copy of the camera frame data.
     mfxFrameSurface1 *surface_camera = nullptr;
     auto status = MFXMemory_GetSurfaceForVPPIn(mfx_session_, &surface_camera);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXMemory_GetSurfaceForVPPIn() failed: " << status;
+        LOG_ERROR << "MFXMemory_GetSurfaceForVPPIn() failed: " << status;
         return nullptr;
     }
 
     // Map the new surface onto the CPU for writing.
     status = surface_camera->FrameInterface->Map(surface_camera, MFX_MAP_WRITE);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "mfxFrameSurfaceInterface->Map(MFX_MAP_WRITE) failed: " << status;
+        LOG_ERROR << "mfxFrameSurfaceInterface->Map(MFX_MAP_WRITE) failed: " << status;
         return nullptr;
     }
 
     // Copy the camera frame data to the new surface.
-    if (!CopyCameraFrameToSurface(camera, *surface_camera)) {
-        PLOG_ERROR << "Encoder::CopyCameraFrameToSurface() failed";
+    if (!CopyCameraBufferToSurface(cref, *surface_camera)) {
+        LOG_ERROR << "Encoder::CopyCameraFrameToSurface() failed";
         return nullptr;
     }
 
     // Unmap the camera surface from the CPU.
     status = surface_camera->FrameInterface->Unmap(surface_camera);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "mfxFrameSurfaceInterface->Unmap() failed: " << status;
+        LOG_ERROR << "mfxFrameSurfaceInterface->Unmap() failed: " << status;
         return nullptr;
     }
 
@@ -510,13 +511,13 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
     // Decrement reference count on the camera surface.
     status = surface_camera->FrameInterface->Release(surface_camera);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "mfxFrameSurfaceInterface->Release() failed: " << status;
+        LOG_ERROR << "mfxFrameSurfaceInterface->Release() failed: " << status;
         return nullptr;
     }
 
     // Check status of the scaling request.
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed: " << status;
+        LOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed: " << status;
         return nullptr;
     }
 
@@ -529,13 +530,13 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
                                         &frame->bitstream,
                                         &syncp);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXVideoENCODE_EncodeFrameAsync() failed: " << status;
+        LOG_ERROR << "MFXVideoENCODE_EncodeFrameAsync() failed: " << status;
         return nullptr;
     }
 
     // Check status of the encoding request.
     if (!syncp) {
-        PLOG_ERROR << "MFXVideoENCODE_EncodeFrameAsync() failed to return a synchronization point";
+        LOG_ERROR << "MFXVideoENCODE_EncodeFrameAsync() failed to return a synchronization point";
         return nullptr;
     }
 
@@ -549,7 +550,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
         }
     } while (status == MFX_WRN_IN_EXECUTION);
     if (status != MFX_ERR_NONE) {
-        PLOG_ERROR << "MFXVideoCORE_SyncOperation() failed: " << status;
+        LOG_ERROR << "MFXVideoCORE_SyncOperation() failed: " << status;
         return nullptr;
     }
 
@@ -558,52 +559,57 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraFrame(CameraFrame& camera)
 
     auto t_stop = std::chrono::steady_clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_stop - t_start).count();
-    auto msg = fmt::format("Encoded frame from buffer {}, sequence {} in {} us, {} bytes",
-                           camera.buf_.index, camera.buf_.sequence, micros, frame->bitstream.DataLength);
+    auto msg = std::format("Encoded frame from buffer {}, sequence {} in {} us, {} bytes",
+                           cref.buf_.vbuf.index,
+                           cref.buf_.vbuf.sequence,
+                           micros,
+                           frame->CompressedDataLength());
     if (stalled) {
-        PLOG_DEBUG << msg;
+        LOG_DEBUG << msg;
     } else {
-        PLOG_VERBOSE << msg;
+        LOG_VERBOSE << msg;
     }
 
     // Success.
     return frame;
 }
 
-bool Encoder::CopyCameraFrameToSurface(CameraFrame& camera, mfxFrameSurface1& surface)
+bool Encoder::CopyCameraBufferToSurface(const CameraBufferRef& cref, mfxFrameSurface1& surface)
 {
     const mfxFrameInfo& info = mfx_videoparam_vpp_.vpp.In;
     auto width = info.CropW;
     auto height = info.CropH;
-    auto fourcc = camera.Fmt().pixelformat;
+    auto data = cref.buf_.mmap.data();
+    auto fourcc = cref.buf_.fmt.pixelformat;
 
     // Copy the frame info parameters from the VPP configuration.
     surface.Info = info;
 
+    // Copy the frame data from the V4L2 mmap() buffer into the MFX surface.
     switch (fourcc) {
     case V4L2_PIX_FMT_NV12:
-        memcpy(surface.Data.Y, camera.data_, width * height);
-        memcpy(surface.Data.UV, (char*)camera.data_ + width*height, width*height / 2);
+        memcpy(surface.Data.Y, data, width * height);
+        memcpy(surface.Data.UV, data + width*height, width*height / 2);
         surface.Data.Pitch = width;
         break;
 
     case V4L2_PIX_FMT_YUYV:
-        memcpy(surface.Data.Y, camera.data_, width*height * 2);
+        memcpy(surface.Data.Y, data, width*height * 2);
         surface.Data.U = surface.Data.Y + 1;
         surface.Data.V = surface.Data.Y + 3;
         surface.Data.Pitch = width * 2;
         break;
 
     case V4L2_PIX_FMT_UYVY:
-        memcpy(surface.Data.U, camera.data_, width*height * 2);
+        memcpy(surface.Data.U, data, width*height * 2);
         surface.Data.Y = surface.Data.U + 1;
         surface.Data.V = surface.Data.U + 2;
         surface.Data.Pitch = width * 2;
         break;
 
     default:
-        PLOG_ERROR << fmt::format("Unsupported V4L2 camera frame FourCC {} ({:#010x})",
-                                  FourCcToString(fourcc), fourcc);
+        LOG_ERROR << std::format("Unsupported V4L2 camera frame FourCC {} ({:#010x})",
+                                 util::FourCcToString(fourcc), fourcc);
         return false;
     }
 

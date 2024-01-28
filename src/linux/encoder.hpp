@@ -15,24 +15,24 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
 #include <mfx.h>
 
-#include "common.hpp"
-#include "linux/camera_frame.hpp"
+#include "linux/camera.hpp"
 #include "linux/video_frame.hpp"
 
 namespace vacon {
 namespace linux {
 
 struct EncoderParams {
-    std::string input_pixel_format;
-    int width;
-    int height;
-    int frame_rate;
-    int bitrate_kbps;
+    std::string pixel_format;
+    uint32_t width;
+    uint32_t height;
+    uint32_t frame_rate;
+    uint32_t bitrate_kbps;
 };
 
 class Encoder {
@@ -42,17 +42,15 @@ class Encoder {
         ~Encoder();
         bool Init();
 
-        std::shared_ptr<VideoFrame> EncodeCameraFrame(CameraFrame&);
+        std::shared_ptr<VideoFrame> EncodeCameraBuffer(const CameraBufferRef&);
 
     private:
         Encoder() = default;
-
         bool InitMfxVideoParams();
         bool SetMfxFourCc();
         bool InitLibraryEncode();
         bool InitLibraryVpp();
-
-        bool CopyCameraFrameToSurface(CameraFrame&, mfxFrameSurface1&);
+        bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);
 
         EncoderParams       params_;
         mfxLoader           mfx_loader_ = nullptr;

@@ -113,7 +113,7 @@ vacon_sources = [
   'src/app.cpp',
   'src/args.cpp',
   'src/linux/camera.cpp',
-  #'src/linux/encoder.cpp',
+  'src/linux/encoder.cpp',
   #'src/linux/video_handler.cpp',
   #'src/network_handler.cpp',
   'src/rtp_depacketizer.cpp',
