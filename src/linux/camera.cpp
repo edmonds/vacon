@@ -337,6 +337,7 @@ bool Camera::InitBuffers()
         bufs_.emplace_back(CameraBuffer {
             .vbuf   = buf,
             .expbuf = expbuf,
+            .fmt    = fmt_,
             .mmap   = std::span<const std::byte>(static_cast<const std::byte*>(data),
                                                  static_cast<size_t>(buf.length)),
         });

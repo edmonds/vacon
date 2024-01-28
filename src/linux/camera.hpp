@@ -44,6 +44,7 @@ struct CameraParams {
 struct CameraBuffer {
     v4l2_buffer                 vbuf = {};
     v4l2_exportbuffer           expbuf = {};
+    v4l2_pix_format             fmt = {};
     SDL_Texture*                texture = nullptr;
     std::span<const std::byte>  mmap = {};
 };
