@@ -16,24 +16,10 @@
 #pragma once
 
 #include <cstdarg>
-#include <csignal>
 #include <memory>
 #include <string>
 
-#include <fmt/format.h>
 #include <plog/Log.h>
-
-extern "C" {
-
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/avutil.h>
-#include <libavutil/pixdesc.h>
-
-extern int plplay_play(AVFormatContext *);
-extern void plplay_shutdown(void);
-
-} // extern "C"
 
 #define VACON_ALIGN16(value) (((value + 15) >> 4) << 4)
 
@@ -48,17 +34,17 @@ av_always_inline std::string av_err2string(int errnum) {
 #endif
 
 namespace vacon {
+namespace util {
 
 template <class T> std::weak_ptr<T> make_weak_ptr(std::shared_ptr<T> ptr) { return ptr; }
 
-extern volatile std::sig_atomic_t gSignalUSR1;
-
-void ffmpegLogCallback(void *ptr, int level, const char *fmt, std::va_list vl_orig);
-plog::Severity ffmpegLogLevelToPlogSeverity(const int av_log_level);
-int plogSeverityToFfmpegLogLevel(const plog::Severity plog_severity);
-void setupLogging(const int verbosity);
-bool setupRealtimePriority();
-void setThreadName(const char *name);
+void FfmpegLogCallback(void *ptr, int level, const char *fmt, std::va_list vl_orig);
+plog::Severity FfmpegLogLevelToPlogSeverity(const int av_log_level);
+int PlogSeverityToFfmpegLogLevel(const plog::Severity plog_severity);
+void SetupLogging(const int verbosity);
+bool SetupRealtimePriority();
+void SetThreadName(const char *name);
 std::string FourCcToString(uint32_t);
 
+} // namespace util
 } // namespace vacon

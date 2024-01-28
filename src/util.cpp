@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#include "common.hpp"
+#include "util.hpp"
 
 #include <cstdarg>
+#include <format>
 
 #if defined(__linux__)
 # include <sys/prctl.h>
@@ -29,13 +30,18 @@
 #include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Formatters/TxtFormatter.h>
 
+extern "C" {
+#include <libavutil/log.h>
+}
+
 namespace vacon {
+namespace util {
 
 #if defined(VACON_USE_BACKWARD)
 backward::SignalHandling gBackwardSignalHandling;
 #endif
 
-void ffmpegLogCallback(void *ptr __attribute__((unused)),
+void FfmpegLogCallback([[maybe_unused]] void *ptr,
                        int level, const char *fmt, std::va_list vl_orig)
 {
     // Apparently ffmpeg doesn't do this.
@@ -53,7 +59,7 @@ void ffmpegLogCallback(void *ptr __attribute__((unused)),
     // Calculate the required size of the log buffer.
     const int len = std::vsnprintf(nullptr, 0, fmt, vl_copy1);
     if (len < 0) {
-        PLOG_DEBUG << "vsnprintf() failed";
+        LOG_DEBUG << "vsnprintf() failed";
         va_end(vl_copy1);
         va_end(vl_copy2);
         return;
@@ -66,8 +72,8 @@ void ffmpegLogCallback(void *ptr __attribute__((unused)),
             if (msg.back() == '\n') {
                 msg.resize(msg.length() - 1);
             }
-            auto severity = ffmpegLogLevelToPlogSeverity(level);
-            PLOG(severity) << msg;
+            auto severity = FfmpegLogLevelToPlogSeverity(level);
+            LOG(severity) << msg;
         }
     }
 
@@ -76,7 +82,7 @@ void ffmpegLogCallback(void *ptr __attribute__((unused)),
     va_end(vl_copy2);
 }
 
-plog::Severity ffmpegLogLevelToPlogSeverity(const int av_log_level)
+plog::Severity FfmpegLogLevelToPlogSeverity(const int av_log_level)
 {
     auto severity = plog::verbose;
 
@@ -96,7 +102,7 @@ plog::Severity ffmpegLogLevelToPlogSeverity(const int av_log_level)
     return severity;
 }
 
-int plogSeverityToFfmpegLogLevel(const plog::Severity plog_severity)
+int PlogSeverityToFfmpegLogLevel(const plog::Severity plog_severity)
 {
     int av_log_level = AV_LOG_TRACE;
 
@@ -114,7 +120,7 @@ int plogSeverityToFfmpegLogLevel(const plog::Severity plog_severity)
     return av_log_level;
 }
 
-void setupLogging(const int verbosity)
+void SetupLogging(const int verbosity)
 {
     auto severity = plog::none;
 
@@ -130,15 +136,15 @@ void setupLogging(const int verbosity)
     static plog::ColorConsoleAppender<plog::TxtFormatter> plogConsoleAppender;
     plog::init(severity, &plogConsoleAppender);
 
-    av_log_set_level(plogSeverityToFfmpegLogLevel(severity));
-    av_log_set_callback(ffmpegLogCallback);
+    av_log_set_level(PlogSeverityToFfmpegLogLevel(severity));
+    av_log_set_callback(FfmpegLogCallback);
 }
 
-bool setupRealtimePriority()
+bool SetupRealtimePriority()
 {
 	const int min_fifo_prio = sched_get_priority_min(SCHED_FIFO);
 	if (min_fifo_prio == -1) {
-        PLOG_DEBUG << fmt::format("sched_get_priority_min() failed: {}", std::strerror(errno));
+        LOG_DEBUG << std::format("sched_get_priority_min() failed: {}", std::strerror(errno));
 		return false;
 	}
 
@@ -146,11 +152,11 @@ bool setupRealtimePriority()
 		.sched_priority = min_fifo_prio + 1,
 	};
 
-    PLOG_VERBOSE << fmt::format("Attempting to set scheduling policy SCHED_FIFO, priority {}",
+    LOG_VERBOSE << std::format("Attempting to set scheduling policy SCHED_FIFO, priority {}",
                                 param.sched_priority);
 
 	if (sched_setscheduler(0, SCHED_FIFO, &param) != 0) {
-        PLOG_DEBUG << fmt::format("sched_setscheduler() failed: {}", std::strerror(errno));
+        LOG_DEBUG << std::format("sched_setscheduler() failed: {}", std::strerror(errno));
 		return false;
 	}
 
@@ -158,27 +164,27 @@ bool setupRealtimePriority()
     int ret;
 	static pthread_attr_t attr;
 	if ((ret = pthread_attr_init(&attr))) {
-        PLOG_DEBUG << fmt::format("pthread_attr_init() failed: {}", ret);
+        LOG_DEBUG << std::format("pthread_attr_init() failed: {}", ret);
 		return false;
 	}
 
 	if ((ret = pthread_attr_setschedpolicy(&attr, SCHED_FIFO))) {
-        PLOG_DEBUG << fmt::format("pthread_attr_setschedpolicy() failed: {}", ret);
+        LOG_DEBUG << std::format("pthread_attr_setschedpolicy() failed: {}", ret);
 		return false;
 	}
 
 	if ((ret = pthread_attr_setschedparam(&attr, &param))) {
-        PLOG_DEBUG << fmt::format("pthread_attr_setschedparam() failed: {}", ret);
+        LOG_DEBUG << std::format("pthread_attr_setschedparam() failed: {}", ret);
 		return false;
 	}
 
 	if ((ret = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED))) {
-        PLOG_DEBUG << fmt::format("pthread_attr_setinheritsched() failed: {}", ret);
+        LOG_DEBUG << std::format("pthread_attr_setinheritsched() failed: {}", ret);
 		return false;
 	}
 
 	if ((ret = pthread_setattr_default_np(&attr))) {
-        PLOG_DEBUG << fmt::format("pthread_setattr_default_np() failed: {}", ret);
+        LOG_DEBUG << std::format("pthread_setattr_default_np() failed: {}", ret);
 		return false;
 	}
 #endif
@@ -186,7 +192,7 @@ bool setupRealtimePriority()
 	return true;
 }
 
-void setThreadName(const char *name)
+void SetThreadName(const char *name)
 {
 #if defined(__linux__)
     prctl(PR_SET_NAME, name);
@@ -207,4 +213,5 @@ std::string FourCcToString(uint32_t val)
     return s;
 }
 
+} // namespace util
 } // namespace vacon
