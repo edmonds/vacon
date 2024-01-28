@@ -17,6 +17,7 @@
 
 #include <chrono>
 #include <exception>
+#include <format>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -24,12 +25,11 @@
 #include <thread>
 #include <variant>
 
-#include <fmt/format.h>
 #include <nlohmann/json.hpp>
+#include <plog/Log.h>
 #include <rtc/rtc.hpp>
 
-#include "common.hpp"
-#include "vacon.hpp"
+#include "util.hpp"
 
 using namespace std::chrono_literals;
 
@@ -39,14 +39,14 @@ namespace vacon {
 
 std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParams& params)
 {
-    PLOG_DEBUG <<
-        fmt::format("NetworkHandlerParams: signaling_base_url {}, signaling secret {}, stun_server {}",
+    LOG_DEBUG <<
+        std::format("NetworkHandlerParams: signaling_base_url {}, signaling secret {}, stun_server {}",
                     params.signaling_base_url,
                     params.signaling_secret,
                     params.stun_server);
 
     if (!params.outgoing_video_packet_queue) {
-        PLOG_ERROR << "NetworkHandlerParams.outgoing_video_packet_queue must be set";
+        LOG_ERROR << "NetworkHandlerParams.outgoing_video_packet_queue must be set";
         return nullptr;
     }
 
@@ -59,7 +59,7 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
 
 NetworkHandler::~NetworkHandler()
 {
-    PLOG_VERBOSE << fmt::format("Destructor called on {}", fmt::ptr(this));
+    LOG_VERBOSE << std::format("Destructor called on {}", (void*)this);
 
     peer_ = nullptr;
     track_ = nullptr;
@@ -79,22 +79,22 @@ void NetworkHandler::Stop()
 
 void NetworkHandler::Join()
 {
-    PLOG_INFO << "Waiting for network handler threads to exit...";
+    LOG_INFO << "Waiting for network handler threads to exit...";
 
     for (auto& thread : threads_) {
         if (thread.joinable()) {
-            PLOG_DEBUG << "Trying to join thread ID " << thread.get_id();
+            LOG_DEBUG << "Trying to join thread ID " << thread.get_id();
             thread.join();
         } else {
-            PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
+            LOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
         }
     }
 }
 
 void NetworkHandler::RunDrain(std::stop_token st)
 {
-    PLOG_DEBUG << "Starting outgoing video packet queue drain thread ID " << std::this_thread::get_id();
-    setThreadName("VOutVideo");
+    LOG_DEBUG << "Starting outgoing video packet queue drain thread ID " << std::this_thread::get_id();
+    util::SetThreadName("VOutVideo");
 
     auto t_last = std::chrono::steady_clock::now();
     int count_frames = -1;
@@ -114,17 +114,17 @@ void NetworkHandler::RunDrain(std::stop_token st)
             if (t_dur >= 1s) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
                 auto fps = count_frames / std::chrono::duration<double>(t_dur).count();
-                PLOG_INFO << fmt::format("Processed {} outgoing camera frames in {} ms, {:.3f} fps",
-                                         count_frames, ms, fps);
+                LOG_INFO << std::format("Processed {} outgoing camera frames in {} ms, {:.3f} fps",
+                                        count_frames, ms, fps);
                 t_last = t_now;
                 count_frames = 0;
             }
         } else {
-            PLOG_VERBOSE << "Stalled dequeuing packet from outgoing video packet queue, retrying";
+            LOG_VERBOSE << "Stalled dequeuing packet from outgoing video packet queue, retrying";
         }
     }
 
-    PLOG_DEBUG << "Stopping outgoing video packet queue drain thread ID " << std::this_thread::get_id();
+    LOG_DEBUG << "Stopping outgoing video packet queue drain thread ID " << std::this_thread::get_id();
 }
 
 void NetworkHandler::ConnectWebRTC()
@@ -132,11 +132,11 @@ void NetworkHandler::ConnectWebRTC()
     ws_ = std::make_shared<rtc::WebSocket>();
 
     ws_->onOpen([]() {
-        PLOG_INFO << "WebSocket connected, signaling ready";
+        LOG_INFO << "WebSocket connected, signaling ready";
     });
 
     ws_->onError([](std::string s) {
-        PLOG_INFO << "WebSocket error: " << s;
+        LOG_INFO << "WebSocket error: " << s;
     });
 
     ws_->onMessage([&](std::variant<rtc::binary, rtc::string> data) {
@@ -148,7 +148,7 @@ void NetworkHandler::ConnectWebRTC()
     });
 
     const std::string url = params_.signaling_base_url + "/" + params_.signaling_secret;
-    PLOG_INFO << fmt::format("Opening WebSocket URL {}", url);
+    LOG_INFO << std::format("Opening WebSocket URL {}", url);
     ws_->open(url);
 }
 
@@ -169,27 +169,27 @@ void NetworkHandler::CloseWebSocket()
 
 void NetworkHandler::OnWsMessage(json message)
 {
-    PLOG_DEBUG << "Received WebSocket message: " << message.dump();
+    LOG_DEBUG << "Received WebSocket message: " << message.dump();
 
     if (!message.contains("type")) {
-        PLOG_ERROR << "Message lacks key 'type'";
+        LOG_ERROR << "Message lacks key 'type'";
         return;
     }
     auto type = message.find("type")->get<std::string>();
 
     if (type == "start_session") {
-        PLOG_DEBUG << "Got start_session, creating peer connection and sending offer";
+        LOG_DEBUG << "Got start_session, creating peer connection and sending offer";
         CreatePeerConnection();
         return;
     }
 
     if (type == "offer") {
-        PLOG_DEBUG << "Got offer, creating peer connection and sending answer";
+        LOG_DEBUG << "Got offer, creating peer connection and sending answer";
         auto sdp = message["sdp"].get<std::string>();
         auto description = rtc::Description(sdp, type);
         CreatePeerConnection(std::optional<rtc::Description>(description));
     } else if (type == "answer") {
-        PLOG_DEBUG << "Got answer, completing session startup";
+        LOG_DEBUG << "Got answer, completing session startup";
         auto sdp = message["sdp"].get<std::string>();
         auto description = rtc::Description(sdp, type);
         peer_->setRemoteDescription(description);
@@ -202,7 +202,7 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
 
     rtp_depacketizer_ = vacon::RtpDepacketizer::Create();
 
-    peer_->onGatheringStateChange([&, wws = make_weak_ptr(ws_)](rtc::PeerConnection::GatheringState state) {
+    peer_->onGatheringStateChange([&, wws = util::make_weak_ptr(ws_)](rtc::PeerConnection::GatheringState state) {
         if (state == rtc::PeerConnection::GatheringState::Complete) {
             auto description = peer_->localDescription();
             json message = {
@@ -210,7 +210,7 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
                 { "sdp", std::string(description.value()) },
             };
             auto message_dump = message.dump();
-            PLOG_DEBUG << "[PeerConnection] Sending WebSocket message: " << message_dump;
+            LOG_DEBUG << "[PeerConnection] Sending WebSocket message: " << message_dump;
             if (auto ws = wws.lock()) {
                 ws->send(message_dump);
             }
@@ -223,7 +223,7 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
                 { "type", description.typeString() },
                 { "sdp", std::string(description) },
             };
-            PLOG_DEBUG << "[PeerConnection onLocalDescription] Local Description: " << message.dump();
+            LOG_DEBUG << "[PeerConnection onLocalDescription] Local Description: " << message.dump();
         });
     }
 
@@ -264,7 +264,7 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
 void NetworkHandler::ReceivePacket(rtc::binary pkt)
 {
     // This is an RTP packet.
-    PLOG_VERBOSE << fmt::format("RECEIVED AN RTP PACKET !!! length {}", pkt.size());
+    LOG_VERBOSE << std::format("RECEIVED AN RTP PACKET !!! length {}", pkt.size());
     if (rtp_depacketizer_) {
         rtp_depacketizer_->submitRtpPacket(pkt);
     }
@@ -279,7 +279,7 @@ void NetworkHandler::SendVideoFrame(const std::byte *data, size_t size, uint64_t
 
     // Consistency check.
     if (!data || size == 0) {
-        PLOG_DEBUG << fmt::format("Called with no data or zero length data at PTS {}, ignoring", pts);
+        LOG_DEBUG << std::format("Called with no data or zero length data at PTS {}, ignoring", pts);
         return;
     }
 
@@ -302,10 +302,10 @@ void NetworkHandler::SendVideoFrame(const std::byte *data, size_t size, uint64_t
 
     // Send the packet.
     try {
-        PLOG_VERBOSE << fmt::format("Sending packet @ {}, size {}", fmt::ptr(data), size);
+        LOG_VERBOSE << std::format("Sending packet @ {}, size {}", (void*)data, size);
         track_->send(data, size);
     } catch (const std::exception &e) {
-        PLOG_INFO << "Unable to send packet: " << e.what();
+        LOG_INFO << "Unable to send packet: " << e.what();
     }
 }
 
