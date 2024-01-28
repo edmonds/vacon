@@ -18,14 +18,12 @@
 #include <cassert>
 #include <chrono>
 #include <cstring>
+#include <format>
 #include <memory>
 #include <string>
 
-#include <fmt/format.h>
 #include <rtc/rtc.hpp>
-
-#include "common.hpp"
-#include "vacon.hpp"
+#include <plog/Log.h>
 
 using namespace std::chrono_literals;
 
@@ -35,7 +33,7 @@ std::unique_ptr<RtpDepacketizer> RtpDepacketizer::Create() {
     auto rd = std::make_unique<RtpDepacketizer>(RtpDepacketizer {});
 
     if (!rd->initFfmpeg()) {
-        PLOG_FATAL << "initFfmpeg() failed";
+        LOG_FATAL << "initFfmpeg() failed";
         return nullptr;
     }
 
@@ -44,7 +42,7 @@ std::unique_ptr<RtpDepacketizer> RtpDepacketizer::Create() {
 
 RtpDepacketizer::~RtpDepacketizer()
 {
-    PLOG_VERBOSE << fmt::format("Destructor called on {}", fmt::ptr(this));
+    LOG_VERBOSE << std::format("Destructor called on {}", (void*)this);
     avformat_free_context(fctx);
     avio_context_free(&rtp_ioctx);
     avio_context_free(&sdp_ioctx);
@@ -209,10 +207,10 @@ int RtpDepacketizer::readAvioPacketRTP(void *opaque, uint8_t *buf, int buf_size)
     rtc::binary packet;
     for (;;) {
         dpkt->rtp_packet_queue.wait_dequeue(packet);
-        PLOG_VERBOSE << fmt::format("Dequeued RTP packet size {}", packet.size());
-        if (vacon::gUSR1) {
-            vacon::gUSR1 = 0;
-            PLOG_DEBUG << "Dropping a packet due to signal!";
+        LOG_VERBOSE << std::format("Dequeued RTP packet size {}", packet.size());
+        if (false /* vacon::gUSR1 */) {
+            //vacon::gUSR1 = 0;
+            //LOG_DEBUG << "Dropping a packet due to signal!";
             continue;
         } else {
             break;
@@ -234,7 +232,7 @@ int RtpDepacketizer::readAvioPacketRTP(void *opaque, uint8_t *buf, int buf_size)
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_diff);
         auto Mbps = (dpkt->count_rtp_bytes / 125000.0) / td_interval;
 
-        PLOG_INFO
+        LOG_INFO
             << "Received "
             << dpkt->count_rtp_packets
             << " incoming RTP packets in "
@@ -262,13 +260,13 @@ int RtpDepacketizer::writeAvioPacketRTP(void *opaque __attribute__((unused)),
                                         /* const */ uint8_t *buf __attribute__((unused)),
                                         int buf_size)
 {
-    PLOG_VERBOSE << fmt::format("ffmpeg wants to write {} bytes to RTP peer, ignoring", buf_size);
+    LOG_VERBOSE << std::format("ffmpeg wants to write {} bytes to RTP peer, ignoring", buf_size);
     return buf_size;
 }
 
 void RtpDepacketizer::submitRtpPacket(rtc::binary packet)
 {
-    PLOG_VERBOSE << fmt::format("Enqueuing RTP packet size {}", packet.size());
+    LOG_VERBOSE << std::format("Enqueuing RTP packet size {}", packet.size());
     this->rtp_packet_queue.emplace(packet);
 }
 

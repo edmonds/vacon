@@ -24,7 +24,9 @@
 #include <rtc/rtc.hpp>
 #include <readerwriterqueue.h>
 
-#include "common.hpp"
+extern "C" {
+#include <libavformat/avformat.h>
+}
 
 namespace vacon {
 
