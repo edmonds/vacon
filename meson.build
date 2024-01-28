@@ -44,11 +44,9 @@ endforeach
 
 if get_option('b_sanitize') == 'none'
   backward = dependency('backward-cpp')
-  backward_sources = ['src/backward.cpp']
   add_project_arguments('-DVACON_USE_BACKWARD', language: ['c', 'cpp'])
 else
   backward = []
-  backward_sources = []
 endif
 
 # libdatachannel
@@ -112,7 +110,6 @@ threads = dependency('threads')
 # targets
 
 vacon_sources = [
-  backward_sources,
   'src/app.cpp',
   'src/common.cpp',
   'src/linux/camera.cpp',

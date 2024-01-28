@@ -23,6 +23,8 @@
 #endif
 
 #if defined(VACON_USE_BACKWARD)
+# define BACKWARD_HAS_DWARF 1
+# define BACKWARD_HAS_UNWIND 1
 # include <backward.hpp>
 #endif
 
@@ -38,7 +40,7 @@ namespace vacon {
 namespace util {
 
 #if defined(VACON_USE_BACKWARD)
-backward::SignalHandling gBackwardSignalHandling;
+backward::SignalHandling g_backward_signal_handling;
 #endif
 
 void FfmpegLogCallback([[maybe_unused]] void *ptr,
