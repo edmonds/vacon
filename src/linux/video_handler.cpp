@@ -16,15 +16,15 @@
 #include "video_handler.hpp"
 
 #include <chrono>
+#include <format>
 #include <memory>
 #include <optional>
 #include <string>
 #include <thread>
 
-#include <fmt/format.h>
+#include <plog/Log.h>
 #include <readerwritercircularbuffer.h>
 
-#include "common.hpp"
 #include "linux/camera.hpp"
 #include "linux/encoder.hpp"
 
@@ -87,21 +87,21 @@ void VideoHandler::Stop()
 
 void VideoHandler::Join()
 {
-    PLOG_INFO << "Waiting for video handler threads to exit...";
+    LOG_INFO << "Waiting for video handler threads to exit...";
 
     for (auto& thread : threads_) {
         if (thread.joinable()) {
-            PLOG_DEBUG << "Trying to join thread ID " << thread.get_id();
+            LOG_DEBUG << "Trying to join thread ID " << thread.get_id();
             thread.join();
         } else {
-            PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
+            LOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
         }
     }
 }
 
 void VideoHandler::RunCamera(std::stop_token st)
 {
-    PLOG_DEBUG << "Starting Linux camera capture thread ID " << std::this_thread::get_id();
+    LOG_DEBUG << "Starting Linux camera capture thread ID " << std::this_thread::get_id();
     setThreadName("VCameraCapture");
 
     // Try multiple times to start the camera capture. This awkwardness is due
@@ -113,13 +113,13 @@ void VideoHandler::RunCamera(std::stop_token st)
         if (!camera_) {
             camera_ = Camera::Create(*params_.camera_params);
             if (!camera_) {
-                PLOG_ERROR << "Camera::Create() failed !!!";
+                LOG_ERROR << "Camera::Create() failed !!!";
                 return;
             }
         }
 
         if (!camera_->Init()) {
-            PLOG_ERROR << "Camera::Init() failed !!!";
+            LOG_ERROR << "Camera::Init() failed !!!";
             camera_ = nullptr;
             continue;
         }
@@ -128,14 +128,14 @@ void VideoHandler::RunCamera(std::stop_token st)
         if (camera_started) {
             break;
         } else {
-            PLOG_ERROR << "Camera::StartCapturing() failed !!!";
+            LOG_ERROR << "Camera::StartCapturing() failed !!!";
             camera_ = nullptr;
             continue;
         }
     }
 
     if (!camera_started) {
-        PLOG_FATAL << "Failed to start capturing frames from camera after multiple attempts, giving up !!!";
+        LOG_FATAL << "Failed to start capturing frames from camera after multiple attempts, giving up !!!";
         return;
     }
 
@@ -149,28 +149,28 @@ void VideoHandler::RunCamera(std::stop_token st)
 
         uint32_t sequence = frame->buf_.sequence;
         if (last_sequence > 0 && (sequence != last_sequence + 1)) {
-            PLOG_INFO << fmt::format("Gap in camera frame sequence, current sequence {}, last sequence {}",
-                                     sequence, last_sequence);
+            LOG_INFO << std::format("Gap in camera frame sequence, current sequence {}, last sequence {}",
+                                    sequence, last_sequence);
         }
         last_sequence = sequence;
 
         // Enqueue the camera frame onto the encoder queue.
         if (!encoder_queue_.try_enqueue(frame)) {
-            PLOG_VERBOSE << "Failed to enqueue frame onto encoder queue, discarding!";
+            //LOG_VERBOSE << "Failed to enqueue frame onto encoder queue, discarding!";
         }
 
         // Enqueue the camera frame onto the preview queue.
         if (!preview_queue_.try_enqueue(frame)) {
-            PLOG_VERBOSE << "Failed to enqueue frame onto preview queue, discarding!";
+            //LOG_VERBOSE << "Failed to enqueue frame onto preview queue, discarding!";
         }
     }
 
-    PLOG_DEBUG << "Stopping Linux camera capture thread ID " << std::this_thread::get_id();
+    LOG_DEBUG << "Stopping Linux camera capture thread ID " << std::this_thread::get_id();
 }
 
 void VideoHandler::RunEncoder(std::stop_token st)
 {
-    PLOG_DEBUG << "Starting video encoder thread ID " << std::this_thread::get_id();
+    LOG_DEBUG << "Starting video encoder thread ID " << std::this_thread::get_id();
 
     // Encoder initialization will start a number of background worker threads
     // when libvpl is initialized. Make sure the names of those worker threads
@@ -178,7 +178,7 @@ void VideoHandler::RunEncoder(std::stop_token st)
     setThreadName("VMfxWorker");
 
     if (!encoder_->Init()) {
-        PLOG_ERROR << "Video encoder initialization failed !!!";
+        LOG_ERROR << "Video encoder initialization failed !!!";
         encoder_ = nullptr;
         return;
     }
@@ -197,7 +197,7 @@ void VideoHandler::RunEncoder(std::stop_token st)
             camera_frame = nullptr;
 
             if (!video_frame) {
-                PLOG_ERROR << "Encoder::EncodeCameraFrame() failed!";
+                LOG_ERROR << "Encoder::EncodeCameraFrame() failed!";
                 continue;
             }
 
@@ -207,14 +207,14 @@ void VideoHandler::RunEncoder(std::stop_token st)
                     if (params_.outgoing_video_packet_queue->wait_enqueue_timed(video_frame, 10ms)) {
                         break;
                     } else {
-                        PLOG_VERBOSE << "Stalled enqueuing packet onto outgoing video packet queue, retrying";
+                        LOG_VERBOSE << "Stalled enqueuing packet onto outgoing video packet queue, retrying";
                     }
                 }
             }
         }
     }
 
-    PLOG_DEBUG << "Stopping video encoder thread ID " << std::this_thread::get_id();
+    LOG_DEBUG << "Stopping video encoder thread ID " << std::this_thread::get_id();
 }
 
 std::shared_ptr<CameraFrame> VideoHandler::GetNextPreviewFrame()

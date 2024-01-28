@@ -22,7 +22,6 @@
 
 #include <readerwritercircularbuffer.h>
 
-#include "common.hpp"
 #include "linux/camera.hpp"
 #include "linux/encoder.hpp"
 
