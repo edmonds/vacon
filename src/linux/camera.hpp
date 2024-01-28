@@ -47,6 +47,10 @@ struct CameraBuffer {
     v4l2_pix_format             fmt = {};
     SDL_Texture*                texture = nullptr;
     std::span<const std::byte>  mmap = {};
+
+    uint64_t PtsMicros() {
+        return vbuf.timestamp.tv_sec * 1'000'000 + vbuf.timestamp.tv_usec;
+    }
 };
 
 class CameraBufferRef {
