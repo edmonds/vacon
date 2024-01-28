@@ -22,6 +22,8 @@ add_global_arguments([
 
 add_project_arguments([
   '-D_POSIX_C_SOURCE=200809L',
+  '-DPROJECT_NAME="@0@"'.format(meson.project_name()),
+  '-DPROJECT_VERSION="@0@"'.format(meson.project_version()),
   ],
   language: ['c', 'cpp'],
 )
