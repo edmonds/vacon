@@ -113,7 +113,6 @@ vacon_sources = [
   backward_sources,
   'src/common.cpp',
   'src/linux/camera.cpp',
-  'src/linux/camera_frame.cpp',
   'src/linux/encoder.cpp',
   'src/linux/video_frame.cpp',
   'src/linux/video_handler.cpp',

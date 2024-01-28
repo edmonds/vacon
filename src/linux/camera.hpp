@@ -19,13 +19,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 
 #include <linux/videodev2.h>
 
-#include "common.hpp"
-#include "linux/camera_frame.hpp"
+#include <SDL3/SDL.h>
 
 namespace vacon {
 namespace linux {
@@ -33,41 +33,64 @@ namespace linux {
 struct CameraParams {
     std::string device;
     std::string pixel_format;
-    int width;
-    int height;
-    int frame_rate;
+    uint32_t frame_rate;
+    uint32_t height;
+    uint32_t width;
+
     uint32_t n_kernel_buffers = 8;
-    uint32_t n_initial_stream_skip_frames_ = 15;
+    uint32_t n_initial_stream_skip_frames = 15;
+};
+
+struct CameraBuffer {
+    v4l2_buffer                 vbuf = {};
+    v4l2_exportbuffer           expbuf = {};
+    SDL_Texture*                texture = nullptr;
+    std::span<const std::byte>  mmap = {};
+};
+
+class CameraBufferRef {
+    public:
+        static std::shared_ptr<CameraBufferRef> Create(CameraBuffer& buf, int v4l2_fd);
+        CameraBufferRef(CameraBufferRef&&);
+        ~CameraBufferRef();
+
+        CameraBuffer& buf_;
+
+    private:
+        CameraBufferRef(CameraBuffer& buf, int v4l2_fd)
+            : buf_(buf), v4l2_fd_(v4l2_fd) {};
+
+        int v4l2_fd_ = -1;
 };
 
 class Camera {
-    friend class CameraFrame;
-
     public:
         static std::shared_ptr<Camera> Create(const CameraParams&);
         Camera(Camera&&) = default;
         ~Camera();
         bool Init();
+        bool ExportBuffersToOpenGL(SDL_Renderer*);
         bool StartCapturing();
+        std::shared_ptr<CameraBufferRef> NextFrame();
 
-        std::shared_ptr<CameraFrame> ReadFrame();
+        struct v4l2_pix_format fmt_ = {};
 
     private:
         Camera() = default;
-
-        bool OpenCameraDevice();
+        Camera(const CameraParams& params)
+            : params_(params) {};
+        bool OpenDevice();
         bool InitV4L2();
-        bool InitKernelBuffers();
+        bool InitVaapi();
+        bool InitBuffers();
+        bool ExportBufferToVaapi(CameraBuffer&);
+        bool ExportBufferToMfx(CameraBuffer&);
 
         CameraParams params_;
 
         int fd_ = -1;
-        struct v4l2_pix_format fmt_ = {};
+        std::vector<CameraBuffer> bufs_ = {};
         std::chrono::time_point<std::chrono::steady_clock> t_last_;
-
-        // Camera frame buffer data and length pairs. The pointer is mmap()'d
-        // V4L2 memory.
-        std::vector<std::pair<void*, size_t>> mmap_buffers_;
 };
 
 } // namespace linux
