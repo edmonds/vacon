@@ -77,6 +77,20 @@ ffmpeg = [
   dependency('libavutil'),
 ]
 
+# OpenGL
+
+if host_machine.system() == 'linux'
+  add_project_arguments(['-DGL_GLEXT_PROTOTYPES'], language: ['c', 'cpp'])
+
+  egl = dependency('egl', version: '>=1.5')
+  gl = dependency('gl')
+  opengl = dependency('opengl')
+
+  graphics_deps = [egl, gl, opengl]
+else
+  error('Only Linux is supported')
+endif
+
 # v4l2 kernel API
 
 cc.check_header('linux/version.h', required: true)
@@ -95,13 +109,6 @@ plog = dependency('plog')
 readerwriterqueue = dependency('readerwriterqueue')
 
 threads = dependency('threads')
-
-egl = dependency('egl')
-if egl.found()
-  add_project_arguments('-DHAVE_EGL', language: ['c', 'cpp'])
-endif
-
-opengl = dependency('opengl')
 
 sdl3 = dependency('sdl3')
 
@@ -128,13 +135,12 @@ vacon_sources = [
 vacon_dependencies = [
   argparse,
   backward,
-  egl,
+  graphics_deps,
   ffmpeg,
   fmt,
   imgui,
   libdatachannel,
   nlohmann_json,
-  opengl,
   plog,
   readerwriterqueue,
   sdl3,
