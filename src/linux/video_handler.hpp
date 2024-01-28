@@ -28,8 +28,8 @@
 namespace vacon {
 namespace linux {
 
-typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<CameraFrame>>
-    CameraFrameQueue;
+typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<CameraBufferRef>>
+    CameraBufferQueue;
 
 struct VideoHandlerParams {
     std::optional<CameraParams> camera_params = std::nullopt;
@@ -50,7 +50,7 @@ class VideoHandler {
         void Stop();
         void Join();
 
-        std::shared_ptr<CameraFrame> GetNextPreviewFrame();
+        std::shared_ptr<CameraBufferRef> NextPreviewFrame();
 
     private:
         VideoHandler() = default;
@@ -59,12 +59,12 @@ class VideoHandler {
 
         VideoHandlerParams params_;
 
-        std::vector<std::jthread>   threads_ = {};
         std::shared_ptr<Camera>     camera_ = {};
         std::shared_ptr<Encoder>    encoder_ = {};
+        std::vector<std::jthread>   threads_ = {};
 
-        CameraFrameQueue encoder_queue_ = CameraFrameQueue(2);
-        CameraFrameQueue preview_queue_ = CameraFrameQueue(2);
+        CameraBufferQueue encoder_queue_ = CameraBufferQueue(2);
+        CameraBufferQueue preview_queue_ = CameraBufferQueue(2);
 };
 
 } // namespace linux

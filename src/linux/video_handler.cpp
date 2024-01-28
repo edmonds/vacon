@@ -27,6 +27,7 @@
 
 #include "linux/camera.hpp"
 #include "linux/encoder.hpp"
+#include "util.hpp"
 
 using namespace std::chrono_literals;
 
@@ -102,7 +103,7 @@ void VideoHandler::Join()
 void VideoHandler::RunCamera(std::stop_token st)
 {
     LOG_DEBUG << "Starting Linux camera capture thread ID " << std::this_thread::get_id();
-    setThreadName("VCameraCapture");
+    util::SetThreadName("VCameraCapture");
 
     // Try multiple times to start the camera capture. This awkwardness is due
     // to real hardware like the Razer Kiyo Pro that sometimes hangs when
@@ -142,26 +143,26 @@ void VideoHandler::RunCamera(std::stop_token st)
     uint32_t last_sequence = 0;
     while (!st.stop_requested()) {
         // Get the next V4L2 frame from the camera.
-        auto frame = camera_->ReadFrame();
-        if (!frame) {
+        auto cref = camera_->NextFrame();
+        if (!cref) {
             continue;
         }
 
-        uint32_t sequence = frame->buf_.sequence;
+        uint32_t sequence = cref->buf_.vbuf.sequence;
         if (last_sequence > 0 && (sequence != last_sequence + 1)) {
-            LOG_INFO << std::format("Gap in camera frame sequence, current sequence {}, last sequence {}",
-                                    sequence, last_sequence);
+            LOG_DEBUG << std::format("Gap in camera frame sequence, current sequence {}, last sequence {}",
+                                     sequence, last_sequence);
         }
         last_sequence = sequence;
 
         // Enqueue the camera frame onto the encoder queue.
-        if (!encoder_queue_.try_enqueue(frame)) {
-            //LOG_VERBOSE << "Failed to enqueue frame onto encoder queue, discarding!";
+        if (!encoder_queue_.try_enqueue(cref)) {
+            LOG_VERBOSE << "Failed to enqueue frame onto encoder queue, discarding!";
         }
 
         // Enqueue the camera frame onto the preview queue.
-        if (!preview_queue_.try_enqueue(frame)) {
-            //LOG_VERBOSE << "Failed to enqueue frame onto preview queue, discarding!";
+        if (!preview_queue_.try_enqueue(cref)) {
+            LOG_VERBOSE << "Failed to enqueue frame onto preview queue, discarding!";
         }
     }
 
@@ -175,7 +176,7 @@ void VideoHandler::RunEncoder(std::stop_token st)
     // Encoder initialization will start a number of background worker threads
     // when libvpl is initialized. Make sure the names of those worker threads
     // are distinct from this thread's name.
-    setThreadName("VMfxWorker");
+    util::SetThreadName("VMfxWorker");
 
     if (!encoder_->Init()) {
         LOG_ERROR << "Video encoder initialization failed !!!";
@@ -183,18 +184,18 @@ void VideoHandler::RunEncoder(std::stop_token st)
         return;
     }
 
-    setThreadName("VEncoderVideo");
+    util::SetThreadName("VEncoderVideo");
 
     while (!st.stop_requested()) {
         // Get the next camera frame from the queue.
-        std::shared_ptr<CameraFrame> camera_frame = nullptr;
-        if (encoder_queue_.wait_dequeue_timed(camera_frame, 250ms)) {
+        std::shared_ptr<CameraBufferRef> cref = nullptr;
+        if (encoder_queue_.wait_dequeue_timed(cref, 250ms)) {
             // Encode the camera frame.
-            auto video_frame = encoder_->EncodeCameraFrame(*camera_frame);
+            auto video_frame = encoder_->EncodeCameraBuffer(*cref);
 
             // Get rid of this CameraFrame as soon as possible so the buffer
             // can be re-enqueued to the kernel.
-            camera_frame = nullptr;
+            cref = nullptr;
 
             if (!video_frame) {
                 LOG_ERROR << "Encoder::EncodeCameraFrame() failed!";
@@ -217,11 +218,11 @@ void VideoHandler::RunEncoder(std::stop_token st)
     LOG_DEBUG << "Stopping video encoder thread ID " << std::this_thread::get_id();
 }
 
-std::shared_ptr<CameraFrame> VideoHandler::GetNextPreviewFrame()
+std::shared_ptr<CameraBufferRef> VideoHandler::NextPreviewFrame()
 {
-    std::shared_ptr<CameraFrame> camera_frame = nullptr;
-    preview_queue_.try_dequeue(camera_frame);
-    return camera_frame;
+    std::shared_ptr<CameraBufferRef> cref = nullptr;
+    preview_queue_.try_dequeue(cref);
+    return cref;
 }
 
 } // namespace linux
