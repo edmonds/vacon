@@ -118,11 +118,11 @@ vacon_sources = [
   'src/linux/encoder.cpp',
   'src/linux/video_frame.cpp',
   'src/linux/video_handler.cpp',
-  'src/main.cpp',
   'src/network_handler.cpp',
   'src/rtp_depacketizer.cpp',
   'src/sdl/app.cpp',
   'src/sdl/texture.cpp',
+  'src/sdlmain.cpp',
   'src/vacon.cpp',
 ]
 
