@@ -113,6 +113,7 @@ threads = dependency('threads')
 
 vacon_sources = [
   backward_sources,
+  'src/app.cpp',
   'src/common.cpp',
   'src/linux/camera.cpp',
   'src/linux/encoder.cpp',
@@ -120,10 +121,8 @@ vacon_sources = [
   'src/linux/video_handler.cpp',
   'src/network_handler.cpp',
   'src/rtp_depacketizer.cpp',
-  'src/sdl/app.cpp',
   'src/sdl/texture.cpp',
   'src/sdlmain.cpp',
-  'src/vacon.cpp',
 ]
 
 vacon_dependencies = [
