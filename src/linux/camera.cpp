@@ -34,7 +34,7 @@
 #include <SDL3/SDL_opengles2.h>
 #include <plog/Log.h>
 
-#include "common.hpp"
+#include "util.hpp"
 
 using namespace std::chrono_literals;
 
@@ -67,7 +67,7 @@ static void LogV4L2Format(const struct v4l2_format *fmt)
     if (fmt->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
         LOG_VERBOSE << "pix.width = "       << fmt->fmt.pix.width;
         LOG_VERBOSE << "pix.height = "      << fmt->fmt.pix.height;
-        LOG_VERBOSE << "pix.pixelformat = " << FourCcToString(fmt->fmt.pix.pixelformat);
+        LOG_VERBOSE << "pix.pixelformat = " << util::FourCcToString(fmt->fmt.pix.pixelformat);
     } else {
         LOG_VERBOSE << "type = {}"          << fmt->type;
     }
@@ -357,7 +357,7 @@ bool Camera::ExportBuffersToOpenGL(SDL_Renderer* sdl_renderer)
         break;
     default:
         LOG_ERROR << std::format("Unhandled V4L2 pixel format {} ({:#010x})",
-                                 FourCcToString(fmt_.pixelformat),
+                                 util::FourCcToString(fmt_.pixelformat),
                                  fmt_.pixelformat);
         return false;
     }
