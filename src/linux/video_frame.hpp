@@ -21,9 +21,6 @@
 
 #include <mfx.h>
 
-#include "common.hpp"
-#include "linux/camera_frame.hpp"
-
 namespace vacon {
 namespace linux {
 
@@ -48,11 +45,35 @@ struct VideoFrame {
         src.surface         = nullptr;
     }
 
-    ~VideoFrame();
-    void FreeMfxSurface();
+    ~VideoFrame()
+    {
+        if (bitstream.Data) {
+            free(bitstream.Data);
+            bitstream.Data = nullptr;
+        }
+        FreeMfxSurface();
+    }
 
-    const std::byte* CompressedData();
-    size_t CompressedDataLength();
+    void FreeMfxSurface()
+    {
+        if (surface) {
+            if (surface->Data.R) {
+                surface->FrameInterface->Unmap(surface);
+            }
+            surface->FrameInterface->Release(surface);
+            surface = nullptr;
+        }
+    }
+
+    const std::byte* CompressedData()
+    {
+        return reinterpret_cast<const std::byte*>(bitstream.Data + bitstream.DataOffset);
+    }
+
+    size_t CompressedDataLength()
+    {
+        return bitstream.DataLength;
+    }
 };
 
 } // namespace linux
