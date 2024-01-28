@@ -13,49 +13,188 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#include "vacon.hpp"
+#include "app.hpp"
 
-#include <cerrno>
-#include <chrono>
-#include <csignal>
-#include <cstddef>
-#include <cstring>
-#include <iostream>
-#include <memory>
-#include <stdexcept>
-#include <thread>
-#include <utility>
-#include <vector>
+#include <SDL3/SDL.h>
+#include <plog/Log.h>
 
-#include "common.hpp"
-#include "linux/video_handler.hpp"
-#include "network_handler.hpp"
-
-using namespace std::chrono_literals;
+//#include "linux/video_handler.hpp"
+//#include "network_handler.hpp"
+#include "util.hpp"
 
 namespace vacon {
 
-struct App gApp = {};
+int App::AppInit(int argc, char *argv[])
+{
+    ParseArgs(argc, argv);
 
-volatile std::sig_atomic_t gShuttingDown = false;
-volatile std::sig_atomic_t gUSR1 = false;
+    util::SetupLogging(verbosity_);
 
-static const char *kDefaultCameraDevice             = "/dev/video0";
-static const char *kDefaultCameraPixelFormat        = ""; // XXX Default value crashes, TODO V4L2 autodetection
-static const int kDefaultCameraWidth                = 1920;
-static const int kDefaultCameraHeight               = 1080;
-static const int kDefaultCameraFrameRate            = 60;
-static const int kDefaultVideoEncoderBitrateKbps    = 10'000;
-static const char *kDefaultSignalingUrl             = "ws://127.0.0.1:8000/v1/ooo";
-static const char *kDefaultStunServer               = "stun:stun.l.google.com:19302";
+    //SetupSignals(args["--usr1"] == true);
 
+    if (!util::SetupRealtimePriority()) {
+        LOG_ERROR << "Unable to set real-time thread priority, performance may be affected!";
+    }
+
+    if (!InitSDL()) {
+        LOG_FATAL << "App::InitSDL() failed";
+        return -1;
+    }
+
+    if (!InitImgui()) {
+        LOG_FATAL << "App::InitImgui() failed";
+        return -1;
+    }
+
+#if 0
+    outgoing_video_packet_queue = std::make_shared<VideoPacketQueue>(2);
+
+    if (args["--xxx-force-start-network-handler"] == true) {
+        StartNetworkHandlerBackground();
+    }
+
+    if (args["--xxx-force-start-video-handler"] == true) {
+        StartVideoHandlerBackground();
+    }
+#endif
+
+#if 0
+    if (args_["--mirror"] == true) {
+        sdl_renderer_flip_ = SDL_FLIP_HORIZONTAL;
+    }
+
+    camera_ = Camera::Create(CameraParams {
+        .device         = args_.get<std::string>("--device"),
+        .pixel_format   = args_.get<std::string>("--pixel-format"),
+        .frame_rate     = args_.get<int>("--frame-rate"),
+        .width          = args_.get<int>("--width"),
+        .height         = args_.get<int>("--height"),
+    });
+    if (!camera_) {
+        LOG_FATAL << "Camera::Create() failed";
+        return -1;
+    }
+
+    if (!camera_->Init()) {
+        LOG_FATAL << "Camera::Init() failed";
+        return -1;
+    }
+
+    if (!InitSDL()) {
+        LOG_FATAL << "App::InitSDL() failed";
+        return -1;
+    }
+
+    if (!camera_->ExportBuffersToOpenGL(sdl_renderer_)) {
+        LOG_FATAL << "Camera::ExportBuffers() failed";
+        return -1;
+    }
+
+    encoder_ = Encoder::Create(EncoderParams {
+        .pixel_format   = util::FourCcToString(camera_->fmt_.pixelformat),
+        .width          = camera_->fmt_.width,
+        .height         = camera_->fmt_.height,
+        .frame_rate     = static_cast<unsigned>(args_.get<int>("--frame-rate")),
+        .bitrate_kbps   = 5000,
+    });
+    if (!encoder_) {
+        LOG_FATAL << "Encoder::Create() failed";
+        return -1;
+    }
+    if (!encoder_->Init()) {
+        LOG_FATAL << "Encoder::Init() failed";
+        return -1;
+    }
+
+    if (!encoder_->Init2()) {
+        LOG_FATAL << "Encoder::Init() failed";
+        return -1;
+    }
+
+    if (!camera_->StartCapturing()) {
+        LOG_FATAL << "Camera::StartCapturing() failed";
+        return -1;
+    }
+#endif
+
+    return 0;
+}
+
+void App::AppQuit()
+{
+#if 0
+    // Drain any video frames remaining on the outgoing video packet queue.
+    if (outgoing_video_packet_queue) {
+        std::shared_ptr<linux::VideoFrame> frame = {};
+        while (outgoing_video_packet_queue->try_dequeue(frame)) {
+            PLOG_VERBOSE << std::format("Drained VideoFrame @ {}", std::ptr(frame.get()));
+        }
+    }
+    outgoing_video_packet_queue = nullptr;
+
+    // Stop the handlers.
+    if (nh) {
+        nh->Stop();
+    }
+    if (vh) {
+        vh->Stop();
+    }
+
+    // Join the handler threads.
+    PLOG_INFO << "Waiting for threads to exit...";
+    for (auto& thread : threads) {
+        if (thread.joinable()) {
+            PLOG_DEBUG << "Trying to join thread ID " << thread.get_id();
+            thread.join();
+        } else {
+            PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
+        }
+    }
+    if (nh) {
+        nh->Join();
+        nh = nullptr;
+    }
+    if (vh) {
+        vh->Join();
+        vh = nullptr;
+    }
+#endif
+}
+
+
+int App::AppEvent(const SDL_Event *event)
+{
+    ProcessUiEvent(event);
+
+    if (event->type == SDL_EVENT_QUIT) {
+        return 1;
+    }
+
+    if (event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
+        event->window.windowID == SDL_GetWindowID(sdl_window_))
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+int App::AppIterate()
+{
+    RenderFrame();
+
+    return 0;
+}
+
+
+#if 0
 void App::Shutdown()
 {
     // Drain any video frames remaining on the outgoing video packet queue.
     if (outgoing_video_packet_queue) {
         std::shared_ptr<linux::VideoFrame> frame = {};
         while (outgoing_video_packet_queue->try_dequeue(frame)) {
-            PLOG_VERBOSE << fmt::format("Drained VideoFrame @ {}", fmt::ptr(frame.get()));
+            PLOG_VERBOSE << std::format("Drained VideoFrame @ {}", std::ptr(frame.get()));
         }
     }
     outgoing_video_packet_queue = nullptr;
@@ -116,89 +255,6 @@ static void SetupSignals(const bool want_sigusr1)
     if (want_sigusr1) {
         PLOG_DEBUG << "Send SIGUSR1 to simulate a packet drop";
         std::signal(SIGUSR1, SignalUSR1);
-    }
-}
-
-void App::ParseArgs(int argc, char *argv[])
-{
-    args.add_argument("-v", "--verbose")
-        .help("increase logging verbosity")
-        .action([&](const auto &) { ++verbosity; })
-        .append()
-        .default_value(false)
-        .implicit_value(true)
-        .nargs(0);
-
-    args.add_argument("--camera-device")
-        .metavar("DEVICE")
-        .help("camera device node")
-        .default_value(kDefaultCameraDevice)
-        .nargs(1);
-
-    args.add_argument("--camera-width")
-        .metavar("W")
-        .help("camera capture frame width")
-        .default_value(kDefaultCameraWidth)
-        .scan<'i', int>()
-        .nargs(1);
-
-    args.add_argument("--camera-height")
-        .metavar("H")
-        .help("camera capture frame height")
-        .default_value(kDefaultCameraHeight)
-        .scan<'i', int>()
-        .nargs(1);
-
-    args.add_argument("--camera-frame-rate")
-        .metavar("R")
-        .help("camera capture frame rate")
-        .default_value(kDefaultCameraFrameRate)
-        .scan<'i', int>()
-        .nargs(1);
-
-    args.add_argument("--camera-pixel-format")
-        .metavar("FMT")
-        .help("camera capture pixel format")
-        .default_value(kDefaultCameraPixelFormat)
-        .nargs(1);
-
-    args.add_argument("--video-encoder-bitrate")
-        .metavar("K")
-        .help("video encoder bitrate (Kbps)")
-        .default_value(kDefaultVideoEncoderBitrateKbps)
-        .scan<'i', int>()
-        .nargs(1);
-
-    args.add_argument("-s", "--network-signaling-secret")
-        .metavar("SECRET")
-        .help("signaling shared secret to identify peer")
-        .required();
-
-    args.add_argument("-u", "--network-signaling-url")
-        .metavar("URL")
-        .help("signaling URL for offer/answer exchange")
-        .default_value(kDefaultSignalingUrl)
-        .nargs(1);
-
-    args.add_argument("--usr1")
-        .help("setup simulated packet loss SIGUSR1 handler")
-        .flag();
-
-    args.add_argument("--xxx-force-start-network-handler").flag();
-
-    args.add_argument("--xxx-force-start-video-handler").flag();
-
-    args.add_argument("--xxx-headless").flag();
-
-    try {
-        args.parse_args(argc, argv);
-    } catch (const std::exception& err) {
-        std::cerr
-            << "vacon: Error parsing arguments: "
-            << err.what()
-            << std::endl << std::endl
-            << args;
-        exit(EXIT_FAILURE);
     }
 }
 
@@ -332,5 +388,6 @@ bool App::Setup(int argc, char *argv[])
 
     return true;
 }
+#endif
 
 } // namespace vacon
