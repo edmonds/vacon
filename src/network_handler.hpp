@@ -27,7 +27,6 @@
 #include <rtc/rtc.hpp>
 #include <readerwritercircularbuffer.h>
 
-#include "common.hpp"
 #include "linux/video_frame.hpp"
 #include "rtp_depacketizer.hpp"
 
@@ -49,17 +48,17 @@ class NetworkHandler {
         NetworkHandler(NetworkHandler&&) = default;
         ~NetworkHandler();
         void Init();
-        void Stop();
-        void Join();
-
-        void ConnectWebRTC();
-        void CloseWebSocket();
-        bool IsConnectedToPeer();
+        void StartAsync();
 
         AVFormatContext* GetRtpAvfcInput();
 
     private:
         NetworkHandler() = default;
+        void Stop();
+        void Join();
+        void ConnectWebRTC();
+        void CloseWebSocket();
+        bool IsConnectedToPeer();
         void RunDrain(std::stop_token);
         void ReceivePacket(rtc::binary);
         void OnWsMessage(nlohmann::json message);
@@ -67,6 +66,7 @@ class NetworkHandler {
         void SendVideoFrame(const std::byte *data, size_t size, uint64_t pts);
 
         NetworkHandlerParams                            params_ = {};
+        bool                                            starting_ = false;
         std::vector<std::jthread>                       threads_ = {};
         rtc::Configuration                              config_;
         std::shared_ptr<rtc::WebSocket>                 ws_;

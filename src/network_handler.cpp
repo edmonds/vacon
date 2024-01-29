@@ -29,6 +29,7 @@
 #include <plog/Log.h>
 #include <rtc/rtc.hpp>
 
+#include "event.hpp"
 #include "util.hpp"
 
 using namespace std::chrono_literals;
@@ -59,15 +60,51 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
 
 NetworkHandler::~NetworkHandler()
 {
+    if (threads_.size() == 0) {
+        return;
+    }
+
     LOG_VERBOSE << std::format("Destructor called on {}", (void*)this);
 
     peer_ = nullptr;
     track_ = nullptr;
+
+    Stop();
+    Join();
 }
 
 void NetworkHandler::Init()
 {
     threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunDrain(st); } });
+}
+
+void NetworkHandler::StartAsync()
+{
+    if (starting_) {
+        return;
+    }
+    starting_ = true;
+
+    std::jthread([&]() {
+        PushEvent(Event::NetworkStarting);
+
+        // Start connecting to the signaling server and the WebRTC peer.
+        ConnectWebRTC();
+
+        // Wait for the NetworkHandler to bring up the peer-to-peer connection.
+        while (!IsConnectedToPeer() /* && !vacon::gShuttingDown */) {
+            std::this_thread::sleep_for(100ms);
+        }
+
+        if (IsConnectedToPeer() /* && !vacon::gShuttingDown */) {
+            LOG_FATAL << "PEER-TO-PEER CONNECTION IS READY !!!";
+            PushEvent(Event::NetworkStarted);
+        }
+
+        // WebRTC peer connection is up, so close the connection to the
+        // signaling server.
+        CloseWebSocket();
+    }).detach();
 }
 
 void NetworkHandler::Stop()

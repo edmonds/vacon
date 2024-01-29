@@ -29,7 +29,7 @@ static const unsigned kDefaultCameraHeight              = 1080;
 static const unsigned kDefaultCameraFrameRate           = 60;
 static const unsigned kDefaultVideoEncoderBitrateKbps   = 10'000;
 static const char *kDefaultSignalingUrl                 = "ws://127.0.0.1:8000/v1/ooo";
-//static const char *kDefaultStunServer               = "stun:stun.l.google.com:19302";
+static const char *kDefaultStunServer                   = "stun:stun.l.google.com:19302";
 
 void App::ParseArgs(int argc, char *argv[])
 {
@@ -90,6 +90,12 @@ void App::ParseArgs(int argc, char *argv[])
          .metavar("URL")
          .help("signaling URL for offer/answer exchange")
          .default_value(kDefaultSignalingUrl)
+         .nargs(1);
+
+    args_.add_argument("--network-stun-server")
+         .metavar("STUN-URL")
+         .help("STUN server to use")
+         .default_value(kDefaultStunServer)
          .nargs(1);
 
     args_.add_argument("--usr1")

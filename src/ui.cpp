@@ -195,13 +195,11 @@ void App::RenderFrame()
         ShowStatsOverlay(&enable_stats_overlay_);
     }
 
-#if 0
     if (xenable_network_handler_) {
-        vacon::gApp.StartNetworkHandler();
+        StartNetworkHandler();
     } else {
-        vacon::gApp.StopNetworkHandler();
+        StopNetworkHandler();
     }
-#endif
 
     if (xenable_video_handler_) {
         StartVideoHandler();

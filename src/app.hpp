@@ -27,7 +27,7 @@
 
 #include "linux/camera.hpp"
 #include "linux/video_handler.hpp"
-//#include "network_handler.hpp"
+#include "network_handler.hpp"
 #include "linux/video_frame.hpp"
 
 namespace vacon {
@@ -48,9 +48,6 @@ class App {
         bool Setup(int argc, char *argv[]);
         void Shutdown();
 
-        void StartNetworkHandler();
-        void StopNetworkHandler();
-
         void StartNetworkHandlerBackground();
         void StartVideoHandlerBackground();
         */
@@ -66,7 +63,7 @@ class App {
         std::shared_ptr<VideoPacketQueue>       outgoing_video_packet_queue_ =
             std::make_shared<VideoPacketQueue>(2);
 
-        //std::unique_ptr<NetworkHandler>         nh_ = nullptr;
+        std::unique_ptr<NetworkHandler>         nh_ = nullptr;
         std::unique_ptr<linux::VideoHandler>    vh_ = nullptr;
         //std::vector<std::jthread>               threads_ = {};
 
@@ -75,7 +72,9 @@ class App {
     private:
         // app.cpp
         void ProcessUserEvent(const SDL_UserEvent*);
+        void StartNetworkHandler();
         void StartVideoHandler();
+        void StopNetworkHandler();
         void StopVideoHandler();
 
         // args.cpp

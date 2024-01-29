@@ -20,7 +20,7 @@
 
 #include "event.hpp"
 #include "linux/video_handler.hpp"
-//#include "network_handler.hpp"
+#include "network_handler.hpp"
 #include "util.hpp"
 
 namespace vacon {
@@ -48,73 +48,12 @@ int App::AppInit(int argc, char *argv[])
     }
 
 #if 0
-    outgoing_video_packet_queue = std::make_shared<VideoPacketQueue>(2);
-
     if (args["--xxx-force-start-network-handler"] == true) {
         StartNetworkHandlerBackground();
     }
 
     if (args["--xxx-force-start-video-handler"] == true) {
         StartVideoHandlerBackground();
-    }
-#endif
-
-#if 0
-    if (args_["--mirror"] == true) {
-        sdl_renderer_flip_ = SDL_FLIP_HORIZONTAL;
-    }
-
-    camera_ = Camera::Create(CameraParams {
-        .device         = args_.get<std::string>("--device"),
-        .pixel_format   = args_.get<std::string>("--pixel-format"),
-        .frame_rate     = args_.get<int>("--frame-rate"),
-        .width          = args_.get<int>("--width"),
-        .height         = args_.get<int>("--height"),
-    });
-    if (!camera_) {
-        LOG_FATAL << "Camera::Create() failed";
-        return -1;
-    }
-
-    if (!camera_->Init()) {
-        LOG_FATAL << "Camera::Init() failed";
-        return -1;
-    }
-
-    if (!InitSDL()) {
-        LOG_FATAL << "App::InitSDL() failed";
-        return -1;
-    }
-
-    if (!camera_->ExportBuffersToOpenGL(sdl_renderer_)) {
-        LOG_FATAL << "Camera::ExportBuffers() failed";
-        return -1;
-    }
-
-    encoder_ = Encoder::Create(EncoderParams {
-        .pixel_format   = util::FourCcToString(camera_->fmt_.pixelformat),
-        .width          = camera_->fmt_.width,
-        .height         = camera_->fmt_.height,
-        .frame_rate     = static_cast<unsigned>(args_.get<int>("--frame-rate")),
-        .bitrate_kbps   = 5000,
-    });
-    if (!encoder_) {
-        LOG_FATAL << "Encoder::Create() failed";
-        return -1;
-    }
-    if (!encoder_->Init()) {
-        LOG_FATAL << "Encoder::Init() failed";
-        return -1;
-    }
-
-    if (!encoder_->Init2()) {
-        LOG_FATAL << "Encoder::Init() failed";
-        return -1;
-    }
-
-    if (!camera_->StartCapturing()) {
-        LOG_FATAL << "Camera::StartCapturing() failed";
-        return -1;
     }
 #endif
 
@@ -134,16 +73,9 @@ void App::AppQuit()
 
     // Stop the handlers.
     StopVideoHandler();
+    StopNetworkHandler();
 
 #if 0
-    // Stop the handlers.
-    if (nh) {
-        nh->Stop();
-    }
-    if (vh) {
-        vh->Stop();
-    }
-
     // Join the handler threads.
     PLOG_INFO << "Waiting for threads to exit...";
     for (auto& thread : threads) {
@@ -154,17 +86,8 @@ void App::AppQuit()
             PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
         }
     }
-    if (nh) {
-        nh->Join();
-        nh = nullptr;
-    }
-    if (vh) {
-        vh->Join();
-        vh = nullptr;
-    }
 #endif
 }
-
 
 int App::AppEvent(const SDL_Event *event)
 {
@@ -283,45 +206,6 @@ void App::StopVideoHandler()
 }
 
 #if 0
-void App::Shutdown()
-{
-    // Drain any video frames remaining on the outgoing video packet queue.
-    if (outgoing_video_packet_queue) {
-        std::shared_ptr<linux::VideoFrame> frame = {};
-        while (outgoing_video_packet_queue->try_dequeue(frame)) {
-            PLOG_VERBOSE << std::format("Drained VideoFrame @ {}", std::ptr(frame.get()));
-        }
-    }
-    outgoing_video_packet_queue = nullptr;
-
-    // Stop the handlers.
-    if (nh) {
-        nh->Stop();
-    }
-    if (vh) {
-        vh->Stop();
-    }
-
-    // Join the handler threads.
-    PLOG_INFO << "Waiting for threads to exit...";
-    for (auto& thread : threads) {
-        if (thread.joinable()) {
-            PLOG_DEBUG << "Trying to join thread ID " << thread.get_id();
-            thread.join();
-        } else {
-            PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
-        }
-    }
-    if (nh) {
-        nh->Join();
-        nh = nullptr;
-    }
-    if (vh) {
-        vh->Join();
-        vh = nullptr;
-    }
-}
-
 void App::SignalTerminate(int signal)
 {
     vacon::gShuttingDown = true;
@@ -352,87 +236,30 @@ static void SetupSignals(const bool want_sigusr1)
         std::signal(SIGUSR1, SignalUSR1);
     }
 }
-
-void App::StopNetworkHandler()
-{
-    if (nh) {
-        nh = nullptr;
-    }
-}
+#endif
 
 void App::StartNetworkHandler()
 {
-    if (nh) {
+    if (nh_) {
         return;
     }
 
-    // Start the network handler.
-    PLOG_DEBUG << "Starting network handler";
-
+    // Get network parameters.
     auto params = NetworkHandlerParams {
-        .signaling_base_url             = args.get<std::string>("--network-signaling-url"),
-        .signaling_secret               = args.get<std::string>("--network-signaling-secret"),
-        .stun_server                    = kDefaultStunServer,
-        .outgoing_video_packet_queue    = outgoing_video_packet_queue,
+        .signaling_base_url             = args_.get<std::string>("--network-signaling-url"),
+        .signaling_secret               = args_.get<std::string>("--network-signaling-secret"),
+        .stun_server                    = args_.get<std::string>("--network-stun-server"),
+        .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
     };
 
-    nh = NetworkHandler::Create(params);
-    nh->Init();
-
-    // Start connecting to the signaling server and the WebRTC peer.
-    nh->ConnectWebRTC();
-
-    // Wait for the NetworkHandler to bring up the peer-to-peer connection.
-    while (!nh->IsConnectedToPeer() && !vacon::gShuttingDown) {
-        std::this_thread::sleep_for(5ms);
-    }
-
-    if (nh->IsConnectedToPeer() && !vacon::gShuttingDown) {
-        PLOG_FATAL << "PEER-TO-PEER CONNECTION IS READY !!!";
-    }
-
-    // WebRTC peer connection is up, so close the connection to the
-    // signaling server.
-    nh->CloseWebSocket();
+    nh_ = NetworkHandler::Create(params);
+    nh_->Init();
+    nh_->StartAsync();
 }
 
-void App::StartNetworkHandlerBackground()
+void App::StopNetworkHandler()
 {
-    std::jthread([&]() {
-        StartNetworkHandler();
-    }).detach();
+    nh_ = nullptr;
 }
-
-void App::StartVideoHandlerBackground()
-{
-    std::jthread([&]() {
-        StartVideoHandler();
-    }).detach();
-}
-
-bool App::Setup(int argc, char *argv[])
-{
-    ParseArgs(argc, argv);
-
-    setupLogging(verbosity);
-
-    SetupSignals(args["--usr1"] == true);
-    if (!setupRealtimePriority()) {
-        PLOG_ERROR << "Unable to set real-time thread priority, performance may be affected!";
-    }
-
-    outgoing_video_packet_queue = std::make_shared<VideoPacketQueue>(2);
-
-    if (args["--xxx-force-start-network-handler"] == true) {
-        StartNetworkHandlerBackground();
-    }
-
-    if (args["--xxx-force-start-video-handler"] == true) {
-        StartVideoHandlerBackground();
-    }
-
-    return true;
-}
-#endif
 
 } // namespace vacon
