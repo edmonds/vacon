@@ -568,11 +568,8 @@ std::shared_ptr<CameraBufferRef> Camera::NextFrame()
         // using the Camera's V4L2 fd.
         auto bref = CameraBufferRef::Create(bufs_.at(buf.index), fd_);
 
-        LOG_DEBUG << std::format("Received frame on fd {}, buffer {}, sequence {}, delta {} us",
-                                 fd_,
-                                 bref->buf_.vbuf.index,
-                                 bref->buf_.vbuf.sequence,
-                                 micros);
+        LOG_VERBOSE << std::format("Received frame on fd {}, buffer {}, sequence {}, delta {} us",
+                                   fd_, bref->buf_.vbuf.index, bref->buf_.vbuf.sequence, micros);
 
         // If there were any errors, get another frame.
         bool is_empty_frame = buf.bytesused == 0;
