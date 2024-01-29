@@ -118,7 +118,6 @@ bool Camera::Init()
 
 Camera::~Camera()
 {
-    LOG_VERBOSE << std::format("Cleaning up {} camera buffers", bufs_.size());
     for (auto& buf : bufs_) {
         // Destroy the OpenGL texture.
         if (buf.texture) {
