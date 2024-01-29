@@ -206,6 +206,15 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
     case Event::CameraFailed:
         break;
 
+    case Event::NetworkStarting:
+        break;
+
+    case Event::NetworkStarted:
+        break;
+
+    case Event::NetworkFailed:
+        break;
+
     default:
         LOG_DEBUG << "Unknown event code " << user->code;
     }

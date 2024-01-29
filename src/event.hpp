@@ -21,6 +21,9 @@ enum class Event {
     CameraStarting,
     CameraStarted,
     CameraFailed,
+    NetworkStarting,
+    NetworkStarted,
+    NetworkFailed,
 };
 
 void PushEvent(Event event_code);
