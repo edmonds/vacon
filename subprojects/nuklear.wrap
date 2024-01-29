@@ -1,8 +1,0 @@
-[wrap-git]
-url = https://github.com/Immediate-Mode-UI/Nuklear.git
-revision = 4.10.7
-depth = 1
-patch_directory = nuklear
-
-[provide]
-nuklear = nuklear_dep
