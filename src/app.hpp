@@ -15,7 +15,7 @@
 
 #pragma once
 
-//#include <csignal>
+#include <csignal>
 //#include <cstdint>
 #include <memory>
 //#include <thread>
@@ -109,5 +109,8 @@ class App {
             unsigned    n_preview_underflow     = 0;
         } stats_;
 };
+
+extern volatile std::sig_atomic_t gShuttingDown;
+extern volatile std::sig_atomic_t gUSR1;
 
 } // namespace vacon

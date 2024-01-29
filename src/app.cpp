@@ -15,6 +15,8 @@
 
 #include "app.hpp"
 
+#include <csignal>
+
 #include <SDL3/SDL.h>
 #include <plog/Log.h>
 
@@ -25,13 +27,24 @@
 
 namespace vacon {
 
+volatile std::sig_atomic_t gShuttingDown;
+volatile std::sig_atomic_t gUSR1;
+
+static void SignalUSR1([[maybe_unused]] int signal)
+{
+    vacon::gUSR1 = 1;
+}
+
 int App::AppInit(int argc, char *argv[])
 {
     ParseArgs(argc, argv);
 
     util::SetupLogging(verbosity_);
 
-    //SetupSignals(args["--usr1"] == true);
+    if (args_["--usr1"] == true) {
+        LOG_DEBUG << "Send SIGUSR1 to simulate a packet drop";
+        std::signal(SIGUSR1, SignalUSR1);
+    }
 
     if (!util::SetupRealtimePriority()) {
         LOG_ERROR << "Unable to set real-time thread priority, performance may be affected!";
@@ -94,12 +107,14 @@ int App::AppEvent(const SDL_Event *event)
     ProcessUiEvent(event);
 
     if (event->type == SDL_EVENT_QUIT) {
+        vacon::gShuttingDown = true;
         return 1;
     }
 
     if (event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
         event->window.windowID == SDL_GetWindowID(sdl_window_))
     {
+        vacon::gShuttingDown = true;
         return 1;
     }
 
@@ -219,21 +234,6 @@ void App::SignalTerminate(int signal)
     // Signal threads to stop.
     for (auto& thread : vacon::gApp.threads) {
         thread.request_stop();
-    }
-}
-
-static void SignalUSR1([[maybe_unused]] int signal = 0)
-{
-    vacon::gUSR1 = 1;
-}
-
-static void SetupSignals(const bool want_sigusr1)
-{
-    std::signal(SIGINT, App::SignalTerminate);
-    std::signal(SIGTERM, App::SignalTerminate);
-    if (want_sigusr1) {
-        PLOG_DEBUG << "Send SIGUSR1 to simulate a packet drop";
-        std::signal(SIGUSR1, SignalUSR1);
     }
 }
 #endif

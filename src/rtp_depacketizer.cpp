@@ -25,6 +25,8 @@
 #include <rtc/rtc.hpp>
 #include <plog/Log.h>
 
+#include "app.hpp"
+
 using namespace std::chrono_literals;
 
 namespace vacon {
@@ -208,9 +210,9 @@ int RtpDepacketizer::readAvioPacketRTP(void *opaque, uint8_t *buf, int buf_size)
     for (;;) {
         dpkt->rtp_packet_queue.wait_dequeue(packet);
         LOG_VERBOSE << std::format("Dequeued RTP packet size {}", packet.size());
-        if (false /* vacon::gUSR1 */) {
-            //vacon::gUSR1 = 0;
-            //LOG_DEBUG << "Dropping a packet due to signal!";
+        if (vacon::gUSR1) {
+            vacon::gUSR1 = 0;
+            LOG_DEBUG << "Dropping a packet due to signal!";
             continue;
         } else {
             break;

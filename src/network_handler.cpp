@@ -29,6 +29,7 @@
 #include <plog/Log.h>
 #include <rtc/rtc.hpp>
 
+#include "app.hpp"
 #include "event.hpp"
 #include "util.hpp"
 
@@ -103,11 +104,11 @@ void NetworkHandler::StartAsync()
         ConnectWebRTC();
 
         // Wait for the NetworkHandler to bring up the peer-to-peer connection.
-        while (!IsConnectedToPeer() /* && !vacon::gShuttingDown */) {
+        while (!IsConnectedToPeer() && !vacon::gShuttingDown) {
             std::this_thread::sleep_for(100ms);
         }
 
-        if (IsConnectedToPeer() /* && !vacon::gShuttingDown */) {
+        if (IsConnectedToPeer() && !vacon::gShuttingDown) {
             LOG_FATAL << "PEER-TO-PEER CONNECTION IS READY !!!";
             PushEvent(Event::NetworkStarted);
         }
