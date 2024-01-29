@@ -60,7 +60,6 @@ class App {
 
         int                                     verbosity_ = 0;
 
-        SDL_RendererFlip                        sdl_renderer_flip_ = SDL_FLIP_NONE;
         SDL_Renderer*                           sdl_renderer_ = nullptr;
         SDL_Window*                             sdl_window_ = nullptr;
 
@@ -92,6 +91,7 @@ class App {
         void ShowMenu();
         void ShowStatsOverlay(bool*);
         void RenderFrame();
+        void RenderPreview();
         void ProcessUiEvent(const SDL_Event*);
 
         float   font_size_sans_                 = 12.0f;
@@ -103,6 +103,7 @@ class App {
         bool    xenable_demo_window_            = false;
         bool    xenable_network_handler_        = false;
         bool    xenable_video_handler_          = false;
+        bool    mirror_self_view_               = true;
 
         struct {
             unsigned    n_preview               = 0;
