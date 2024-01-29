@@ -247,13 +247,13 @@ void App::RenderFrame()
     } else {
         vacon::gApp.StopNetworkHandler();
     }
+#endif
 
     if (xenable_video_handler_) {
         StartVideoHandler();
     } else {
         StopVideoHandler();
     }
-#endif
 
     ImGui::Render();
     SDL_SetRenderScale(sdl_renderer_,
