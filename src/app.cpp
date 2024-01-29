@@ -18,7 +18,8 @@
 #include <SDL3/SDL.h>
 #include <plog/Log.h>
 
-//#include "linux/video_handler.hpp"
+#include "event.hpp"
+#include "linux/video_handler.hpp"
 //#include "network_handler.hpp"
 #include "util.hpp"
 
@@ -122,16 +123,19 @@ int App::AppInit(int argc, char *argv[])
 
 void App::AppQuit()
 {
-#if 0
-    // Drain any video frames remaining on the outgoing video packet queue.
-    if (outgoing_video_packet_queue) {
+    // Drain any packets remaining on the outgoing video packet queue.
+    if (outgoing_video_packet_queue_) {
         std::shared_ptr<linux::VideoFrame> frame = {};
-        while (outgoing_video_packet_queue->try_dequeue(frame)) {
-            PLOG_VERBOSE << std::format("Drained VideoFrame @ {}", std::ptr(frame.get()));
+        while (outgoing_video_packet_queue_->try_dequeue(frame)) {
+            LOG_VERBOSE << std::format("Drained VideoFrame @ {}", (void*)frame.get());
         }
     }
-    outgoing_video_packet_queue = nullptr;
+    outgoing_video_packet_queue_ = nullptr;
 
+    // Stop the handlers.
+    StopVideoHandler();
+
+#if 0
     // Stop the handlers.
     if (nh) {
         nh->Stop();
@@ -176,7 +180,35 @@ int App::AppEvent(const SDL_Event *event)
         return 1;
     }
 
+    if (event->type == SDL_EVENT_USER) {
+        ProcessUserEvent(&event->user);
+    }
+
     return 0;
+}
+
+void App::ProcessUserEvent(const SDL_UserEvent *user)
+{
+    auto event = static_cast<Event>(user->code);
+
+    switch (event) {
+
+    case Event::CameraStarting:
+        break;
+
+    case Event::CameraStarted:
+        if (vh_ && sdl_renderer_) {
+            LOG_DEBUG << "Calling Camera::ExportBuffersToOpenGL() on render thread";
+            vh_->camera_->ExportBuffersToOpenGL(sdl_renderer_);
+        }
+        break;
+
+    case Event::CameraFailed:
+        break;
+
+    default:
+        LOG_DEBUG << "Unknown event code " << user->code;
+    }
 }
 
 int App::AppIterate()
@@ -186,6 +218,60 @@ int App::AppIterate()
     return 0;
 }
 
+void App::StartVideoHandler()
+{
+    if (vh_) {
+        return;
+    }
+
+    // Get camera parameters.
+    std::optional<linux::CameraParams> camera_params = {
+        linux::CameraParams {
+            .device         = args_.get<std::string>("--camera-device"),
+            .pixel_format   = args_.get<std::string>("--camera-pixel-format"),
+            .width          = args_.get<unsigned>("--camera-width"),
+            .height         = args_.get<unsigned>("--camera-height"),
+            .frame_rate     = args_.get<unsigned>("--camera-frame-rate"),
+        }
+    };
+
+    // Get video encoder parameters.
+    std::optional<linux::EncoderParams> encoder_params = {
+        linux::EncoderParams {
+            .pixel_format   = args_.get<std::string>("--camera-pixel-format"),
+            .width          = args_.get<unsigned>("--camera-width"),
+            .height         = args_.get<unsigned>("--camera-height"),
+            .frame_rate     = args_.get<unsigned>("--camera-frame-rate"),
+            .bitrate_kbps   = args_.get<unsigned>("--video-encoder-bitrate"),
+        }
+    };
+
+    auto params = linux::VideoHandlerParams {
+        .camera_params = camera_params,
+        .encoder_params = encoder_params,
+        .outgoing_video_packet_queue = outgoing_video_packet_queue_,
+    };
+
+    vh_ = linux::VideoHandler::Create(params);
+    if (!vh_) {
+        LOG_FATAL << "VideoHandler::Create() failed!";
+        return;
+    }
+
+    vh_->Init();
+}
+
+void App::StopVideoHandler()
+{
+    if (vh_) {
+        // All outstanding CameraBufferRef's need to be destroyed before the
+        // VideoHandler (and its Camera) can be destroyed, because destroying a
+        // CameraBufferRef causes a VIDIOC_QBUF ioctl to the Camera's V4L2 fd.
+        preview_cref_ = nullptr;
+
+        vh_ = nullptr;
+    }
+}
 
 #if 0
 void App::Shutdown()
@@ -265,13 +351,6 @@ void App::StopNetworkHandler()
     }
 }
 
-void App::StopVideoHandler()
-{
-    if (vh) {
-        vh = nullptr;
-    }
-}
-
 void App::StartNetworkHandler()
 {
     if (nh) {
@@ -306,49 +385,6 @@ void App::StartNetworkHandler()
     // WebRTC peer connection is up, so close the connection to the
     // signaling server.
     nh->CloseWebSocket();
-}
-
-void App::StartVideoHandler()
-{
-    if (vh) {
-        return;
-    }
-
-    // Get camera parameters.
-    std::optional<linux::CameraParams> camera_params = {
-        linux::CameraParams {
-            .device         = args.get<std::string>("--camera-device"),
-            .pixel_format   = args.get<std::string>("--camera-pixel-format"),
-            .width          = args.get<int>("--camera-width"),
-            .height         = args.get<int>("--camera-height"),
-            .frame_rate     = args.get<int>("--camera-frame-rate"),
-        }
-    };
-
-    // Get video encoder parameters.
-    std::optional<linux::EncoderParams> encoder_params = {
-        linux::EncoderParams {
-            .input_pixel_format = args.get<std::string>("--camera-pixel-format"),
-            .width              = args.get<int>("--camera-width"),
-            .height             = args.get<int>("--camera-height"),
-            .frame_rate         = args.get<int>("--camera-frame-rate"),
-            .bitrate_kbps       = args.get<int>("--video-encoder-bitrate"),
-        }
-    };
-
-    // Start the video handler.
-    PLOG_DEBUG << "Starting video handler";
-
-    auto params = linux::VideoHandlerParams {
-        .camera_params = camera_params,
-        .encoder_params = encoder_params,
-        .outgoing_video_packet_queue = outgoing_video_packet_queue,
-    };
-
-    vh = linux::VideoHandler::Create(params);
-
-    // Start the camera and video encoder threads.
-    vh->Init();
 }
 
 void App::StartNetworkHandlerBackground()

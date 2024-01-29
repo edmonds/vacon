@@ -17,29 +17,29 @@
 
 //#include <csignal>
 //#include <cstdint>
-//#include <memory>
+#include <memory>
 //#include <thread>
 //#include <vector>
 
 #include <SDL3/SDL.h>
 #include <argparse/argparse.hpp>
-//#include <readerwritercircularbuffer.h>
+#include <readerwritercircularbuffer.h>
 
-//#include "linux/video_handler.hpp"
+#include "linux/camera.hpp"
+#include "linux/video_handler.hpp"
 //#include "network_handler.hpp"
+#include "linux/video_frame.hpp"
 
 namespace vacon {
 
-/*
 typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<linux::VideoFrame>>
     VideoPacketQueue;
-*/
 
 class App {
     public:
         int AppInit(int argc, char *argv[]);
         int AppIterate();
-        int AppEvent(const SDL_Event *event);
+        int AppEvent(const SDL_Event* event);
         void AppQuit();
 
         /*
@@ -49,32 +49,36 @@ class App {
         void Shutdown();
 
         void StartNetworkHandler();
-        void StartVideoHandler();
+        void StopNetworkHandler();
 
         void StartNetworkHandlerBackground();
         void StartVideoHandlerBackground();
-
-        void StopNetworkHandler();
-        void StopVideoHandler();
         */
 
-        argparse::ArgumentParser                args_ = argparse::ArgumentParser(PROJECT_NAME,
-                                                                                 PROJECT_VERSION,
-                                                                                 argparse::default_arguments::none);
+        argparse::ArgumentParser                args_ =
+            argparse::ArgumentParser(PROJECT_NAME, PROJECT_VERSION, argparse::default_arguments::none);
+
         int                                     verbosity_ = 0;
 
         SDL_RendererFlip                        sdl_renderer_flip_ = SDL_FLIP_NONE;
         SDL_Renderer*                           sdl_renderer_ = nullptr;
         SDL_Window*                             sdl_window_ = nullptr;
 
-        /*
-        std::shared_ptr<VideoPacketQueue>       outgoing_video_packet_queue_ = nullptr;
-        std::unique_ptr<NetworkHandler>         nh_ = nullptr;
+        std::shared_ptr<VideoPacketQueue>       outgoing_video_packet_queue_ =
+            std::make_shared<VideoPacketQueue>(2);
+
+        //std::unique_ptr<NetworkHandler>         nh_ = nullptr;
         std::unique_ptr<linux::VideoHandler>    vh_ = nullptr;
-        std::vector<std::jthread>               threads_ = {};
-        */
+        //std::vector<std::jthread>               threads_ = {};
+
+        std::shared_ptr<linux::CameraBufferRef> preview_cref_ = nullptr;
 
     private:
+        // app.cpp
+        void ProcessUserEvent(const SDL_UserEvent*);
+        void StartVideoHandler();
+        void StopVideoHandler();
+
         // args.cpp
         void ParseArgs(int argc, char *argv[]);
 
