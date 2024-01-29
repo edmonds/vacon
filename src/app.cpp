@@ -87,19 +87,6 @@ void App::AppQuit()
     // Stop the handlers.
     StopVideoHandler();
     StopNetworkHandler();
-
-#if 0
-    // Join the handler threads.
-    PLOG_INFO << "Waiting for threads to exit...";
-    for (auto& thread : threads) {
-        if (thread.joinable()) {
-            PLOG_DEBUG << "Trying to join thread ID " << thread.get_id();
-            thread.join();
-        } else {
-            PLOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
-        }
-    }
-#endif
 }
 
 int App::AppEvent(const SDL_Event *event)
@@ -219,24 +206,6 @@ void App::StopVideoHandler()
         vh_ = nullptr;
     }
 }
-
-#if 0
-void App::SignalTerminate(int signal)
-{
-    vacon::gShuttingDown = true;
-
-    static unsigned user_anger = 0;
-    if ((signal == SIGINT || signal == SIGTERM) && ++user_anger > 1) {
-        puts("\n\nUser anger detected, exiting immediately !!!\n");
-        _exit(EXIT_FAILURE);
-    }
-
-    // Signal threads to stop.
-    for (auto& thread : vacon::gApp.threads) {
-        thread.request_stop();
-    }
-}
-#endif
 
 void App::StartNetworkHandler()
 {
