@@ -146,7 +146,7 @@ Camera::~Camera()
         // Close the V4L2 dmabuf fd.
         if (buf.expbuf.fd != -1) {
             LOG_VERBOSE << std::format("Closing V4L2 dmabuf fd {}", buf.expbuf.fd);
-            if (close(buf.expbuf.fd) == 0) {
+            if (close(buf.expbuf.fd) != 0) {
                 LOG_ERROR << std::format("close() failed on V4L2 dmabuf fd {}: {} ({})",
                                          buf.expbuf.fd, errno, strerror(errno));
             }
