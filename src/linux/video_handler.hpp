@@ -52,6 +52,9 @@ class VideoHandler {
 
         std::shared_ptr<CameraBufferRef> NextPreviewFrame();
 
+        std::shared_ptr<Camera>     camera_ = {};
+        std::shared_ptr<Encoder>    encoder_ = {};
+
     private:
         VideoHandler() = default;
         void RunCamera(std::stop_token);
@@ -59,8 +62,6 @@ class VideoHandler {
 
         VideoHandlerParams params_;
 
-        std::shared_ptr<Camera>     camera_ = {};
-        std::shared_ptr<Encoder>    encoder_ = {};
         std::vector<std::jthread>   threads_ = {};
 
         CameraBufferQueue encoder_queue_ = CameraBufferQueue(2);
