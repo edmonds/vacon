@@ -99,7 +99,6 @@ cc.check_header('linux/videodev2.h', required: true)
 # other dependencies
 
 argparse = dependency('argparse', version: '>=3')
-fmt = dependency('fmt', version: '>9')
 imgui = dependency('imgui', static: true)
 nlohmann_json = dependency('nlohmann_json')
 plog = dependency('plog')
@@ -128,7 +127,6 @@ vacon_dependencies = [
   argparse,
   backward,
   ffmpeg,
-  fmt,
   graphics_deps,
   imgui,
   libdatachannel,
