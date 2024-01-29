@@ -22,9 +22,11 @@
 #include <string>
 #include <thread>
 
+#include <SDL3/SDL.h>
 #include <plog/Log.h>
 #include <readerwritercircularbuffer.h>
 
+#include "event.hpp"
 #include "linux/camera.hpp"
 #include "linux/encoder.hpp"
 #include "util.hpp"
@@ -105,6 +107,8 @@ void VideoHandler::RunCamera(std::stop_token st)
     LOG_DEBUG << "Starting Linux camera capture thread ID " << std::this_thread::get_id();
     util::SetThreadName("VCameraCapture");
 
+    PushEvent(Event::CameraStarting);
+
     // Try multiple times to start the camera capture. This awkwardness is due
     // to real hardware like the Razer Kiyo Pro that sometimes hangs when
     // trying to read the first frame from the kernel.
@@ -137,8 +141,11 @@ void VideoHandler::RunCamera(std::stop_token st)
 
     if (!camera_started) {
         LOG_FATAL << "Failed to start capturing frames from camera after multiple attempts, giving up !!!";
+        PushEvent(Event::CameraFailed);
         return;
     }
+
+    PushEvent(Event::CameraStarted);
 
     uint32_t last_sequence = 0;
     while (!st.stop_requested()) {
