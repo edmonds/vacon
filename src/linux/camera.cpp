@@ -559,15 +559,15 @@ std::shared_ptr<CameraBufferRef> Camera::NextFrame()
         auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_now - t_last_).count();
         t_last_ = t_now;
 
+        // Update the v4l2_buffer embedded in the CameraBuffer in order to
+        // expose the current timestamp, sequence number, etc. to the caller.
+        bufs_.at(buf.index).vbuf = buf;
+
         // Create a new CameraBufferRef wrapping the CameraBuffer that
         // corresponds to the buffer index returned by the kernel. When this
         // object is destroyed, the buffer will be VIDIOC_QBUF'd to the kernel
         // using the Camera's V4L2 fd.
         auto bref = CameraBufferRef::Create(bufs_.at(buf.index), fd_);
-
-        // Update the v4l2_buffer embedded in the CameraBuffer in order to
-        // expose the current timestamp, sequence number, etc. to the caller.
-        bref->buf_.vbuf = buf;
 
         LOG_DEBUG << std::format("Received frame on fd {}, buffer {}, sequence {}, delta {} us",
                                  fd_,
