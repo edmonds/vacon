@@ -47,9 +47,6 @@ class VideoHandler {
         VideoHandler(VideoHandler&&) = default;
         ~VideoHandler();
         void Init();
-        void Stop();
-        void Join();
-
         std::shared_ptr<CameraBufferRef> NextPreviewFrame();
 
         std::shared_ptr<Camera>     camera_ = {};

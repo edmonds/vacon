@@ -64,13 +64,24 @@ NetworkHandler::~NetworkHandler()
         return;
     }
 
-    LOG_VERBOSE << std::format("Destructor called on {}", (void*)this);
+    LOG_INFO << "Waiting for network handler threads to exit...";
 
+    for (auto& thread : threads_) {
+        thread.request_stop();
+    }
+
+    for (auto& thread : threads_) {
+        if (thread.joinable()) {
+            LOG_DEBUG << "Trying to join thread ID " << thread.get_id();
+            thread.join();
+        } else {
+            LOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
+        }
+    }
+
+    threads_.clear();
     peer_ = nullptr;
     track_ = nullptr;
-
-    Stop();
-    Join();
 }
 
 void NetworkHandler::Init()
@@ -105,27 +116,6 @@ void NetworkHandler::StartAsync()
         // signaling server.
         CloseWebSocket();
     }).detach();
-}
-
-void NetworkHandler::Stop()
-{
-    for (auto& thread : threads_) {
-        thread.request_stop();
-    }
-}
-
-void NetworkHandler::Join()
-{
-    LOG_INFO << "Waiting for network handler threads to exit...";
-
-    for (auto& thread : threads_) {
-        if (thread.joinable()) {
-            LOG_DEBUG << "Trying to join thread ID " << thread.get_id();
-            thread.join();
-        } else {
-            LOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
-        }
-    }
 }
 
 void NetworkHandler::RunDrain(std::stop_token st)

@@ -65,8 +65,22 @@ VideoHandler::~VideoHandler()
         return;
     }
 
-    Stop();
-    Join();
+    LOG_INFO << "Waiting for video handler threads to exit...";
+
+    for (auto& thread : threads_) {
+        thread.request_stop();
+    }
+
+    for (auto& thread : threads_) {
+        if (thread.joinable()) {
+            LOG_DEBUG << "Trying to join thread ID " << thread.get_id();
+            thread.join();
+        } else {
+            LOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
+        }
+    }
+
+    threads_.clear();
 }
 
 void VideoHandler::Init()
@@ -77,28 +91,6 @@ void VideoHandler::Init()
 
     if (encoder_) {
         threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunEncoder(st); } });
-    }
-}
-
-void VideoHandler::Stop()
-{
-    for (auto& thread : threads_) {
-        thread.request_stop();
-    }
-    threads_.clear();
-}
-
-void VideoHandler::Join()
-{
-    LOG_INFO << "Waiting for video handler threads to exit...";
-
-    for (auto& thread : threads_) {
-        if (thread.joinable()) {
-            LOG_DEBUG << "Trying to join thread ID " << thread.get_id();
-            thread.join();
-        } else {
-            LOG_FATAL << "Thread ID " << thread.get_id() << " is not joinable ?!";
-        }
     }
 }
 
