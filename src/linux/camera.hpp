@@ -33,9 +33,9 @@ namespace linux {
 struct CameraParams {
     std::string device;
     std::string pixel_format;
-    uint32_t frame_rate;
-    uint32_t height;
     uint32_t width;
+    uint32_t height;
+    uint32_t frame_rate;
 
     uint32_t n_kernel_buffers = 8;
     uint32_t n_initial_stream_skip_frames = 15;

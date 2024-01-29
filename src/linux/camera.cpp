@@ -77,9 +77,9 @@ static void LogCameraParams(const CameraParams& params)
 {
     LOG_DEBUG << "device = "            << params.device;
     LOG_DEBUG << "pixel format = "      << params.pixel_format;
+    LOG_DEBUG << "frame_rate = "        << params.frame_rate;
     LOG_DEBUG << "width = "             << params.width;
     LOG_DEBUG << "height = "            << params.height;
-    LOG_DEBUG << "frame_rate = "        << params.frame_rate;
     LOG_DEBUG << "n_kernel_buffers = "  << params.n_kernel_buffers;
 }
 
