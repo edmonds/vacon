@@ -20,7 +20,7 @@ jobs:
     env:
       CC: "gcc-13"
       CXX: "g++-13"
-      LDFLAGS: "-static-libstdc++ -static-libgcc"
+      LDFLAGS: "-static-libstdc++ -static-libgcc -Wl,-rpath=/opt/vacon/lib -Wl,--disable-new-dtags"
       PKG_CONFIG_PATH: "/opt/vacon/lib/pkgconfig"
       CMAKE: "cmake -Wno-dev"
 
