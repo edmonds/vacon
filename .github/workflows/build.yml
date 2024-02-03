@@ -17,6 +17,13 @@ jobs:
   build:
     runs-on: ubuntu-22.04
 
+    env:
+      CC: "gcc-13"
+      CXX: "g++-13"
+      LDFLAGS: "-static-libstdc++ -static-libgcc"
+      PKG_CONFIG_PATH: "/opt/vacon/lib/pkgconfig"
+      CMAKE: "cmake -Wno-dev"
+
     steps:
     - name: Checkout Vacon
       uses: actions/checkout@v4
@@ -203,12 +210,6 @@ jobs:
         sudo rm -vrf /opt/vacon/share/ffmpeg
 
     - name: Build Vacon
-      env:
-        CC: "gcc-13"
-        CXX: "g++-13"
-        LDFLAGS: "-static-libstdc++ -static-libgcc"
-        PKG_CONFIG_PATH: "/opt/vacon/lib/pkgconfig"
-        CMAKE: "cmake -Wno-dev"
       run: |
         meson setup build --default-library static --wrap-mode forcefallback --prefix /opt/vacon --libdir lib
         meson compile -v -C build
