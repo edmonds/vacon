@@ -21,6 +21,13 @@ jobs:
     - name: Checkout Vacon
       uses: actions/checkout@v4
 
+    - name: Checkout SDL3
+      uses: actions/checkout@v4
+      with:
+        repository: libsdl-org/SDL
+        ref: "99f6bcf5049ba7d536f8e5b94de818618a47814e"
+        path: sdl
+
     - name: Checkout FFmpeg
       uses: actions/checkout@v4
       with:
@@ -38,6 +45,7 @@ jobs:
         sudo apt-get install -y --no-install-recommends -V \
           build-essential \
           ca-certificates \
+          chrpath \
           cmake \
           debhelper \
           git \
@@ -60,6 +68,62 @@ jobs:
           pkg-config \
           wayland-protocols \
         ;
+
+    - name: Configure package manager with Debian sources
+      run: |
+        sudo apt-get install -y --no-install-recommends -V debian-archive-keyring
+        sudo ln -sf /usr/share/keyrings/debian-archive-keyring.gpg /etc/apt/trusted.gpg.d/
+        echo "deb http://deb.debian.org/debian/ sid main" | sudo tee /etc/apt/sources.list.d/debian-sid.list
+        echo "deb-src http://deb.debian.org/debian/ experimental main" | sudo tee /etc/apt/sources.list.d/debian-experimental.list
+        echo -e "Package: *\nPin: release o=Debian\nPin-Priority: -10" | sudo tee /etc/apt/preferences.d/99-local-debian
+        sudo apt-get update
+
+    - name: Install libsdl3 build dependencies
+      run: |
+        sudo apt-get install -y --no-install-recommends -V libdecor-0-dev/unstable
+        sudo apt-get build-dep -y libsdl3-dev
+        sudo dpkg -P libdecor-0-0 libdecor-0-dev
+
+    - name: Build SDL3
+      working-directory: "./sdl"
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_INSTALL_PREFIX=/opt/vacon \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
+          -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF \
+          -DCMAKE_INSTALL_RUNSTATEDIR=/run \
+          -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON \
+          -DSDL_ALSA_SHARED=OFF \
+          -DSDL_DISABLE_INSTALL_DOCS=ON \
+          -DSDL_HAPTIC_DEFAULT=OFF \
+          -DSDL_HIDAPI_DEFAULT=OFF \
+          -DSDL_HIDAPI_LIBUSB_SHARED=OFF \
+          -DSDL_INSTALL_TESTS=ON \
+          -DSDL_JACK=OFF \
+          -DSDL_JACK_SHARED=OFF \
+          -DSDL_JOYSTICK_DEFAULT=OFF \
+          -DSDL_KMSDRM_SHARED=OFF \
+          -DSDL_OSS=OFF \
+          -DSDL_PIPEWIRE_SHARED=ON \
+          -DSDL_POWER_DEFAULT=OFF \
+          -DSDL_PULSEAUDIO_SHARED=OFF \
+          -DSDL_RPATH=OFF \
+          -DSDL_RPI=OFF \
+          -DSDL_SENSOR_DEFAULT=OFF \
+          -DSDL_SHARED=ON \
+          -DSDL_STATIC=OFF \
+          -DSDL_TESTS=OFF \
+          -DSDL_TEST_LIBRARY=OFF \
+          -DSDL_VIDEO_CAPTURE=OFF \
+          -DSDL_VIVANTE=OFF \
+          -DSDL_WAYLAND=ON \
+          -DSDL_WAYLAND_SHARED=OFF \
+          -DSDL_X11=ON \
+          -DSDL_X11_SHARED=OFF \
+        ;
+        ninja -v -C build
+        sudo ninja -C build install
 
     - name: Build FFmpeg
       working-directory: "./ffmpeg"
@@ -148,7 +212,9 @@ jobs:
       run: |
         meson setup build --default-library static --wrap-mode forcefallback --prefix /opt/vacon --libdir lib
         meson compile -v -C build
-        sudo meson install -C build --skip-subprojects
+        chrpath --replace /opt/vacon/lib build/vacon
+        mkdir -p /opt/vacon/bin
+        sudo install -m 0755 build/vacon /opt/vacon/bin/vacon
 
     - name: Prepare Debian packaging
       run: |
