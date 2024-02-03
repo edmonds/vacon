@@ -21,6 +21,8 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 
+#include "linux/font.hpp"
+
 namespace vacon {
 
 static ImFont* g_imfont_sans = nullptr;
@@ -39,9 +41,12 @@ bool App::InitImgui()
     CalculateUiSize();
 
     // Load fonts.
-    // XXX: Hardcoded font paths.
-    g_imfont_sans = io.Fonts->AddFontFromFileTTF("/usr/share/fonts/truetype/croscore/Arimo-Regular.ttf", font_size_sans_);
-    g_imfont_mono = io.Fonts->AddFontFromFileTTF("/usr/share/fonts/truetype/croscore/Cousine-Regular.ttf", font_size_mono_);
+    if (auto sans_fname = vacon::linux::GetTrueTypeFileNameByPattern("sans")) {
+        g_imfont_sans = io.Fonts->AddFontFromFileTTF((*sans_fname).c_str(), font_size_sans_);
+    }
+    if (auto mono_fname = vacon::linux::GetTrueTypeFileNameByPattern("monospace")) {
+        g_imfont_mono = io.Fonts->AddFontFromFileTTF((*mono_fname).c_str(), font_size_mono_);
+    }
 
     // Styles.
     ImGui::StyleColorsLight();
@@ -159,12 +164,16 @@ void App::ShowStatsOverlay(bool* p_open)
 
     ImGui::SetNextWindowBgAlpha(0.80f); // Transparent background
     if (ImGui::Begin("Stats", p_open, window_flags)) {
-        ImGui::PushFont(g_imfont_mono);
+        if (g_imfont_mono) {
+            ImGui::PushFont(g_imfont_mono);
+        }
         ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
         ImGui::Separator();
         ImGui::Text("Display time: %d us", int(1'000'000.0f / io.Framerate));
         ImGui::Text("Display rate: %.3f fps", io.Framerate);
-        ImGui::PopFont();
+        if (g_imfont_mono) {
+            ImGui::PopFont();
+        }
     }
     ImGui::End();
 }
