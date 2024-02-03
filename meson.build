@@ -76,22 +76,6 @@ else
   backward = []
 endif
 
-# libdatachannel
-
-libdatachannel = dependency('LibDataChannel', required: false)
-if not libdatachannel.found()
-  libdatachannel_opts = cmake.subproject_options()
-  libdatachannel_opts.set_install(false)
-  libdatachannel_cmake = cmake.subproject('libdatachannel', options: libdatachannel_opts)
-
-  libdatachannel = [
-    libdatachannel_cmake.dependency('datachannel-static'),
-    libdatachannel_cmake.dependency('juice-static'),
-    libdatachannel_cmake.dependency('srtp2'),
-    libdatachannel_cmake.dependency('usrsctp'),
-  ]
-endif
-
 # ffmpeg
 
 ffmpeg = [
@@ -100,11 +84,11 @@ ffmpeg = [
   dependency('libavutil'),
 ]
 
-
 # other dependencies
 
 argparse = dependency('argparse', version: '>=3')
 imgui = dependency('imgui', static: true)
+libdatachannel = dependency('LibDataChannel')
 nlohmann_json = dependency('nlohmann_json')
 plog = dependency('plog')
 readerwriterqueue = dependency('readerwriterqueue')
