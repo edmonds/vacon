@@ -28,6 +28,13 @@ jobs:
     - name: Checkout Vacon
       uses: actions/checkout@v4
 
+    - name: Checkout VPL
+      uses: actions/checkout@v4
+      with:
+        repository: intel/libvpl
+        ref: "v2.10.1"
+        path: libvpl
+
     - name: Checkout LibDataChannel
       uses: actions/checkout@v4
       with:
@@ -75,6 +82,10 @@ jobs:
           libvpl-dev \
           libvpl2 \
           libwayland-dev \
+          libx11-dev \
+          libx11-xcb-dev \
+          libxcb-dri3-dev \
+          libxcb-present-dev \
           libxkbcommon-dev \
           linux-libc-dev \
           meson \
@@ -82,6 +93,38 @@ jobs:
           nlohmann-json3-dev \
           pkg-config \
           wayland-protocols \
+        ;
+
+    - name: Build VPL
+      working-directory: "./libvpl"
+      run: |
+        cmake -B build -G Ninja \
+          --install-prefix /opt/vacon \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
+          -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
+          -DCMAKE_INSTALL_LIBDIR=lib \
+          -DBUILD_DISPATCHER=ON \
+          -DBUILD_DISPATCHER_ONEVPL_EXPERIMENTAL=ON \
+          -DBUILD_SHARED_LIBS=ON \
+          -DBUILD_TESTS=OFF \
+          -DBUILD_TOOLS=ON \
+          -DENABLE_DRI3=ON \
+          -DENABLE_DRM=ON \
+          -DENABLE_VA=ON \
+          -DENABLE_WAYLAND=ON \
+          -DENABLE_X11=ON \
+          -DINSTALL_EXAMPLE_CODE=OFF \
+        ;
+        ninja -v -C build
+        sudo ninja -C build install
+        sudo rm -vrf \
+          /opt/vacon/bin/sample_* \
+          /opt/vacon/bin/sample_* \
+          /opt/vacon/bin/val-* \
+          /opt/vacon/bin/vpl-import-export \
+          /opt/vacon/etc \
+          /opt/vacon/share/vpl/examples \
         ;
 
     - name: Configure package manager with Debian sources
