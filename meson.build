@@ -14,11 +14,8 @@ project(
   ]
 )
 
-add_global_arguments([
-  '-fno-omit-frame-pointer',
-  ],
-  language: ['c', 'cpp'],
-)
+cc = meson.get_compiler('c')
+cpp = meson.get_compiler('cpp')
 
 add_project_arguments([
   '-D_POSIX_C_SOURCE=200809L',
@@ -28,9 +25,14 @@ add_project_arguments([
   language: ['c', 'cpp'],
 )
 
-cc = meson.get_compiler('c')
-cpp = meson.get_compiler('cpp')
-cmake = import('cmake')
+if get_option('debug')
+  add_global_arguments(cpp.get_supported_arguments([
+    '-ggdb3',
+    '-fno-omit-frame-pointer',
+  ]),
+  language: ['c', 'cpp'],
+)
+endif
 
 os_deps = []
 
