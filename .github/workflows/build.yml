@@ -237,7 +237,13 @@ jobs:
 
     - name: Build Vacon
       run: |
-        meson setup build --default-library static --wrap-mode forcefallback --prefix /opt/vacon --libdir lib
+        meson setup build \
+          --default-library static \
+          --wrap-mode forcefallback \
+          --prefix /opt/vacon \
+          --libdir lib \
+          --cmake-prefix-path /opt/vacon \
+        ;
         meson compile -v -C build
         chrpath --replace /opt/vacon/lib build/vacon
         mkdir -p /opt/vacon/bin
