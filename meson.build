@@ -37,6 +37,10 @@ os_deps = []
 # Linux-specific dependencies
 
 if host_machine.system() == 'linux'
+  # fontconfig
+  fontconfig = dependency('fontconfig')
+  os_deps += fontconfig
+
   # OpenGL
   add_project_arguments(['-DGL_GLEXT_PROTOTYPES'], language: ['c', 'cpp'])
   egl = dependency('egl', version: '>=1.5')
