@@ -32,6 +32,29 @@ cc = meson.get_compiler('c')
 cpp = meson.get_compiler('cpp')
 cmake = import('cmake')
 
+os_deps = []
+
+# Linux-specific dependencies
+
+if host_machine.system() == 'linux'
+  # OpenGL
+  add_project_arguments(['-DGL_GLEXT_PROTOTYPES'], language: ['c', 'cpp'])
+  egl = dependency('egl', version: '>=1.5')
+  gl = dependency('gl')
+  opengl = dependency('opengl')
+  os_deps += [egl, gl, opengl]
+
+  # V4L2 kernel API
+  cc.check_header('linux/version.h', required: true)
+  cc.check_header('linux/videodev2.h', required: true)
+
+  # VPL (Intel Video Processing Library)
+  vpl = dependency('vpl', version: '>2')
+  os_deps += vpl
+else
+  error('Only Linux is supported')
+endif
+
 # optional functions
 
 foreach ident : ['pthread_setattr_default_np']
@@ -65,10 +88,6 @@ if not libdatachannel.found()
   ]
 endif
 
-# vpl
-
-vpl = dependency('vpl', version: '>2')
-
 # ffmpeg
 
 ffmpeg = [
@@ -77,24 +96,6 @@ ffmpeg = [
   dependency('libavutil'),
 ]
 
-# OpenGL
-
-if host_machine.system() == 'linux'
-  add_project_arguments(['-DGL_GLEXT_PROTOTYPES'], language: ['c', 'cpp'])
-
-  egl = dependency('egl', version: '>=1.5')
-  gl = dependency('gl')
-  opengl = dependency('opengl')
-
-  graphics_deps = [egl, gl, opengl]
-else
-  error('Only Linux is supported')
-endif
-
-# v4l2 kernel API
-
-cc.check_header('linux/version.h', required: true)
-cc.check_header('linux/videodev2.h', required: true)
 
 # other dependencies
 
@@ -127,15 +128,14 @@ vacon_dependencies = [
   argparse,
   backward,
   ffmpeg,
-  graphics_deps,
   imgui,
   libdatachannel,
   nlohmann_json,
+  os_deps,
   plog,
   readerwriterqueue,
   sdl3,
   threads,
-  vpl,
 ]
 
 executable('vacon',
