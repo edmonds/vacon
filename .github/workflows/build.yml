@@ -143,6 +143,8 @@ jobs:
           --cc=gcc-13 \
           --cxx=g++-13 \
           --disable-everything \
+          --disable-programs \
+          --disable-static \
           --enable-avcodec \
           --enable-avfilter \
           --enable-avformat \
@@ -184,6 +186,7 @@ jobs:
           --enable-protocol=file \
           --enable-protocol=rtp \
           --enable-pthreads \
+          --enable-shared \
           --enable-vaapi \
           --disable-dwt \
           --disable-error-resilience \
