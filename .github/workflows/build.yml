@@ -28,19 +28,19 @@ jobs:
     - name: Checkout Vacon
       uses: actions/checkout@v4
 
-    - name: Checkout VPL
-      uses: actions/checkout@v4
-      with:
-        repository: intel/libvpl
-        ref: "v2.10.1"
-        path: libvpl
-
     - name: Checkout LibDataChannel
       uses: actions/checkout@v4
       with:
         repository: paullouisageneau/libdatachannel
         submodules: recursive
         path: libdatachannel
+
+    - name: Checkout FFmpeg
+      uses: actions/checkout@v4
+      with:
+        repository: FFmpeg/FFmpeg
+        ref: "n6.1.1"
+        path: ffmpeg
 
     - name: Checkout SDL3
       uses: actions/checkout@v4
@@ -49,12 +49,12 @@ jobs:
         ref: "99f6bcf5049ba7d536f8e5b94de818618a47814e"
         path: sdl
 
-    - name: Checkout FFmpeg
+    - name: Checkout VPL
       uses: actions/checkout@v4
       with:
-        repository: FFmpeg/FFmpeg
-        ref: "n6.1.1"
-        path: ffmpeg
+        repository: intel/libvpl
+        ref: "v2.10.1"
+        path: libvpl
 
     - name: Install meson and ninja
       run: |
@@ -95,38 +95,6 @@ jobs:
           wayland-protocols \
         ;
 
-    - name: Build VPL
-      working-directory: "./libvpl"
-      run: |
-        cmake -B build -G Ninja \
-          --install-prefix /opt/vacon \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
-          -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
-          -DCMAKE_INSTALL_LIBDIR=lib \
-          -DBUILD_DISPATCHER=ON \
-          -DBUILD_DISPATCHER_ONEVPL_EXPERIMENTAL=ON \
-          -DBUILD_SHARED_LIBS=ON \
-          -DBUILD_TESTS=OFF \
-          -DBUILD_TOOLS=ON \
-          -DENABLE_DRI3=ON \
-          -DENABLE_DRM=ON \
-          -DENABLE_VA=ON \
-          -DENABLE_WAYLAND=ON \
-          -DENABLE_X11=ON \
-          -DINSTALL_EXAMPLE_CODE=OFF \
-        ;
-        ninja -v -C build
-        sudo ninja -C build install
-        sudo rm -vrf \
-          /opt/vacon/bin/sample_* \
-          /opt/vacon/bin/sample_* \
-          /opt/vacon/bin/val-* \
-          /opt/vacon/bin/vpl-import-export \
-          /opt/vacon/etc \
-          /opt/vacon/share/vpl/examples \
-        ;
-
     - name: Configure package manager with Debian sources
       run: |
         sudo apt-get install -y --no-install-recommends -V debian-archive-keyring
@@ -141,47 +109,6 @@ jobs:
         sudo apt-get install -y --no-install-recommends -V libdecor-0-dev/unstable
         sudo apt-get build-dep -y libsdl3-dev
         sudo dpkg -P libdecor-0-0 libdecor-0-dev
-
-    - name: Build SDL3
-      working-directory: "./sdl"
-      run: |
-        cmake -B build -G Ninja \
-          -DCMAKE_INSTALL_PREFIX=/opt/vacon \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
-          -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF \
-          -DCMAKE_INSTALL_RUNSTATEDIR=/run \
-          -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON \
-          -DSDL_ALSA_SHARED=OFF \
-          -DSDL_DISABLE_INSTALL_DOCS=ON \
-          -DSDL_HAPTIC_DEFAULT=OFF \
-          -DSDL_HIDAPI_DEFAULT=OFF \
-          -DSDL_HIDAPI_LIBUSB_SHARED=OFF \
-          -DSDL_INSTALL_TESTS=ON \
-          -DSDL_JACK=OFF \
-          -DSDL_JACK_SHARED=OFF \
-          -DSDL_JOYSTICK_DEFAULT=OFF \
-          -DSDL_KMSDRM_SHARED=OFF \
-          -DSDL_OSS=OFF \
-          -DSDL_PIPEWIRE_SHARED=ON \
-          -DSDL_POWER_DEFAULT=OFF \
-          -DSDL_PULSEAUDIO_SHARED=OFF \
-          -DSDL_RPATH=OFF \
-          -DSDL_RPI=OFF \
-          -DSDL_SENSOR_DEFAULT=OFF \
-          -DSDL_SHARED=ON \
-          -DSDL_STATIC=OFF \
-          -DSDL_TESTS=OFF \
-          -DSDL_TEST_LIBRARY=OFF \
-          -DSDL_VIDEO_CAPTURE=OFF \
-          -DSDL_VIVANTE=OFF \
-          -DSDL_WAYLAND=ON \
-          -DSDL_WAYLAND_SHARED=OFF \
-          -DSDL_X11=ON \
-          -DSDL_X11_SHARED=OFF \
-        ;
-        ninja -v -C build
-        sudo ninja -C build install
 
     - name: Build LibDataChannel
       working-directory: "./libdatachannel"
@@ -277,6 +204,79 @@ jobs:
         make -j$(nproc)
         sudo make install
         sudo rm -vrf /opt/vacon/share/ffmpeg
+
+    - name: Build SDL3
+      working-directory: "./sdl"
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_INSTALL_PREFIX=/opt/vacon \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
+          -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF \
+          -DCMAKE_INSTALL_RUNSTATEDIR=/run \
+          -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON \
+          -DSDL_ALSA_SHARED=OFF \
+          -DSDL_DISABLE_INSTALL_DOCS=ON \
+          -DSDL_HAPTIC_DEFAULT=OFF \
+          -DSDL_HIDAPI_DEFAULT=OFF \
+          -DSDL_HIDAPI_LIBUSB_SHARED=OFF \
+          -DSDL_INSTALL_TESTS=ON \
+          -DSDL_JACK=OFF \
+          -DSDL_JACK_SHARED=OFF \
+          -DSDL_JOYSTICK_DEFAULT=OFF \
+          -DSDL_KMSDRM_SHARED=OFF \
+          -DSDL_OSS=OFF \
+          -DSDL_PIPEWIRE_SHARED=ON \
+          -DSDL_POWER_DEFAULT=OFF \
+          -DSDL_PULSEAUDIO_SHARED=OFF \
+          -DSDL_RPATH=OFF \
+          -DSDL_RPI=OFF \
+          -DSDL_SENSOR_DEFAULT=OFF \
+          -DSDL_SHARED=ON \
+          -DSDL_STATIC=OFF \
+          -DSDL_TESTS=OFF \
+          -DSDL_TEST_LIBRARY=OFF \
+          -DSDL_VIDEO_CAPTURE=OFF \
+          -DSDL_VIVANTE=OFF \
+          -DSDL_WAYLAND=ON \
+          -DSDL_WAYLAND_SHARED=OFF \
+          -DSDL_X11=ON \
+          -DSDL_X11_SHARED=OFF \
+        ;
+        ninja -v -C build
+        sudo ninja -C build install
+
+    - name: Build VPL
+      working-directory: "./libvpl"
+      run: |
+        cmake -B build -G Ninja \
+          --install-prefix /opt/vacon \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
+          -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
+          -DCMAKE_INSTALL_LIBDIR=lib \
+          -DBUILD_DISPATCHER=ON \
+          -DBUILD_DISPATCHER_ONEVPL_EXPERIMENTAL=ON \
+          -DBUILD_SHARED_LIBS=ON \
+          -DBUILD_TESTS=OFF \
+          -DBUILD_TOOLS=ON \
+          -DENABLE_DRI3=ON \
+          -DENABLE_DRM=ON \
+          -DENABLE_VA=ON \
+          -DENABLE_WAYLAND=ON \
+          -DENABLE_X11=ON \
+          -DINSTALL_EXAMPLE_CODE=OFF \
+        ;
+        ninja -v -C build
+        sudo ninja -C build install
+        sudo rm -vrf \
+          /opt/vacon/bin/sample_* \
+          /opt/vacon/bin/sample_* \
+          /opt/vacon/bin/val-* \
+          /opt/vacon/bin/vpl-import-export \
+          /opt/vacon/etc \
+          /opt/vacon/share/vpl/examples \
+        ;
 
     - name: Build Vacon
       run: |
