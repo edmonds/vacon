@@ -28,6 +28,13 @@ jobs:
     - name: Checkout Vacon
       uses: actions/checkout@v4
 
+    - name: Checkout LibDataChannel
+      uses: actions/checkout@v4
+      with:
+        repository: paullouisageneau/libdatachannel
+        submodules: recursive
+        path: libdatachannel
+
     - name: Checkout SDL3
       uses: actions/checkout@v4
       with:
@@ -129,6 +136,21 @@ jobs:
           -DSDL_WAYLAND_SHARED=OFF \
           -DSDL_X11=ON \
           -DSDL_X11_SHARED=OFF \
+        ;
+        ninja -v -C build
+        sudo ninja -C build install
+
+    - name: Build LibDataChannel
+      working-directory: "./libdatachannel"
+      run: |
+        cmake -B build -G Ninja \
+          --install-prefix /opt/vacon \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
+          -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
+          -DUSE_SYSTEM_JSON=ON \
+          -DNO_EXAMPLES=ON \
+          -DNO_TESTS=ON \
         ;
         ninja -v -C build
         sudo ninja -C build install
