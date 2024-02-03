@@ -16,6 +16,7 @@
 #include "app.hpp"
 
 #include <csignal>
+#include <format>
 
 #include <SDL3/SDL.h>
 #include <plog/Log.h>
