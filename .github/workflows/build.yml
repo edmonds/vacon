@@ -257,9 +257,10 @@ jobs:
           -DCMAKE_INSTALL_LIBDIR=lib \
           -DBUILD_DISPATCHER=ON \
           -DBUILD_DISPATCHER_ONEVPL_EXPERIMENTAL=ON \
+          -DBUILD_EXAMPLES=OFF \
           -DBUILD_SHARED_LIBS=ON \
           -DBUILD_TESTS=OFF \
-          -DBUILD_TOOLS=ON \
+          -DBUILD_TOOLS=OFF \
           -DENABLE_DRI3=ON \
           -DENABLE_DRM=ON \
           -DENABLE_VA=ON \
@@ -270,10 +271,6 @@ jobs:
         ninja -v -C build
         sudo ninja -C build install
         sudo rm -vrf \
-          /opt/vacon/bin/sample_* \
-          /opt/vacon/bin/sample_* \
-          /opt/vacon/bin/val-* \
-          /opt/vacon/bin/vpl-import-export \
           /opt/vacon/etc \
           /opt/vacon/share/vpl/examples \
         ;
