@@ -78,20 +78,21 @@ class App {
         void RenderPreview();
         void ProcessUiEvent(const SDL_Event*);
 
-        float   font_size_sans_                 = 12.0f;
-        float   font_size_mono_                 = 12.0f;
-        bool    enable_my_camera_               = true;
-        bool    enable_my_microphone_           = true;
-        bool    enable_self_view_               = true;
-        bool    enable_stats_overlay_           = true;
-        bool    xenable_demo_window_            = false;
-        bool    xenable_network_handler_        = false;
-        bool    xenable_video_handler_          = false;
-        bool    mirror_self_view_               = true;
+        float           font_size_sans_                 = 12.0f;
+        float           font_size_mono_                 = 12.0f;
+        bool            enable_my_camera_               = true;
+        bool            enable_my_microphone_           = true;
+        bool            enable_stats_overlay_           = true;
+        bool            xenable_demo_window_            = false;
+        bool            xenable_network_handler_        = false;
+        bool            xenable_video_handler_          = false;
+
+        bool            enable_self_view_               = true;
+        bool            mirror_self_view_               = true;
 
         struct {
-            unsigned    n_preview               = 0;
-            unsigned    n_preview_underflow     = 0;
+            unsigned    n_preview                       = 0;
+            unsigned    n_preview_underflow             = 0;
         } stats_;
 };
 
