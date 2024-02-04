@@ -47,6 +47,11 @@ bool App::InitSDL()
         return false;
     }
 
+    if (!InitSDLTextures()) {
+        LOG_FATAL << "InitSDLTextures() failed";
+        return false;
+    }
+
     if (SDL_ShowWindow(sdl_window_) != 0) {
         LOG_FATAL << "SDL_ShowWindow() failed: " << SDL_GetError();
         return -1;
@@ -118,6 +123,49 @@ bool App::InitSDLRenderer()
             LOG_FATAL << "Required OpenGL extension '" << wanted << "' is not supported";
             return false;
         }
+    }
+
+    // Success.
+    return true;
+}
+
+bool App::InitSDLTextures()
+{
+    sdl_texture_placeholder_ =
+        SDL_CreateTexture(sdl_renderer_,
+                          SDL_PIXELFORMAT_RGBA8888,
+                          SDL_TEXTUREACCESS_TARGET,
+                          8 /* width */,
+                          8 /* height */);
+    if (!sdl_texture_placeholder_) {
+        LOG_FATAL << "SDL_CreateTexture() failed: " << SDL_GetError();
+        return false;
+    }
+
+    if (SDL_SetRenderTarget(sdl_renderer_, sdl_texture_placeholder_) != 0) {
+        LOG_FATAL << "SDL_SetRenderTarget() failed: " << SDL_GetError();
+        return false;
+    }
+
+    // Magenta.
+    if (SDL_SetRenderDrawColor(sdl_renderer_,
+                               255  /* r */,
+                               0    /* g */,
+                               255  /* b */,
+                               0    /* a */) != 0)
+    {
+        LOG_FATAL << "SDL_SetRenderDrawColor() failed: " << SDL_GetError();
+        return false;
+    }
+
+    if (SDL_RenderClear(sdl_renderer_) != 0) {
+        LOG_FATAL << "SDL_RenderClear() failed: " << SDL_GetError();
+        return false;
+    }
+
+    if (SDL_SetRenderTarget(sdl_renderer_, nullptr) != 0) {
+        LOG_FATAL << "SDL_SetRenderTarget() failed: " << SDL_GetError();
+        return false;
     }
 
     // Success.

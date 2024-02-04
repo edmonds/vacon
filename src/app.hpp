@@ -68,6 +68,7 @@ class App {
         // sdl.cpp
         bool InitSDL();
         bool InitSDLRenderer();
+        bool InitSDLTextures();
 
         // ui.cpp
         bool InitImgui();
@@ -89,6 +90,8 @@ class App {
 
         bool            enable_self_view_               = true;
         bool            mirror_self_view_               = true;
+
+        SDL_Texture*    sdl_texture_placeholder_        = nullptr;
 
         struct {
             unsigned    n_preview                       = 0;
