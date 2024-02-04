@@ -254,6 +254,7 @@ void App::ShowPreview()
 void App::ShowPreviewWindow()
 {
     ImGuiWindowFlags window_flags =
+        ImGuiWindowFlags_AlwaysAutoResize |
         ImGuiWindowFlags_NoDecoration |
         ImGuiWindowFlags_NoFocusOnAppearing |
         ImGuiWindowFlags_NoNav;
@@ -277,6 +278,16 @@ void App::ShowPreviewWindow()
         // Show the placeholder texture.
         ImGui::Image(static_cast<void*>(sdl_texture_placeholder_),
                      ImVec2(self_view_width_, self_view_height_));
+    }
+
+    if (ImGui::IsItemClicked(1 /* right mouse button */)) {
+        switch (self_view_width_) {
+        case 128: self_view_width_ = 256; self_view_height_ = 144; break;
+        case 256: self_view_width_ = 384; self_view_height_ = 216; break;
+        case 384: self_view_width_ = 512; self_view_height_ = 288; break;
+        case 512: self_view_width_ = 640; self_view_height_ = 360; break;
+        case 640: self_view_width_ = 128; self_view_height_ = 72; break;
+        }
     }
 
     ImGui::End();
