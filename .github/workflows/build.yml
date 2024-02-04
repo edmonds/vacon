@@ -56,6 +56,13 @@ jobs:
         ref: "v2.10.1"
         path: libvpl
 
+    - name: Checkout oneVPL-intel-gpu
+      uses: actions/checkout@v4
+      with:
+        repository: oneapi-src/oneVPL-intel-gpu
+        ref: "intel-onevpl-24.1.3"
+        path: oneVPL-intel-gpu
+
     - name: Install meson and ninja
       run: |
         sudo pip install meson ninja
@@ -288,6 +295,18 @@ jobs:
         chrpath --replace /opt/vacon/lib build/vacon
         mkdir -p /opt/vacon/bin
         sudo install -m 0755 build/vacon /opt/vacon/bin/vacon
+
+    - name: Build oneVPL-intel-gpu
+      working-directory: "./oneVPL-intel-gpu"
+      run: |
+        cmake -B build -G Ninja \
+          --install-prefix /opt/vacon \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_FLAGS_RELEASE="-O3 -fno-omit-frame-pointer" \
+          -DCMAKE_CXX_FLAGS_RELEASE="-O3 -fno-omit-frame-pointer" \
+        ;
+        ninja -v -C build
+        sudo ninja -C build install
 
     - name: Prepare Debian packaging
       run: |
