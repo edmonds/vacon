@@ -419,7 +419,7 @@ bool Camera::ExportBuffersToOpenGL(SDL_Renderer* sdl_renderer)
             return false;
         }
         SDL_SetTextureBlendMode(buf.texture, SDL_BLENDMODE_NONE);
-        SDL_SetTextureScaleMode(buf.texture, SDL_SCALEMODE_LINEAR);
+        SDL_SetTextureScaleMode(buf.texture, SDL_SCALEMODE_BEST);
 
         // Get the texture properties.
         auto texture_props = SDL_GetTextureProperties(buf.texture);
