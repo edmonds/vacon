@@ -22,16 +22,21 @@ add_project_arguments([
   '-DPROJECT_NAME="@0@"'.format(meson.project_name()),
   '-DPROJECT_VERSION="@0@"'.format(meson.project_version()),
   ],
-  language: ['c', 'cpp'],
-)
+  language: ['c', 'cpp'])
 
 if get_option('debug')
   add_global_arguments(cpp.get_supported_arguments([
     '-ggdb3',
     '-fno-omit-frame-pointer',
-  ]),
-  language: ['c', 'cpp'],
-)
+    ]),
+    language: ['c', 'cpp'])
+endif
+
+if get_option('onevpl_priority_path') != ''
+  add_project_arguments([
+    '-DVACON_ONEVPL_PRIORITY_PATH="@0@"'.format(get_option('onevpl_priority_path'))
+    ],
+    language: ['c', 'cpp'])
 endif
 
 os_deps = []

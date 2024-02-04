@@ -1,0 +1,1 @@
+option('onevpl_priority_path', type: 'string', description: 'override path to VPL implementations')

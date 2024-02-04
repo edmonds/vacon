@@ -42,6 +42,14 @@ int App::AppInit(int argc, char *argv[])
 
     util::SetupLogging(verbosity_);
 
+#if defined(VACON_ONEVPL_PRIORITY_PATH)
+    if (!getenv("ONEVPL_PRIORITY_PATH")) {
+        LOG_DEBUG << std::format("Setting environment variable ONEVPL_PRIORITY_PATH = '{}'",
+                                 VACON_ONEVPL_PRIORITY_PATH);
+        setenv("ONEVPL_PRIORITY_PATH", VACON_ONEVPL_PRIORITY_PATH, 1 /* overwrite */);
+    }
+#endif
+
     if (args_["--usr1"] == true) {
         LOG_DEBUG << "Send SIGUSR1 to simulate a packet drop";
         std::signal(SIGUSR1, SignalUSR1);
