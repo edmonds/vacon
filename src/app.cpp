@@ -102,23 +102,52 @@ int App::AppEvent(const SDL_Event *event)
 {
     ProcessUiEvent(event);
 
-    if (event->type == SDL_EVENT_QUIT) {
-        vacon::gShuttingDown = true;
-        return 1;
+    switch (event->type) {
+    case SDL_EVENT_QUIT: {
+        return ShutdownEvent();
     }
 
-    if (event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-        event->window.windowID == SDL_GetWindowID(sdl_window_))
-    {
-        vacon::gShuttingDown = true;
-        return 1;
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED: {
+        if (event->window.windowID == SDL_GetWindowID(sdl_window_)) {
+            return ShutdownEvent();
+        }
+        break;
     }
 
-    if (event->type == SDL_EVENT_USER) {
+    case SDL_EVENT_USER: {
         ProcessUserEvent(&event->user);
+        break;
+    }
+
+    case SDL_EVENT_KEY_DOWN: {
+        LOG_DEBUG << "Got a key down event";
+        break;
+    }
+
+    case SDL_EVENT_KEY_UP: {
+        auto key = &event->key.keysym;
+        if ((key->sym == SDLK_q) &&
+            (key->mod & SDL_KMOD_ALT) &&
+            (key->mod & SDL_KMOD_SHIFT))
+        {
+            return ShutdownEvent();
+        }
+        break;
+    }
+
+    default:
+        // Ignore.
+        break;
     }
 
     return 0;
+}
+
+int App::ShutdownEvent()
+{
+    LOG_INFO << "App shutdown requested!";
+    vacon::gShuttingDown = true;
+    return 1;
 }
 
 void App::ProcessUserEvent(const SDL_UserEvent *user)

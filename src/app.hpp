@@ -55,6 +55,7 @@ class App {
 
     private:
         // app.cpp
+        int ShutdownEvent();
         void ProcessUserEvent(const SDL_UserEvent*);
         void StartNetworkHandler();
         void StartVideoHandler();
