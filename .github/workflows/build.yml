@@ -290,6 +290,7 @@ jobs:
           --prefix /opt/vacon \
           --libdir lib \
           --cmake-prefix-path /opt/vacon \
+          -Donevpl_priority_path=/opt/vacon/lib \
         ;
         meson compile -v -C build
         chrpath --replace /opt/vacon/lib build/vacon
