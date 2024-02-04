@@ -76,7 +76,8 @@ class App {
         void ShowMenu();
         void ShowStatsOverlay(bool*);
         void RenderFrame();
-        void RenderPreview();
+        void ShowPreview();
+        void ShowPreviewWindow();
         void ProcessUiEvent(const SDL_Event*);
 
         float           font_size_sans_                 = 12.0f;
@@ -90,6 +91,8 @@ class App {
 
         bool            enable_self_view_               = true;
         bool            mirror_self_view_               = true;
+        int             self_view_width_                = 512;
+        int             self_view_height_               = 288;
 
         SDL_Texture*    sdl_texture_placeholder_        = nullptr;
 

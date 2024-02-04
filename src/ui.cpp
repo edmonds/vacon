@@ -191,7 +191,7 @@ void App::RenderFrame()
     SDL_RenderClear(sdl_renderer_);
 
     if (vh_) {
-        RenderPreview();
+        ShowPreview();
     }
 
     ShowMenu();
@@ -225,7 +225,7 @@ void App::RenderFrame()
     SDL_RenderPresent(sdl_renderer_);
 }
 
-void App::RenderPreview()
+void App::ShowPreview()
 {
     // Get the next preview frame from the camera.
     if (auto cref = vh_->NextPreviewFrame()) {
@@ -239,21 +239,47 @@ void App::RenderPreview()
         ++stats_.n_preview_underflow;
     }
 
-    if (preview_cref_ && enable_self_view_) {
+    if (enable_self_view_) {
         ++stats_.n_preview;
 
-        auto flip_mode = mirror_self_view_ ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
-        if (SDL_RenderTextureRotated(sdl_renderer_,
-                                     preview_cref_->buf_.texture,
-                                     nullptr,   /* srcrect */
-                                     nullptr,   /* dstrect */
-                                     0.0,       /* angle */
-                                     nullptr,   /* center */
-                                     flip_mode) != 0)
-        {
-            LOG_ERROR << "SDL_RenderTextureRotated() failed: " << SDL_GetError();
-        }
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        ShowPreviewWindow();
+        ImGui::PopStyleVar(2);
+    } else {
+        preview_cref_ = nullptr;
     }
+}
+
+void App::ShowPreviewWindow()
+{
+    ImGuiWindowFlags window_flags =
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoNav;
+
+    if (!ImGui::Begin("Self-view", nullptr, window_flags)) {
+        ImGui::End();
+        return;
+    }
+
+    if (preview_cref_) {
+        // Show the frame from the camera.
+        if (mirror_self_view_) {
+            ImGui::Image(static_cast<void*>(preview_cref_->buf_.texture),
+                         ImVec2(self_view_width_, self_view_height_),
+                         ImVec2(1, 0), ImVec2(0, 1));
+        } else {
+            ImGui::Image(static_cast<void*>(preview_cref_->buf_.texture),
+                         ImVec2(self_view_width_, self_view_height_));
+        }
+    } else {
+        // Show the placeholder texture.
+        ImGui::Image(static_cast<void*>(sdl_texture_placeholder_),
+                     ImVec2(self_view_width_, self_view_height_));
+    }
+
+    ImGui::End();
 }
 
 void App::ProcessUiEvent(const SDL_Event* event)
