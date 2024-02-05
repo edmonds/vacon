@@ -119,11 +119,6 @@ int App::AppEvent(const SDL_Event *event)
         break;
     }
 
-    case SDL_EVENT_KEY_DOWN: {
-        LOG_DEBUG << "Got a key down event";
-        break;
-    }
-
     case SDL_EVENT_KEY_UP: {
         auto key = &event->key.keysym;
         if ((key->sym == SDLK_q) &&
