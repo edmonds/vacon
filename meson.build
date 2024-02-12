@@ -55,6 +55,12 @@ if host_machine.system() == 'linux'
   opengl = dependency('opengl')
   os_deps += [egl, gl, opengl]
 
+  # VAAPI
+  va = dependency('libva')
+  os_deps += va
+  va_wayland = dependency('libva-wayland')
+  os_deps += va_wayland
+
   # V4L2 kernel API
   cc.check_header('linux/version.h', required: true)
   cc.check_header('linux/videodev2.h', required: true)
@@ -62,6 +68,11 @@ if host_machine.system() == 'linux'
   # VPL (Intel Video Processing Library)
   vpl = dependency('vpl', version: '>2')
   os_deps += vpl
+  add_project_arguments(['-DONEVPL_EXPERIMENTAL'], language: ['c', 'cpp'])
+
+  # Wayland
+  wayland_client = dependency('wayland-client')
+  os_deps += wayland_client
 else
   error('Only Linux is supported')
 endif
@@ -108,9 +119,10 @@ vacon_sources = [
   'src/app.cpp',
   'src/args.cpp',
   'src/event.cpp',
-  'src/linux/font.cpp',
   'src/linux/camera.cpp',
+  'src/linux/decoder.cpp',
   'src/linux/encoder.cpp',
+  'src/linux/font.cpp',
   'src/linux/mfx.cpp',
   'src/linux/video_handler.cpp',
   'src/network_handler.cpp',

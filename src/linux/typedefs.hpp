@@ -29,10 +29,14 @@ typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<PacketRef
 namespace linux {
 
 class CameraBufferRef;
+class DecodedFrame;
 class VideoFrame;
 
 typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<CameraBufferRef>>
     CameraBufferQueue;
+
+typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<DecodedFrame>>
+    DecodedFrameQueue;
 
 typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<VideoFrame>>
     VideoPacketQueue;
