@@ -111,6 +111,7 @@ vacon_sources = [
   'src/linux/font.cpp',
   'src/linux/camera.cpp',
   'src/linux/encoder.cpp',
+  'src/linux/mfx.cpp',
   'src/linux/video_handler.cpp',
   'src/network_handler.cpp',
   'src/rtp_depacketizer.cpp',
