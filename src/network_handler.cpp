@@ -29,8 +29,15 @@
 #include <plog/Log.h>
 #include <rtc/rtc.hpp>
 
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/imgutils.h>
+}
+
 #include "app.hpp"
 #include "event.hpp"
+#include "packet_ref.hpp"
 #include "util.hpp"
 
 using namespace std::chrono_literals;
@@ -109,6 +116,15 @@ void NetworkHandler::StartAsync()
         }
 
         if (IsConnectedToPeer() && !vacon::gShuttingDown) {
+            // Start the incoming video packet fill thread.
+            if (rtp_depacketizer_) {
+                // XXX: FFmpeg can hang in av_read_frame(), so for now detach
+                // the incoming fill thread.
+                //
+                //threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunIncomingFill(st); } });
+                std::jthread([&](std::stop_token st) { RunIncomingFill(st); }).detach();
+            }
+
             LOG_FATAL << "PEER-TO-PEER CONNECTION IS READY !!!";
             PushEvent(Event::NetworkStarted);
         }
@@ -153,6 +169,68 @@ void NetworkHandler::RunOutgoingDrain(std::stop_token st)
     }
 
     LOG_DEBUG << "Stopping outgoing video packet queue drain thread ID " << std::this_thread::get_id();
+}
+
+void NetworkHandler::RunIncomingFill(std::stop_token st)
+{
+    LOG_DEBUG << "Starting incoming video packet queue fill thread ID " << std::this_thread::get_id();
+    util::SetThreadName("VInVideo");
+
+    auto format = rtp_depacketizer_->fctx;
+
+    if (avformat_find_stream_info(format, nullptr) < 0) {
+        LOG_ERROR << "avformat_find_stream_info() failed";
+        return;
+    }
+
+    int stream_idx = av_find_best_stream(format, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    if (stream_idx < 0) {
+        LOG_ERROR << "av_find_best_stream() returned no video streams";
+        return;
+    }
+
+    LOG_INFO
+        << "Opened incoming video stream, pixel format: "
+        << av_get_pix_fmt_name(static_cast<enum AVPixelFormat>(format->streams[stream_idx]->codecpar->format));
+
+    auto t_last = std::chrono::steady_clock::now();
+    int count_frames = -1;
+
+    while (!st.stop_requested()) {
+        auto pref = PacketRef::Create(av_packet_alloc());
+
+        auto ret = av_read_frame(format, pref->packet_);
+        if (ret < 0) {
+            LOG_DEBUG << "av_read_frame() returned: " << av_err2string(ret);
+            break;
+        }
+
+        while (!st.stop_requested()) {
+            if (params_.incoming_video_packet_queue->wait_enqueue_timed(pref, 250ms)) {
+                break;
+            } else {
+                LOG_DEBUG << "Stalled enqueuing packet onto incoming video packet queue, retrying";
+            }
+        }
+
+        auto t_now = std::chrono::steady_clock::now();
+        if (count_frames == -1) {
+            t_last = t_now;
+        }
+        ++count_frames;
+        auto t_dur = t_now - t_last;
+
+        if (t_dur >= 1s) {
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
+            auto fps = count_frames / std::chrono::duration<double>(t_dur).count();
+            LOG_INFO << std::format("Processed {} incoming video frames in {} ms, {:.3f} fps",
+                                    count_frames, ms, fps);
+            t_last = t_now;
+            count_frames = 0;
+        }
+    }
+
+    LOG_DEBUG << "Stopping incoming video packet queue fill thread ID " << std::this_thread::get_id();
 }
 
 void NetworkHandler::ConnectWebRTC()

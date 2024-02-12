@@ -84,6 +84,10 @@ int App::AppInit(int argc, char *argv[])
 
 void App::AppQuit()
 {
+    // Stop the handlers.
+    StopNetworkHandler();
+    StopVideoHandler();
+
     // Drain any packets remaining on the outgoing video packet queue.
     if (outgoing_video_packet_queue_) {
         std::shared_ptr<linux::VideoFrame> frame = {};
@@ -93,9 +97,14 @@ void App::AppQuit()
     }
     outgoing_video_packet_queue_ = nullptr;
 
-    // Stop the handlers.
-    StopVideoHandler();
-    StopNetworkHandler();
+    // Drain any packets remaining on the incoming video packet queue.
+    if (incoming_video_packet_queue_) {
+        std::shared_ptr<PacketRef> pref = {};
+        while (incoming_video_packet_queue_->try_dequeue(pref)) {
+            LOG_VERBOSE << std::format("Drained PacketRef @ {}", (void*)pref.get());
+        }
+    }
+    incoming_video_packet_queue_ = nullptr;
 }
 
 int App::AppEvent(const SDL_Event *event)
@@ -252,6 +261,7 @@ void App::StartNetworkHandler()
         .signaling_secret               = args_.get<std::string>("--network-signaling-secret"),
         .stun_server                    = args_.get<std::string>("--network-stun-server"),
         .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
+        .incoming_video_packet_queue    = incoming_video_packet_queue_,
     };
 
     nh_ = NetworkHandler::Create(params);

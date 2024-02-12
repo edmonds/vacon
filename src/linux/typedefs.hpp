@@ -20,6 +20,12 @@
 #include <readerwritercircularbuffer.h>
 
 namespace vacon {
+
+class PacketRef;
+
+typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<PacketRef>>
+    PacketRefQueue;
+
 namespace linux {
 
 class CameraBufferRef;

@@ -25,6 +25,7 @@
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
 #include "linux/video_handler.hpp"
+#include "packet_ref.hpp"
 #include "network_handler.hpp"
 
 namespace vacon {
@@ -47,6 +48,9 @@ class App {
         std::unique_ptr<NetworkHandler>         nh_ = nullptr;
         std::unique_ptr<linux::VideoHandler>    vh_ = nullptr;
         std::shared_ptr<linux::CameraBufferRef> preview_cref_ = nullptr;
+
+        std::shared_ptr<PacketRefQueue>         incoming_video_packet_queue_ =
+            std::make_shared<PacketRefQueue>(2);
 
         std::shared_ptr<linux::VideoPacketQueue>    outgoing_video_packet_queue_ =
             std::make_shared<linux::VideoPacketQueue>(2);

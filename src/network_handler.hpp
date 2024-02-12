@@ -28,6 +28,7 @@
 
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
+#include "packet_ref.hpp"
 #include "rtp_depacketizer.hpp"
 
 namespace vacon {
@@ -37,6 +38,7 @@ struct NetworkHandlerParams {
     std::string signaling_secret;
     std::string stun_server;
     std::shared_ptr<linux::VideoPacketQueue> outgoing_video_packet_queue;
+    std::shared_ptr<PacketRefQueue> incoming_video_packet_queue;
 };
 
 class NetworkHandler {
@@ -53,6 +55,7 @@ class NetworkHandler {
         void CloseWebSocket();
         bool IsConnectedToPeer();
         void RunOutgoingDrain(std::stop_token);
+        void RunIncomingFill(std::stop_token);
         void ReceivePacket(rtc::binary);
         void OnWsMessage(nlohmann::json message);
         void CreatePeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);
