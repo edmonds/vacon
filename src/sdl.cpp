@@ -89,19 +89,26 @@ bool App::InitSDLRenderer()
         }
     }
 
-    // Check for the EGL extension "EGL_EXT_image_dma_buf_import".
+    // Check for the EGL extensions "EGL_EXT_image_dma_buf_import" and
+    // "EGL_EXT_image_dma_buf_import_modifiers".
     const char *egl_query_extensions = eglQueryString(eglGetCurrentDisplay(), EGL_EXTENSIONS);
     if (egl_query_extensions) {
         LOG_VERBOSE << "Supported EGL extensions: " << egl_query_extensions;
 
         std::string extensions(egl_query_extensions);
-        std::string wanted("EGL_EXT_image_dma_buf_import");
 
-        if (extensions.contains(wanted)) {
-            LOG_VERBOSE << "Required EGL extension '" << wanted << "' is supported";
-        } else {
-            LOG_FATAL << "Required EGL extension '" << wanted << "' is not supported";
-            return false;
+        std::vector<std::string> wanted_extensions{
+            "EGL_EXT_image_dma_buf_import",
+            "EGL_EXT_image_dma_buf_import_modifiers",
+        };
+
+        for (auto& wanted : wanted_extensions) {
+            if (extensions.contains(wanted)) {
+                LOG_VERBOSE << "Required EGL extension '" << wanted << "' is supported";
+            } else {
+                LOG_FATAL << "Required EGL extension '" << wanted << "' is not supported";
+                return false;
+            }
         }
     } else {
         LOG_FATAL << std::format("eglQueryString(EGL_EXTENSIONS) failed with error code {:#010x}", eglGetError());
