@@ -476,9 +476,9 @@ bool DecodedFrame::ExportToOpenGL(SDL_Renderer *sdl_renderer)
 
     // Get the GL texture number of the texture.
     auto texture_id = static_cast<GLuint>
-        (SDL_GetNumberProperty(texture_props, SDL_PROPERTY_TEXTURE_OPENGLES2_TEXTURE_NUMBER, 0));
+        (SDL_GetNumberProperty(texture_props, SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_NUMBER, 0));
     if (!texture_id) {
-        LOG_ERROR << "SDL_GetNumberProperty(SDL_PROPERTY_TEXTURE_OPENGLES2_TEXTURE_NUMBER) failed";
+        LOG_ERROR << "SDL_GetNumberProperty(SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_NUMBER) failed";
         return false;
     }
 
