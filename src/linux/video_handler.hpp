@@ -20,25 +20,17 @@
 #include <string>
 #include <thread>
 
-#include <readerwritercircularbuffer.h>
-
 #include "linux/camera.hpp"
 #include "linux/encoder.hpp"
+#include "linux/typedefs.hpp"
 
 namespace vacon {
 namespace linux {
 
-typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<CameraBufferRef>>
-    CameraBufferQueue;
-
 struct VideoHandlerParams {
-    std::optional<CameraParams> camera_params = std::nullopt;
-    std::optional<EncoderParams> encoder_params = std::nullopt;
-    std::shared_ptr
-        <moodycamel::BlockingReaderWriterCircularBuffer
-            <std::shared_ptr
-                <linux::VideoFrame> > >
-        outgoing_video_packet_queue = nullptr;
+    std::optional<CameraParams>         camera_params = std::nullopt;
+    std::optional<EncoderParams>        encoder_params = std::nullopt;
+    std::shared_ptr<VideoPacketQueue>   outgoing_video_packet_queue = nullptr;
 };
 
 class VideoHandler {

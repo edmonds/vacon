@@ -24,7 +24,6 @@
 
 #include <SDL3/SDL.h>
 #include <plog/Log.h>
-#include <readerwritercircularbuffer.h>
 
 #include "event.hpp"
 #include "linux/camera.hpp"
@@ -37,7 +36,6 @@ namespace vacon {
 namespace linux {
 
 std::unique_ptr<VideoHandler> VideoHandler::Create(const VideoHandlerParams& params)
-
 {
     auto vh = std::make_unique<VideoHandler>(VideoHandler {});
     vh->params_ = params;
