@@ -25,6 +25,7 @@ void PushEvent(Event event_code)
     auto event = SDL_Event {
         .user = {
             .type = SDL_EVENT_USER,
+            .reserved = 0,
             .timestamp = 0,
             .windowID = 0,
             .code = static_cast<Sint32>(event_code),
