@@ -48,8 +48,6 @@ class Encoder {
         Encoder() = default;
         bool InitMfxVideoParams();
         bool SetMfxFourCc();
-        bool InitLibraryEncode();
-        bool InitLibraryVpp();
         bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);
 
         EncoderParams       params_;

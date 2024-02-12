@@ -13,15 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-// Parts derived from Intel® Video Processing Library (Intel® VPL) 2.X
-// "hello-encode" example:
-//
-// https://github.com/intel/libvpl/tree/master/examples/api2x/hello-encode
-//
-// Copyright (C) Intel Corporation
-//
-// SPDX-License-Identifier: MIT
-
 #include "linux/encoder.hpp"
 
 #include <algorithm>
@@ -39,6 +30,7 @@
 #include <plog/Log.h>
 
 #include "linux/camera.hpp"
+#include "linux/mfx.hpp"
 #include "linux/video_frame.hpp"
 #include "util.hpp"
 
@@ -112,13 +104,27 @@ bool Encoder::Init()
         return false;
     }
 
-    if (!InitLibraryVpp()) {
-        LOG_ERROR << "InitLibraryVpp() failed";
+    if (!SetMfxLoaderConfigFilters(mfx_loader_,
+        {
+            { "mfxImplDescription.ApiVersion.Version", ((2 << 16) | 2) },
+            { "mfxImplDescription.Impl", MFX_IMPL_TYPE_HARDWARE },
+            { "mfxImplDescription.mfxEncoderDescription.encoder.CodecID", mfx_videoparam_encode_.mfx.CodecId },
+            { "mfxImplDescription.mfxVPPDescription.filter.FilterFourCC", MFX_EXTBUFF_VPP_SCALING },
+        }))
+    {
+        LOG_ERROR << "SetMfxLoaderConfigFilters() failed";
         return false;
     }
 
-    if (!InitLibraryEncode()) {
-        LOG_ERROR << "InitLibraryEncode() failed";
+    status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
+    if (status != MFX_ERR_NONE) {
+        LOG_ERROR << "MFXVideoVPP_Init() failed: " << status;
+        return false;
+    }
+
+    status = MFXVideoENCODE_Init(mfx_session_, &mfx_videoparam_encode_);
+    if (status != MFX_ERR_NONE) {
+        LOG_ERROR << "MFXVideoENCODE_Init() failed: " << status;
         return false;
     }
 
@@ -339,136 +345,6 @@ bool Encoder::SetMfxFourCc()
     return true;
 }
 
-bool Encoder::InitLibraryEncode()
-{
-    mfxConfig cfg[3];
-    mfxVariant cfgVal[3];
-
-    // MFXCreateConfig(): Creates the dispatcher internal configuration, which
-    // is used to filter out available implementations. This configuration is
-    // used to walk through selected implementations to gather more details and
-    // select the appropriate implementation to load. The loader object
-    // remembers all created mfxConfig objects and destroys them during the
-    // mfxUnload function call.
-    //
-    // MFXSetConfigFilterProperty(): Adds additional filter properties (any
-    // fields of the mfxImplDescription structure) to the configuration of the
-    // loader object. One mfxConfig properties can hold only single filter
-    // property.
-
-    // Require a hardware video encoder.
-    cfg[0] = MFXCreateConfig(mfx_loader_);
-    if(!cfg[0]) {
-        LOG_ERROR << "MFXCreateConfig() failed";
-        return false;
-    }
-    cfgVal[0].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal[0].Data.U32 = MFX_IMPL_TYPE_HARDWARE;
-    auto status = MFXSetConfigFilterProperty(cfg[0], (mfxU8 *)"mfxImplDescription.Impl", cfgVal[0]);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.Impl = MFX_IMPL_TYPE_HARDWARE) failed: " << status;
-        return false;
-    }
-
-    // Require a particular codec.
-    cfg[1] = MFXCreateConfig(mfx_loader_);
-    if (!cfg[1]) {
-        LOG_ERROR << "MFXCreateConfig() failed";
-        return false;
-    }
-    cfgVal[1].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal[1].Data.U32 = MFX_CODEC_HEVC;
-    status = MFXSetConfigFilterProperty(cfg[1], (mfxU8 *)"mfxImplDescription.mfxEncoderDescription.encoder.CodecID", cfgVal[1]);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.mfxEncoderDescription.encoder.CodecID = MFX_CODEC_HEVC) failed: " << status;
-        return false;
-    }
-
-    // Require API version >= 2.2.
-    cfg[2] = MFXCreateConfig(mfx_loader_);
-    if (!cfg[2]) {
-        LOG_ERROR << "MFXCreateConfig() failed";
-        return false;
-    }
-    cfgVal[2].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal[2].Data.U32 = ((2 << 16) | 2);
-    status = MFXSetConfigFilterProperty(cfg[2], (mfxU8 *)"mfxImplDescription.ApiVersion.Version", cfgVal[2]);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.ApiVersion.Version >= 2.2) failed: " << status;
-        return false;
-    }
-
-    // MFXVideoENCODE_Init(): Allocates memory and prepares tables and
-    // necessary structures for encoding. This function also does extensive
-    // validation to ensure if the configuration, as specified in the input
-    // parameters, is supported.
-    status = MFXVideoENCODE_Init(mfx_session_, &mfx_videoparam_encode_);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXVideoENCODE_Init() failed: " << status;
-        return false;
-    }
-
-    // Success.
-    return true;
-}
-
-bool Encoder::InitLibraryVpp()
-{
-    mfxConfig cfg[3];
-    mfxVariant cfgVal[3];
-
-    // Require a hardware video encoder.
-    cfg[0] = MFXCreateConfig(mfx_loader_);
-    if(!cfg[0]) {
-        LOG_ERROR << "MFXCreateConfig() failed";
-        return false;
-    }
-    cfgVal[0].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal[0].Data.U32 = MFX_IMPL_TYPE_HARDWARE;
-    auto status = MFXSetConfigFilterProperty(cfg[0], (mfxU8 *)"mfxImplDescription.Impl", cfgVal[0]);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.Impl = MFX_IMPL_TYPE_HARDWARE) failed: " << status;
-        return false;
-    }
-
-    // Require that VPP scaling is supported.
-    cfg[1] = MFXCreateConfig(mfx_loader_);
-    if (!cfg[1]) {
-        LOG_ERROR << "MFXCreateConfig() failed";
-        return false;
-    }
-    cfgVal[1].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal[1].Data.U32 = MFX_EXTBUFF_VPP_SCALING;
-    status = MFXSetConfigFilterProperty(cfg[1], (mfxU8 *)"mfxImplDescription.mfxVPPDescription.filter.FilterFourCC", cfgVal[1]);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.mfxVPPDescription.filter.FilterFourCC = MFX_EXTBUFF_VPP_SCALING) failed: " << status;
-        return false;
-    }
-
-    // Require API version >= 2.2.
-    cfg[2] = MFXCreateConfig(mfx_loader_);
-    if (!cfg[2]) {
-        LOG_ERROR << "MFXCreateConfig() failed";
-        return false;
-    }
-    cfgVal[2].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal[2].Data.U32 = ((2 << 16) | 2);
-    status = MFXSetConfigFilterProperty(cfg[2], (mfxU8 *)"mfxImplDescription.ApiVersion.Version", cfgVal[2]);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXSetConfigFilterProperty(mfxImplDescription.ApiVersion.Version >= 2.2) failed: " << status;
-        return false;
-    }
-
-    status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXVideoVPP_Init() failed: " << status;
-        return false;
-    }
-
-    // Success.
-    return true;
-}
-
 std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& cref)
 {
     auto t_start = std::chrono::steady_clock::now();
@@ -546,7 +422,6 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
         status = MFXVideoCORE_SyncOperation(mfx_session_, syncp, 10 /* wait ms */);
         if (status == MFX_WRN_IN_EXECUTION) {
             stalled = true;
-
         }
     } while (status == MFX_WRN_IN_EXECUTION);
     if (status != MFX_ERR_NONE) {
