@@ -190,6 +190,8 @@ void App::RenderFrame()
     SDL_SetRenderDrawColor(sdl_renderer_, 58, 110, 165, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(sdl_renderer_);
 
+    ShowDecodedVideoFrame();
+
     if (vh_) {
         ShowPreview();
     }
@@ -223,6 +225,40 @@ void App::RenderFrame()
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData());
 
     SDL_RenderPresent(sdl_renderer_);
+}
+
+void App::ShowDecodedVideoFrame()
+{
+    // Get the next decoded video frame from the decoder.
+    if (decoded_video_frame_queue_->try_dequeue(decoded_frame_)) {
+        LOG_VERBOSE << std::format("Got next decoded video frame: VASurfaceID = {}, DRM PRIME fd = {}",
+                                   decoded_frame_->exported_surface_->vaSurfaceID,
+                                   decoded_frame_->prime_.objects[0].fd);
+    } else {
+        // No new video frame available from the decoder.
+        if (!decoded_frame_) {
+            // No previous frame, either.
+            return;
+        }
+    }
+
+    // Export the decoded video frame to an OpenGL texture.
+    if (!decoded_frame_->texture_) {
+        if (!decoded_frame_->ExportToOpenGL(sdl_renderer_)) {
+            LOG_ERROR << "DecodedFrame::ExportToOpenGL() failed";
+            decoded_frame_ = nullptr;
+            return;
+        }
+    }
+
+    // Render the OpenGL texture.
+    if (SDL_RenderTexture(sdl_renderer_,
+                          decoded_frame_->texture_,
+                          nullptr /* srcrect */,
+                          nullptr /* dstrect */))
+    {
+        LOG_ERROR << "SDL_RenderTexture() failed: " << SDL_GetError();
+    }
 }
 
 void App::ShowPreview()

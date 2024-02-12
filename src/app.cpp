@@ -22,6 +22,7 @@
 #include <plog/Log.h>
 
 #include "event.hpp"
+#include "linux/decoder.hpp"
 #include "linux/video_handler.hpp"
 #include "network_handler.hpp"
 #include "util.hpp"
@@ -105,6 +106,10 @@ void App::AppQuit()
         }
     }
     incoming_video_packet_queue_ = nullptr;
+
+    // Stop the decoder.
+    decoded_frame_ = nullptr;
+    decoder_ = nullptr;
 }
 
 int App::AppEvent(const SDL_Event *event)
@@ -222,19 +227,30 @@ void App::StartVideoHandler()
         }
     };
 
+    // Start the VideoHandler.
     auto params = linux::VideoHandlerParams {
         .camera_params = camera_params,
         .encoder_params = encoder_params,
         .outgoing_video_packet_queue = outgoing_video_packet_queue_,
     };
-
     vh_ = linux::VideoHandler::Create(params);
     if (!vh_) {
         LOG_FATAL << "VideoHandler::Create() failed!";
         return;
     }
-
     vh_->Init();
+
+    // Start the linux::Decoder.
+    auto dec_params = linux::DecoderParams {
+        .incoming_video_packet_queue    = incoming_video_packet_queue_,
+        .decoded_video_frame_queue      = decoded_video_frame_queue_,
+    };
+    decoder_ = linux::Decoder::Create(dec_params);
+    if (!decoder_) {
+        LOG_FATAL << "linux::Decoder::Create() failed!";
+        return;
+    }
+    decoder_->Init();
 }
 
 void App::StopVideoHandler()

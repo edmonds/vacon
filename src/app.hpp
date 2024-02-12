@@ -22,6 +22,7 @@
 #include <argparse/argparse.hpp>
 
 #include "linux/camera.hpp"
+#include "linux/decoder.hpp"
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
 #include "linux/video_handler.hpp"
@@ -45,8 +46,11 @@ class App {
         SDL_Renderer*                           sdl_renderer_ = nullptr;
         SDL_Window*                             sdl_window_ = nullptr;
 
+        std::unique_ptr<linux::Decoder>         decoder_ = nullptr;
         std::unique_ptr<NetworkHandler>         nh_ = nullptr;
         std::unique_ptr<linux::VideoHandler>    vh_ = nullptr;
+
+        std::shared_ptr<linux::DecodedFrame>    decoded_frame_ = nullptr;
         std::shared_ptr<linux::CameraBufferRef> preview_cref_ = nullptr;
 
         std::shared_ptr<PacketRefQueue>         incoming_video_packet_queue_ =
@@ -54,6 +58,9 @@ class App {
 
         std::shared_ptr<linux::VideoPacketQueue>    outgoing_video_packet_queue_ =
             std::make_shared<linux::VideoPacketQueue>(2);
+
+        std::shared_ptr<linux::DecodedFrameQueue>   decoded_video_frame_queue_ =
+            std::make_shared<linux::DecodedFrameQueue>(4);
 
     private:
         // app.cpp
@@ -78,6 +85,7 @@ class App {
         void ShowMenu();
         void ShowStatsOverlay(bool*);
         void RenderFrame();
+        void ShowDecodedVideoFrame();
         void ShowPreview();
         void ShowPreviewWindow();
         void ProcessUiEvent(const SDL_Event*);
