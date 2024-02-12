@@ -114,6 +114,7 @@ vacon_sources = [
   'src/linux/mfx.cpp',
   'src/linux/video_handler.cpp',
   'src/network_handler.cpp',
+  'src/packet_ref.cpp',
   'src/rtp_depacketizer.cpp',
   'src/sdl.cpp',
   'src/sdlmain.cpp',
