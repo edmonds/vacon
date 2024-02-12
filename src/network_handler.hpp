@@ -47,8 +47,6 @@ class NetworkHandler {
         void Init();
         void StartAsync();
 
-        AVFormatContext* GetRtpAvfcInput();
-
     private:
         NetworkHandler() = default;
         void ConnectWebRTC();

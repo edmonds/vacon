@@ -337,13 +337,4 @@ void NetworkHandler::SendVideoFrame(const std::byte *data, size_t size, uint64_t
     }
 }
 
-AVFormatContext* NetworkHandler::GetRtpAvfcInput()
-{
-    if (rtp_depacketizer_) {
-        return rtp_depacketizer_->fctx;
-    } else {
-        return nullptr;
-    }
-}
-
 } // namespace vacon
