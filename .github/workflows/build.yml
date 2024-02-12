@@ -86,8 +86,6 @@ jobs:
           libssl-dev \
           libunwind-dev \
           libva-dev \
-          libvpl-dev \
-          libvpl2 \
           libwayland-dev \
           libx11-dev \
           libx11-xcb-dev \
