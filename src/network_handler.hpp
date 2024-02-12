@@ -52,7 +52,7 @@ class NetworkHandler {
         void ConnectWebRTC();
         void CloseWebSocket();
         bool IsConnectedToPeer();
-        void RunDrain(std::stop_token);
+        void RunOutgoingDrain(std::stop_token);
         void ReceivePacket(rtc::binary);
         void OnWsMessage(nlohmann::json message);
         void CreatePeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);

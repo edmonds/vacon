@@ -87,7 +87,7 @@ NetworkHandler::~NetworkHandler()
 
 void NetworkHandler::Init()
 {
-    threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunDrain(st); } });
+    threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunOutgoingDrain(st); } });
 }
 
 void NetworkHandler::StartAsync()
@@ -119,7 +119,7 @@ void NetworkHandler::StartAsync()
     }).detach();
 }
 
-void NetworkHandler::RunDrain(std::stop_token st)
+void NetworkHandler::RunOutgoingDrain(std::stop_token st)
 {
     LOG_DEBUG << "Starting outgoing video packet queue drain thread ID " << std::this_thread::get_id();
     util::SetThreadName("VOutVideo");
