@@ -91,8 +91,8 @@ std::optional<std::string> GetTrueTypeFileNameByPattern(std::string_view name)
         std::string filename(reinterpret_cast<char*>(fc_filename));
         std::string fontformat(reinterpret_cast<char*>(fc_fontformat));
 
-        LOG_DEBUG << std::format("Found {} fonts matching '{}', using '{}'",
-                                 fontset->nfont, name, filename);
+        LOG_VERBOSE << std::format("Found {} fonts matching '{}', using '{}'",
+                                   fontset->nfont, name, filename);
         result = filename;
         break;
     }
