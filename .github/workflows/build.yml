@@ -46,7 +46,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: libsdl-org/SDL
-        ref: "202886f87392fc3e964aae5a3ec99eed1d99acf7"
+        ref: "7f33464beddb48407ad7478bb77e42c9d9b490db"
         path: sdl
 
     - name: Checkout VPL
