@@ -116,11 +116,17 @@ bool Encoder::Init()
         return false;
     }
 
+    status = MFXVideoVPP_Query(mfx_session_, &mfx_videoparam_vpp_, &mfx_videoparam_vpp_);
+    LOG_DEBUG << "MFXVideoVPP_Query() returned: " << MfxStatusStr(status);
+
     status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
     if (status != MFX_ERR_NONE) {
         LOG_ERROR << "MFXVideoVPP_Init() failed: " << status;
         return false;
     }
+
+    status = MFXVideoENCODE_Query(mfx_session_, &mfx_videoparam_encode_, &mfx_videoparam_encode_);
+    LOG_DEBUG << "MFXVideoENCODE_Query() returned: " << MfxStatusStr(status);
 
     status = MFXVideoENCODE_Init(mfx_session_, &mfx_videoparam_encode_);
     if (status != MFX_ERR_NONE) {
