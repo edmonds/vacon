@@ -84,6 +84,58 @@ std::unique_ptr<Camera> Camera::Create(const CameraParams& params)
     return std::make_unique<Camera>(Camera(params));
 }
 
+Camera::~Camera()
+{
+    RequestStop();
+    Join();
+
+    for (auto& buf : bufs_) {
+        // Destroy the OpenGL texture.
+        if (buf.texture) {
+            LOG_VERBOSE << std::format("Destroying SDL_Texture @ {}",
+                                       reinterpret_cast<void*>(buf.texture));
+            SDL_ClearError();
+            SDL_DestroyTexture(buf.texture);
+            if (auto err = std::string(SDL_GetError()); err != "") {
+                LOG_ERROR << std::format("SDL_DestroyTexture() failed: {}", err);
+            }
+            buf.texture = nullptr;
+        }
+
+        // Unmap the V4L2 frame buffer.
+        if (buf.mmap.data()) {
+            const void *ptr = buf.mmap.data();
+            size_t len = buf.mmap.size_bytes();
+            LOG_VERBOSE << std::format("Unmapping V4L2 buffer data @ {}, length {}", ptr, len);
+            if (munmap(const_cast<void*>(ptr), len) == -1) {
+                LOG_ERROR << std::format("munmap() data @ {}, length {} failed: {} ({})",
+                                         ptr, len, errno, strerror(errno));
+            }
+            buf.mmap = {};
+        }
+
+        // Close the V4L2 dmabuf fd.
+        if (buf.expbuf.fd != -1) {
+            LOG_VERBOSE << std::format("Closing V4L2 dmabuf fd {}", buf.expbuf.fd);
+            if (close(buf.expbuf.fd) != 0) {
+                LOG_ERROR << std::format("close() failed on V4L2 dmabuf fd {}: {} ({})",
+                                         buf.expbuf.fd, errno, strerror(errno));
+            }
+            buf.expbuf.fd = -1;
+        }
+    }
+
+    // Close the V4L2 device.
+    if (fd_ != -1) {
+        LOG_VERBOSE << std::format("Closing V4L2 device {} (fd {})", params_.device, fd_);
+        if (close(fd_) != 0) {
+            LOG_ERROR << std::format("close() failed on V4L2 device {} (fd {}): {} ({})",
+                                     params_.device, fd_, errno, strerror(errno));
+        }
+        fd_ = -1;
+    }
+}
+
 bool Camera::Init()
 {
     thread_ = std::jthread([&](std::stop_token st) { RunCamera(st); });
@@ -187,58 +239,6 @@ bool Camera::InitCamera()
                             params_.device, format_.Str(), millis);
 
     return true;
-}
-
-Camera::~Camera()
-{
-    RequestStop();
-    Join();
-
-    for (auto& buf : bufs_) {
-        // Destroy the OpenGL texture.
-        if (buf.texture) {
-            LOG_VERBOSE << std::format("Destroying SDL_Texture @ {}",
-                                       reinterpret_cast<void*>(buf.texture));
-            SDL_ClearError();
-            SDL_DestroyTexture(buf.texture);
-            if (auto err = std::string(SDL_GetError()); err != "") {
-                LOG_ERROR << std::format("SDL_DestroyTexture() failed: {}", err);
-            }
-            buf.texture = nullptr;
-        }
-
-        // Unmap the V4L2 frame buffer.
-        if (buf.mmap.data()) {
-            const void *ptr = buf.mmap.data();
-            size_t len = buf.mmap.size_bytes();
-            LOG_VERBOSE << std::format("Unmapping V4L2 buffer data @ {}, length {}", ptr, len);
-            if (munmap(const_cast<void*>(ptr), len) == -1) {
-                LOG_ERROR << std::format("munmap() data @ {}, length {} failed: {} ({})",
-                                         ptr, len, errno, strerror(errno));
-            }
-            buf.mmap = {};
-        }
-
-        // Close the V4L2 dmabuf fd.
-        if (buf.expbuf.fd != -1) {
-            LOG_VERBOSE << std::format("Closing V4L2 dmabuf fd {}", buf.expbuf.fd);
-            if (close(buf.expbuf.fd) != 0) {
-                LOG_ERROR << std::format("close() failed on V4L2 dmabuf fd {}: {} ({})",
-                                         buf.expbuf.fd, errno, strerror(errno));
-            }
-            buf.expbuf.fd = -1;
-        }
-    }
-
-    // Close the V4L2 device.
-    if (fd_ != -1) {
-        LOG_VERBOSE << std::format("Closing V4L2 device {} (fd {})", params_.device, fd_);
-        if (close(fd_) != 0) {
-            LOG_ERROR << std::format("close() failed on V4L2 device {} (fd {}): {} ({})",
-                                     params_.device, fd_, errno, strerror(errno));
-        }
-        fd_ = -1;
-    }
 }
 
 CameraFormat Camera::GetCameraFormat()
