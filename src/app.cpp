@@ -24,6 +24,7 @@
 #include "event.hpp"
 #include "linux/camera.hpp"
 #include "linux/decoder.hpp"
+#include "linux/encoder.hpp"
 #include "network_handler.hpp"
 #include "util.hpp"
 
@@ -166,16 +167,45 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
     switch (event) {
 
     case Event::CameraStarting:
+        LOG_DEBUG << "[CameraStarting]";
         break;
 
     case Event::CameraStarted:
-        if (camera_ && sdl_renderer_) {
-            LOG_DEBUG << "Calling Camera::ExportBuffersToOpenGL() on render thread";
-            camera_->ExportBuffersToOpenGL(sdl_renderer_);
+        if (camera_) {
+            if (sdl_renderer_) {
+                LOG_DEBUG << "[CameraStarted] Calling Camera::ExportBuffersToOpenGL() on render thread";
+                camera_->ExportBuffersToOpenGL(sdl_renderer_);
+            }
+
+            LOG_DEBUG << "[CameraStarted] Creating encoder";
+            encoder_ = linux::Encoder::Create(linux::EncoderParams {
+                .camera_format                  = camera_->GetCameraFormat(),
+                .bitrate_kbps                   = args_.get<unsigned>("--video-encoder-bitrate"),
+                .encoder_queue                  = encoder_queue_,
+                .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
+            });
+            if (!encoder_) {
+                LOG_FATAL << "[CameraStarted] linux::Encoder::Create() failed!";
+                break;
+            }
+            encoder_->Init();
         }
         break;
 
     case Event::CameraFailed:
+        LOG_FATAL << "[CameraFailed]";
+        break;
+
+    case Event::EncoderStarting:
+        LOG_DEBUG << "[EncoderStarting]";
+        break;
+
+    case Event::EncoderStarted:
+        LOG_DEBUG << "[EncoderStarted]";
+        break;
+
+    case Event::EncoderFailed:
+        LOG_FATAL << "[EncoderFailed]";
         break;
 
     case Event::NetworkStarting:
@@ -217,32 +247,6 @@ void App::StartVideoHandler()
     }
     camera_->Init();
 
-#if 0
-    // Get video encoder parameters.
-    std::optional<linux::EncoderParams> encoder_params = {
-        linux::EncoderParams {
-            .pixel_format   = args_.get<std::string>("--camera-pixel-format"),
-            .width          = args_.get<unsigned>("--camera-width"),
-            .height         = args_.get<unsigned>("--camera-height"),
-            .frame_rate     = args_.get<unsigned>("--camera-frame-rate"),
-            .bitrate_kbps   = args_.get<unsigned>("--video-encoder-bitrate"),
-        }
-    };
-
-    // Start the VideoHandler.
-    auto params = linux::VideoHandlerParams {
-        .camera_params = camera_params,
-        .encoder_params = encoder_params,
-        .outgoing_video_packet_queue = outgoing_video_packet_queue_,
-    };
-    vh_ = linux::VideoHandler::Create(params);
-    if (!vh_) {
-        LOG_FATAL << "VideoHandler::Create() failed!";
-        return;
-    }
-    vh_->Init();
-#endif
-
     // Start the linux::Decoder.
     auto dec_params = linux::DecoderParams {
         .incoming_video_packet_queue    = incoming_video_packet_queue_,
@@ -258,20 +262,10 @@ void App::StartVideoHandler()
 
 void App::StopVideoHandler()
 {
-    if (camera_) {
-        preview_cref_ = nullptr;
-        camera_ = nullptr;
-    }
-#if 0
-    if (vh_) {
-        // All outstanding CameraBufferRef's need to be destroyed before the
-        // VideoHandler (and its Camera) can be destroyed, because destroying a
-        // CameraBufferRef causes a VIDIOC_QBUF ioctl to the Camera's V4L2 fd.
-        preview_cref_ = nullptr;
+    encoder_ = nullptr;
 
-        vh_ = nullptr;
-    }
-#endif
+    preview_cref_ = nullptr;
+    camera_ = nullptr;
 }
 
 void App::StartNetworkHandler()

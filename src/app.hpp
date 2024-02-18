@@ -23,6 +23,7 @@
 
 #include "linux/camera.hpp"
 #include "linux/decoder.hpp"
+#include "linux/encoder.hpp"
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
 #include "packet_ref.hpp"
@@ -53,9 +54,6 @@ class App {
 
         std::shared_ptr<PacketRefQueue>         incoming_video_packet_queue_ =
             std::make_shared<PacketRefQueue>(2);
-
-        std::shared_ptr<linux::VideoPacketQueue>    outgoing_video_packet_queue_ =
-            std::make_shared<linux::VideoPacketQueue>(2);
 
         std::shared_ptr<linux::DecodedFrameQueue>   decoded_video_frame_queue_ =
             std::make_shared<linux::DecodedFrameQueue>(4);
@@ -107,11 +105,17 @@ class App {
         std::unique_ptr<linux::Camera>
             camera_                                     = nullptr;
 
+        std::unique_ptr<linux::Encoder>
+            encoder_                                    = nullptr;
+
         std::shared_ptr<linux::CameraBufferQueue>
             encoder_queue_                              = std::make_shared<linux::CameraBufferQueue>(2);
 
         std::shared_ptr<linux::CameraBufferQueue>
             preview_queue_                              = std::make_shared<linux::CameraBufferQueue>(2);
+
+        std::shared_ptr<linux::VideoPacketQueue>
+            outgoing_video_packet_queue_                = std::make_shared<linux::VideoPacketQueue>(2);
 
         struct {
             unsigned    n_preview                       = 0;
