@@ -53,12 +53,8 @@ std::unique_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 
 Encoder::~Encoder()
 {
-    if (thread_.joinable()) {
-        LOG_DEBUG << "Trying to join video encoder thread ID " << thread_.get_id();
-        thread_.request_stop();
-        thread_.join();
-        thread_ = {};
-    }
+    RequestStop();
+    Join();
 
     if (mfx_session_) {
         LOG_VERBOSE << std::format("Closing MFX session @ {}", (void*)mfx_session_);
@@ -81,6 +77,23 @@ bool Encoder::Init()
 {
     thread_ = std::jthread([&](std::stop_token st) { RunEncoder(st); });
     return true;
+}
+
+void Encoder::RequestStop()
+{
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Requesting stop of encoder thread ID " << thread_.get_id();
+        thread_.request_stop();
+    }
+}
+
+void Encoder::Join()
+{
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Joining encoder thread ID " << thread_.get_id();
+        thread_.join();
+        thread_ = {};
+    }
 }
 
 void Encoder::RunEncoder(std::stop_token st)

@@ -58,6 +58,8 @@ class Decoder {
         Decoder(Decoder&&) = default;
         ~Decoder();
         bool Init();
+        void RequestStop();
+        void Join();
 
     private:
         Decoder() = default;

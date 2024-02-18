@@ -111,6 +111,8 @@ class Camera {
         Camera(Camera&&) = default;
         ~Camera();
         bool Init();
+        void RequestStop();
+        void Join();
         bool ExportBuffersToOpenGL(SDL_Renderer*);
         CameraFormat GetCameraFormat();
 

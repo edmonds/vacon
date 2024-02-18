@@ -50,19 +50,8 @@ std::unique_ptr<Decoder> Decoder::Create(const DecoderParams& params)
 
 Decoder::~Decoder()
 {
-    if (thread_.joinable()) {
-        LOG_INFO << "Waiting for decoder thread to exit...";
-        thread_.request_stop();
-
-        LOG_DEBUG << "Trying to join thread ID " << thread_.get_id();
-        thread_.join();
-
-        thread_ = {};
-    }
-
-    if (params_.decoded_video_frame_queue) {
-        while (params_.decoded_video_frame_queue->try_pop()) {}
-    }
+    RequestStop();
+    Join();
 
     if (mfx_session_) {
         LOG_VERBOSE << std::format("Closing MFX session @ {}", (void*)mfx_session_);
@@ -138,6 +127,23 @@ bool Decoder::Init()
     LOG_INFO << std::format("Initialized video decoder in {} ms", millis);
 
     return true;
+}
+
+void Decoder::RequestStop()
+{
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Requesting stop of decoder thread ID " << thread_.get_id();
+        thread_.request_stop();
+    }
+}
+
+void Decoder::Join()
+{
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Joining decoder thread ID " << thread_.get_id();
+        thread_.join();
+        thread_ = {};
+    }
 }
 
 bool Decoder::InitVaapi()

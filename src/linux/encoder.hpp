@@ -47,6 +47,8 @@ class Encoder {
         Encoder(Encoder&&) = default;
         ~Encoder();
         bool Init();
+        void RequestStop();
+        void Join();
 
     private:
         Encoder() = default;

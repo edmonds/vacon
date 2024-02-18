@@ -90,6 +90,23 @@ bool Camera::Init()
     return true;
 }
 
+void Camera::RequestStop()
+{
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Requesting stop of camera capture thread ID " << thread_.get_id();
+        thread_.request_stop();
+    }
+}
+
+void Camera::Join()
+{
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Joining camera capture thread ID " << thread_.get_id();
+        thread_.join();
+        thread_ = {};
+    }
+}
+
 void Camera::RunCamera(std::stop_token st)
 {
     LOG_DEBUG << "Starting camera capture thread ID " << std::this_thread::get_id();
@@ -174,12 +191,8 @@ bool Camera::InitCamera()
 
 Camera::~Camera()
 {
-    if (thread_.joinable()) {
-        LOG_DEBUG << "Trying to join camera capture thread ID " << thread_.get_id();
-        thread_.request_stop();
-        thread_.join();
-        thread_ = {};
-    }
+    RequestStop();
+    Join();
 
     for (auto& buf : bufs_) {
         // Destroy the OpenGL texture.
