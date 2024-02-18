@@ -25,7 +25,6 @@
 #include "linux/decoder.hpp"
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
-#include "linux/video_handler.hpp"
 #include "packet_ref.hpp"
 #include "network_handler.hpp"
 
@@ -48,7 +47,6 @@ class App {
 
         std::unique_ptr<linux::Decoder>         decoder_ = nullptr;
         std::unique_ptr<NetworkHandler>         nh_ = nullptr;
-        std::unique_ptr<linux::VideoHandler>    vh_ = nullptr;
 
         std::shared_ptr<linux::DecodedFrame>    decoded_frame_ = nullptr;
         std::shared_ptr<linux::CameraBufferRef> preview_cref_ = nullptr;
@@ -105,6 +103,15 @@ class App {
         int             self_view_height_               = 288;
 
         SDL_Texture*    sdl_texture_placeholder_        = nullptr;
+
+        std::shared_ptr<linux::Camera>
+            camera_                                     = nullptr;
+
+        std::shared_ptr<linux::CameraBufferQueue>
+            encoder_queue_                              = std::make_shared<linux::CameraBufferQueue>(2);
+
+        std::shared_ptr<linux::CameraBufferQueue>
+            preview_queue_                              = std::make_shared<linux::CameraBufferQueue>(2);
 
         struct {
             unsigned    n_preview                       = 0;

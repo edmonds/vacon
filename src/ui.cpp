@@ -192,7 +192,7 @@ void App::RenderFrame()
 
     ShowDecodedVideoFrame();
 
-    if (vh_) {
+    if (camera_) {
         ShowPreview();
     }
 
@@ -264,7 +264,8 @@ void App::ShowDecodedVideoFrame()
 void App::ShowPreview()
 {
     // Get the next preview frame from the camera.
-    if (auto cref = vh_->NextPreviewFrame()) {
+    std::shared_ptr<linux::CameraBufferRef> cref = nullptr;
+    if (preview_queue_->try_dequeue(cref)) {
         LOG_VERBOSE << "NextPreviewFrame() returned buffer index " << cref->buf_.vbuf.index;
 
         // Save the frame in case it's needed for the next rendering

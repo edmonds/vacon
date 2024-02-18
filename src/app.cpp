@@ -23,7 +23,6 @@
 
 #include "event.hpp"
 #include "linux/decoder.hpp"
-#include "linux/video_handler.hpp"
 #include "network_handler.hpp"
 #include "util.hpp"
 
@@ -169,9 +168,9 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         break;
 
     case Event::CameraStarted:
-        if (vh_ && sdl_renderer_) {
+        if (camera_ && sdl_renderer_) {
             LOG_DEBUG << "Calling Camera::ExportBuffersToOpenGL() on render thread";
-            vh_->camera_->ExportBuffersToOpenGL(sdl_renderer_);
+            camera_->ExportBuffersToOpenGL(sdl_renderer_);
         }
         break;
 
@@ -201,21 +200,23 @@ int App::AppIterate()
 
 void App::StartVideoHandler()
 {
-    if (vh_) {
+    if (camera_) {
         return;
     }
 
-    // Get camera parameters.
-    std::optional<linux::CameraParams> camera_params = {
-        linux::CameraParams {
-            .device         = args_.get<std::string>("--camera-device"),
-            .pixel_format   = args_.get<std::string>("--camera-pixel-format"),
-            .width          = args_.get<unsigned>("--camera-width"),
-            .height         = args_.get<unsigned>("--camera-height"),
-            .frame_rate     = args_.get<unsigned>("--camera-frame-rate"),
-        }
-    };
+    // Start the linux::Camera.
+    camera_ = linux::Camera::Create(linux::CameraParams {
+        .device         = args_.get<std::string>("--camera-device"),
+        .encoder_queue  = encoder_queue_,
+        .preview_queue  = preview_queue_,
+    });
+    if (!camera_) {
+        LOG_FATAL << "linux::Camera::Create() failed!";
+        return;
+    }
+    camera_->Init();
 
+#if 0
     // Get video encoder parameters.
     std::optional<linux::EncoderParams> encoder_params = {
         linux::EncoderParams {
@@ -239,6 +240,7 @@ void App::StartVideoHandler()
         return;
     }
     vh_->Init();
+#endif
 
     // Start the linux::Decoder.
     auto dec_params = linux::DecoderParams {
@@ -255,6 +257,11 @@ void App::StartVideoHandler()
 
 void App::StopVideoHandler()
 {
+    if (camera_) {
+        preview_cref_ = nullptr;
+        camera_ = nullptr;
+    }
+#if 0
     if (vh_) {
         // All outstanding CameraBufferRef's need to be destroyed before the
         // VideoHandler (and its Camera) can be destroyed, because destroying a
@@ -263,6 +270,7 @@ void App::StopVideoHandler()
 
         vh_ = nullptr;
     }
+#endif
 }
 
 void App::StartNetworkHandler()
