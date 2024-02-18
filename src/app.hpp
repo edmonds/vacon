@@ -38,26 +38,6 @@ class App {
         int AppEvent(const SDL_Event* event);
         void AppQuit();
 
-        argparse::ArgumentParser                args_ =
-            argparse::ArgumentParser(PROJECT_NAME, PROJECT_VERSION, argparse::default_arguments::none);
-
-        int                                     verbosity_ = 0;
-
-        SDL_Renderer*                           sdl_renderer_ = nullptr;
-        SDL_Window*                             sdl_window_ = nullptr;
-
-        std::unique_ptr<linux::Decoder>         decoder_ = nullptr;
-        std::unique_ptr<NetworkHandler>         nh_ = nullptr;
-
-        std::shared_ptr<linux::DecodedFrame>    decoded_frame_ = nullptr;
-        std::shared_ptr<linux::CameraBufferRef> preview_cref_ = nullptr;
-
-        std::shared_ptr<PacketRefQueue>         incoming_video_packet_queue_ =
-            std::make_shared<PacketRefQueue>(2);
-
-        std::shared_ptr<linux::DecodedFrameQueue>   decoded_video_frame_queue_ =
-            std::make_shared<linux::DecodedFrameQueue>(4);
-
     private:
         // app.cpp
         int ShutdownEvent();
@@ -86,6 +66,14 @@ class App {
         void ShowPreviewWindow();
         void ProcessUiEvent(const SDL_Event*);
 
+        argparse::ArgumentParser
+            args_ =
+                argparse::ArgumentParser(PROJECT_NAME,
+                                         PROJECT_VERSION,
+                                         argparse::default_arguments::none);
+
+        int             verbosity_                      = 0;
+
         float           font_size_sans_                 = 12.0f;
         float           font_size_mono_                 = 12.0f;
         bool            enable_my_camera_               = true;
@@ -100,19 +88,39 @@ class App {
         int             self_view_width_                = 512;
         int             self_view_height_               = 288;
 
+        SDL_Renderer*   sdl_renderer_                   = nullptr;
         SDL_Texture*    sdl_texture_placeholder_        = nullptr;
+        SDL_Window*     sdl_window_                     = nullptr;
 
         std::unique_ptr<linux::Camera>
             camera_                                     = nullptr;
 
+        std::unique_ptr<linux::Decoder>
+            decoder_                                    = nullptr;
+
         std::unique_ptr<linux::Encoder>
             encoder_                                    = nullptr;
+
+        std::unique_ptr<NetworkHandler>
+            nh_                                         = nullptr;
+
+        std::shared_ptr<linux::CameraBufferRef>
+            preview_cref_                               = nullptr;
+
+        std::shared_ptr<linux::DecodedFrame>
+            decoded_frame_                              = nullptr;
 
         std::shared_ptr<linux::CameraBufferQueue>
             encoder_queue_                              = std::make_shared<linux::CameraBufferQueue>(2);
 
         std::shared_ptr<linux::CameraBufferQueue>
             preview_queue_                              = std::make_shared<linux::CameraBufferQueue>(2);
+
+        std::shared_ptr<linux::DecodedFrameQueue>
+            decoded_video_frame_queue_                  = std::make_shared<linux::DecodedFrameQueue>(4);
+
+        std::shared_ptr<PacketRefQueue>
+            incoming_video_packet_queue_                = std::make_shared<PacketRefQueue>(2);
 
         std::shared_ptr<linux::VideoPacketQueue>
             outgoing_video_packet_queue_                = std::make_shared<linux::VideoPacketQueue>(2);
