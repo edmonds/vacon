@@ -192,7 +192,7 @@ void Decoder::RunDecoder(std::stop_token st)
     while (!st.stop_requested()) {
         std::shared_ptr<PacketRef> pref;
 
-        if (params_.incoming_video_packet_queue->wait_dequeue_timed(pref, 250ms)) {
+        if (params_.incoming_video_packet_queue->wait_dequeue_timed(pref, 10ms)) {
             DecodePacket(pref);
         } else {
             LOG_VERBOSE << "Stalled dequeuing packet from incoming video packet queue, retrying";

@@ -118,7 +118,7 @@ void Encoder::RunEncoder(std::stop_token st)
     while (!st.stop_requested()) {
         // Get the next camera frame from the queue.
         std::shared_ptr<CameraBufferRef> cref = nullptr;
-        if (params_.encoder_queue->wait_dequeue_timed(cref, 250ms)) {
+        if (params_.encoder_queue->wait_dequeue_timed(cref, 10ms)) {
             // Encode the camera frame.
             auto video_frame = EncodeCameraBuffer(*cref);
 
