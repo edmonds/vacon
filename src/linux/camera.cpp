@@ -35,6 +35,7 @@
 #include <SDL3/SDL_opengles2.h>
 #include <plog/Log.h>
 
+#include "event.hpp"
 #include "util.hpp"
 
 using namespace std::chrono_literals;
@@ -74,16 +75,6 @@ static void LogV4L2Format(const struct v4l2_format *fmt)
     }
 }
 
-static void LogCameraParams(const CameraParams& params)
-{
-    LOG_DEBUG << "device = "            << params.device;
-    LOG_DEBUG << "pixel format = "      << params.pixel_format;
-    LOG_DEBUG << "frame_rate = "        << params.frame_rate;
-    LOG_DEBUG << "width = "             << params.width;
-    LOG_DEBUG << "height = "            << params.height;
-    LOG_DEBUG << "n_kernel_buffers = "  << params.n_kernel_buffers;
-}
-
 std::shared_ptr<Camera> Camera::Create(const CameraParams& params)
 {
     return std::make_shared<Camera>(Camera(params));
@@ -91,9 +82,59 @@ std::shared_ptr<Camera> Camera::Create(const CameraParams& params)
 
 bool Camera::Init()
 {
-    auto t_start = std::chrono::steady_clock::now();
+    thread_ = std::jthread([&](std::stop_token st) { RunCamera(st); });
+    return true;
+}
 
-    LogCameraParams(params_);
+void Camera::RunCamera(std::stop_token st)
+{
+    LOG_DEBUG << "Starting Linux camera capture thread ID " << std::this_thread::get_id();
+    util::SetThreadName("VCameraCapture");
+
+    PushEvent(Event::CameraStarting);
+
+    if (!InitCamera()) {
+        LOG_ERROR << "InitCamera() failed!";
+        PushEvent(Event::CameraFailed);
+        return;
+    }
+
+    PushEvent(Event::CameraStarted);
+
+    uint32_t last_sequence = 0;
+    while (!st.stop_requested()) {
+        // Get the next V4L2 frame from the camera.
+        auto cref = NextFrame();
+        if (!cref) {
+            continue;
+        }
+
+        // Check if any frames have been dropped.
+        uint32_t sequence = cref->buf_.vbuf.sequence;
+        if (last_sequence > 0 && (sequence != last_sequence + 1)) {
+            LOG_DEBUG << std::format("Gap in camera frame sequence, current sequence {}, last sequence {}",
+                                     sequence, last_sequence);
+        }
+        last_sequence = sequence;
+
+        // Enqueue the camera frame onto the encoder queue.
+        if (params_.encoder_queue && !params_.encoder_queue->try_enqueue(cref)) {
+            LOG_VERBOSE << "Failed to enqueue frame onto encoder queue, discarding!";
+        }
+
+        // Enqueue the camera frame onto the preview queue.
+        if (params_.preview_queue && !params_.preview_queue->try_enqueue(cref)) {
+            LOG_VERBOSE << "Failed to enqueue frame onto preview queue, discarding!";
+        }
+    }
+
+    LOG_DEBUG << "Stopping Linux camera capture thread ID " << std::this_thread::get_id();
+}
+
+bool Camera::InitCamera()
+{
+    auto t_start = std::chrono::steady_clock::now();
+    LOG_INFO << std::format("Initializing V4L2 device {}", params_.device);
 
     if (!OpenDevice()) {
         LOG_ERROR << "OpenDevice() failed";
@@ -112,6 +153,11 @@ bool Camera::Init()
 
     if (!InitBuffers()) {
         LOG_ERROR << "InitBuffers() failed";
+        return false;
+    }
+
+    if (!StartCapturing()) {
+        LOG_ERROR << "StartCapturing() failed";
         return false;
     }
 
@@ -613,8 +659,6 @@ bool Camera::ExportBuffersToOpenGL(SDL_Renderer* sdl_renderer)
 
 bool Camera::StartCapturing()
 {
-    auto t_start = std::chrono::steady_clock::now();
-
     // VIDIOC_STREAMON
     enum v4l2_buf_type type(V4L2_BUF_TYPE_VIDEO_CAPTURE);
     if (ioctl(fd_, VIDIOC_STREAMON, &type) == -1) {
@@ -687,10 +731,6 @@ bool Camera::StartCapturing()
         LOG_ERROR << std::format("fcntl(F_SETFL) on fd {} failed: {} ({})", fd_, errno, strerror(errno));
         return false;
     }
-
-    t_last_ = std::chrono::steady_clock::now();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_last_ - t_start).count();
-    LOG_INFO << std::format("Started capturing from V4L2 device {} in {} ms", params_.device, millis);
 
     // Success.
     return true;

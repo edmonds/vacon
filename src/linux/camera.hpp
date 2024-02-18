@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -27,15 +28,15 @@
 
 #include <SDL3/SDL.h>
 
+#include "linux/typedefs.hpp"
+
 namespace vacon {
 namespace linux {
 
 struct CameraParams {
     std::string device;
-    std::string pixel_format;
-    uint32_t width;
-    uint32_t height;
-    uint32_t frame_rate;
+    std::shared_ptr<CameraBufferQueue> encoder_queue = nullptr;
+    std::shared_ptr<CameraBufferQueue> preview_queue = nullptr;
 
     uint32_t n_kernel_buffers = 8;
     uint32_t n_initial_stream_skip_frames = 15;
@@ -93,28 +94,31 @@ class Camera {
         ~Camera();
         bool Init();
         bool ExportBuffersToOpenGL(SDL_Renderer*);
-        bool StartCapturing();
-        std::shared_ptr<CameraBufferRef> NextFrame();
-
-        struct v4l2_pix_format fmt_ = {};
 
     private:
         Camera() = default;
         Camera(const CameraParams& params)
             : params_(params) {};
+        void RunCamera(std::stop_token);
+        bool InitCamera();
+
         bool OpenDevice();
         bool EnumerateFormats();
         bool InitV4L2(const CameraFormat&);
         bool InitBuffers();
-        bool ExportBufferToVaapi(CameraBuffer&);
-        bool ExportBufferToMfx(CameraBuffer&);
+        bool StartCapturing();
+
+        std::shared_ptr<CameraBufferRef> NextFrame();
 
         CameraParams params_;
+
+        std::jthread thread_ = {};
 
         int fd_ = -1;
         std::vector<CameraBuffer> bufs_ = {};
         std::chrono::time_point<std::chrono::steady_clock> t_last_;
 
+        struct v4l2_pix_format fmt_ = {};
         std::vector<CameraFormat> formats_ = {};
 };
 
