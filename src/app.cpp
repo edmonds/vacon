@@ -86,31 +86,7 @@ int App::AppInit(int argc, char *argv[])
 
 void App::AppQuit()
 {
-    // Stop the handlers.
-    StopNetworkHandler();
-    StopVideoHandler();
-
-    // Drain any packets remaining on the outgoing video packet queue.
-    if (outgoing_video_packet_queue_) {
-        std::shared_ptr<linux::VideoFrame> frame = {};
-        while (outgoing_video_packet_queue_->try_dequeue(frame)) {
-            LOG_VERBOSE << std::format("Drained VideoFrame @ {}", (void*)frame.get());
-        }
-    }
-    outgoing_video_packet_queue_ = nullptr;
-
-    // Drain any packets remaining on the incoming video packet queue.
-    if (incoming_video_packet_queue_) {
-        std::shared_ptr<PacketRef> pref = {};
-        while (incoming_video_packet_queue_->try_dequeue(pref)) {
-            LOG_VERBOSE << std::format("Drained PacketRef @ {}", (void*)pref.get());
-        }
-    }
-    incoming_video_packet_queue_ = nullptr;
-
-    // Stop the decoder.
-    decoded_frame_ = nullptr;
-    decoder_ = nullptr;
+    StopVideo();
 }
 
 int App::AppEvent(const SDL_Event *event)
@@ -229,45 +205,6 @@ int App::AppIterate()
     return 0;
 }
 
-void App::StartVideoHandler()
-{
-    if (camera_) {
-        return;
-    }
-
-    // Start the linux::Camera.
-    camera_ = linux::Camera::Create(linux::CameraParams {
-        .device         = args_.get<std::string>("--camera-device"),
-        .encoder_queue  = encoder_queue_,
-        .preview_queue  = preview_queue_,
-    });
-    if (!camera_) {
-        LOG_FATAL << "linux::Camera::Create() failed!";
-        return;
-    }
-    camera_->Init();
-
-    // Start the linux::Decoder.
-    auto dec_params = linux::DecoderParams {
-        .incoming_video_packet_queue    = incoming_video_packet_queue_,
-        .decoded_video_frame_queue      = decoded_video_frame_queue_,
-    };
-    decoder_ = linux::Decoder::Create(dec_params);
-    if (!decoder_) {
-        LOG_FATAL << "linux::Decoder::Create() failed!";
-        return;
-    }
-    decoder_->Init();
-}
-
-void App::StopVideoHandler()
-{
-    encoder_ = nullptr;
-
-    preview_cref_ = nullptr;
-    camera_ = nullptr;
-}
-
 void App::StartNetworkHandler()
 {
     if (nh_) {
@@ -291,6 +228,69 @@ void App::StartNetworkHandler()
 void App::StopNetworkHandler()
 {
     nh_ = nullptr;
+}
+
+void App::StartVideo()
+{
+    if (camera_) {
+        return;
+    }
+
+    // Start the linux::Camera.
+    camera_ = linux::Camera::Create(linux::CameraParams {
+        .device         = args_.get<std::string>("--camera-device"),
+        .encoder_queue  = encoder_queue_,
+        .preview_queue  = preview_queue_,
+    });
+    if (!camera_) {
+        LOG_FATAL << "linux::Camera::Create() failed!";
+        return;
+    }
+    camera_->Init();
+
+    // Start the linux::Decoder.
+    decoder_ = linux::Decoder::Create(linux::DecoderParams {
+        .incoming_video_packet_queue    = incoming_video_packet_queue_,
+        .decoded_video_frame_queue      = decoded_video_frame_queue_,
+    });
+    if (!decoder_) {
+        LOG_FATAL << "linux::Decoder::Create() failed!";
+        return;
+    }
+    decoder_->Init();
+}
+
+
+void App::StopVideo()
+{
+    StopNetworkHandler();
+
+    // Signal the background threads to stop.
+    if (camera_)  { camera_ ->RequestStop(); }
+    if (decoder_) { decoder_->RequestStop(); }
+    if (encoder_) { encoder_->RequestStop(); }
+
+    // Wait for the background threads to stop.
+    if (camera_)  { camera_ ->Join(); }
+    if (decoder_) { decoder_->Join(); }
+    if (encoder_) { encoder_->Join(); }
+
+    // Drain the video queues.
+    while (encoder_queue_->try_pop()) {}
+    while (preview_queue_->try_pop()) {}
+    while (decoded_video_frame_queue_->try_pop()) {}
+    while (outgoing_video_packet_queue_->try_pop()) {}
+    while (incoming_video_packet_queue_->try_pop()) {}
+
+    // Free the cached frames that depend on resources allocated by the video
+    // objects.
+    decoded_frame_  = nullptr;
+    preview_cref_   = nullptr;
+
+    // Free the video objects.
+    camera_     = nullptr;
+    decoder_    = nullptr;
+    encoder_    = nullptr;
 }
 
 } // namespace vacon

@@ -129,7 +129,7 @@ void App::ShowMenu()
         if (ImGui::BeginMenu("XXX")) {
             ImGui::MenuItem("Demo window", "",              &xenable_demo_window_);
             ImGui::MenuItem("Toggle NetworkHandler", "",    &xenable_network_handler_);
-            ImGui::MenuItem("Toggle VideoHandler", "",      &xenable_video_handler_);
+            ImGui::MenuItem("Toggle Video", "",             &xenable_video_);
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();
@@ -212,10 +212,10 @@ void App::RenderFrame()
         StopNetworkHandler();
     }
 
-    if (xenable_video_handler_) {
-        StartVideoHandler();
+    if (xenable_video_) {
+        StartVideo();
     } else {
-        StopVideoHandler();
+        StopVideo();
     }
 
     ImGui::Render();
