@@ -23,10 +23,6 @@
 namespace vacon {
 
 static const char *kDefaultCameraDevice                 = "/dev/video0";
-static const char *kDefaultCameraPixelFormat            = "";
-static const unsigned kDefaultCameraWidth               = 1920;
-static const unsigned kDefaultCameraHeight              = 1080;
-static const unsigned kDefaultCameraFrameRate           = 60;
 static const unsigned kDefaultVideoEncoderBitrateKbps   = 10'000;
 static const char *kDefaultSignalingUrl                 = "ws://127.0.0.1:8000/v1/ooo";
 static const char *kDefaultStunServer                   = "stun:stun.l.google.com:19302";
@@ -45,33 +41,6 @@ void App::ParseArgs(int argc, char *argv[])
          .metavar("DEVICE")
          .help("camera device node")
          .default_value(kDefaultCameraDevice)
-         .nargs(1);
-
-    args_.add_argument("--camera-width")
-         .metavar("W")
-         .help("camera capture frame width")
-         .default_value(kDefaultCameraWidth)
-         .scan<'u', unsigned>()
-         .nargs(1);
-
-    args_.add_argument("--camera-height")
-         .metavar("H")
-         .help("camera capture frame height")
-         .default_value(kDefaultCameraHeight)
-         .scan<'u', unsigned>()
-         .nargs(1);
-
-    args_.add_argument("--camera-frame-rate")
-         .metavar("R")
-         .help("camera capture frame rate")
-         .default_value(kDefaultCameraFrameRate)
-         .scan<'u', unsigned>()
-         .nargs(1);
-
-    args_.add_argument("--camera-pixel-format")
-         .metavar("FMT")
-         .help("camera capture pixel format")
-         .default_value(kDefaultCameraPixelFormat)
          .nargs(1);
 
     args_.add_argument("--video-encoder-bitrate")
