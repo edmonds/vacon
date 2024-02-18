@@ -41,6 +41,24 @@ struct CameraParams {
     uint32_t n_initial_stream_skip_frames = 15;
 };
 
+enum class ChromaFormat {
+    Invalid,
+    YUV420_8,
+    YUV422_8,
+};
+
+struct CameraFormat {
+    // The sort key.
+    float           frame_rate = 0.0f;
+    ChromaFormat    chroma_format = ChromaFormat::Invalid;
+    uint32_t        width = 0;
+    uint32_t        height = 0;
+
+    // The parameters to pass to VIDIOC_S_FMT, VIDIOC_S_PARM.
+    v4l2_format     fmt = {};
+    v4l2_streamparm parm = {};
+};
+
 struct CameraBuffer {
     v4l2_buffer                 vbuf = {};
     v4l2_exportbuffer           expbuf = {};
@@ -86,7 +104,7 @@ class Camera {
             : params_(params) {};
         bool OpenDevice();
         bool InitV4L2();
-        bool InitVaapi();
+        bool EnumerateFormats();
         bool InitBuffers();
         bool ExportBufferToVaapi(CameraBuffer&);
         bool ExportBufferToMfx(CameraBuffer&);
@@ -96,6 +114,8 @@ class Camera {
         int fd_ = -1;
         std::vector<CameraBuffer> bufs_ = {};
         std::chrono::time_point<std::chrono::steady_clock> t_last_;
+
+        std::vector<CameraFormat> formats_ = {};
 };
 
 } // namespace linux

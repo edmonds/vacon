@@ -15,6 +15,7 @@
 
 #include "camera.hpp"
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
@@ -175,6 +176,166 @@ bool Camera::OpenDevice()
         return false;
     } else {
         LOG_VERBOSE << std::format("Opened V4L2 device {} (fd {})", params_.device, fd_);
+    }
+
+    // Success.
+    return true;
+}
+
+bool Camera::EnumerateFormats()
+{
+    const uint32_t min_frame_height = 720;
+    const uint32_t max_frame_height = 1080;
+    const float min_frame_rate = 30.0f;
+    const float max_frame_rate = 60.0f;
+
+    const std::vector<uint32_t> pixelformat_allowlist = {
+        V4L2_PIX_FMT_YUYV,
+        V4L2_PIX_FMT_UYVY,
+        V4L2_PIX_FMT_NV12,
+    };
+
+    // VIDIOC_ENUM_FMT
+    struct v4l2_fmtdesc fmtdesc = {};
+    fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    while (ioctl(fd_, VIDIOC_ENUM_FMT, &fmtdesc) == 0) {
+        ++fmtdesc.index;
+        LOG_VERBOSE << std::format("fmtdesc: pixel format = {}, description = '{}'",
+                                   util::FourCcToString(fmtdesc.pixelformat),
+                                   (const char *)&fmtdesc.description[0]);
+
+        // Check if this pixel format is on the allowlist.
+        if (std::find(pixelformat_allowlist.begin(),
+                      pixelformat_allowlist.end(),
+                      fmtdesc.pixelformat) == pixelformat_allowlist.end())
+        {
+            LOG_VERBOSE << std::format("Ignoring pixel format '{}' not on allowlist",
+                                       util::FourCcToString(fmtdesc.pixelformat));
+            continue;
+        }
+
+        ChromaFormat chroma_format = ChromaFormat::Invalid;
+        switch (fmtdesc.pixelformat) {
+        case V4L2_PIX_FMT_YUYV: [[fallthrough]];
+        case V4L2_PIX_FMT_UYVY:
+            chroma_format = ChromaFormat::YUV422_8;
+            break;
+        case V4L2_PIX_FMT_NV12:
+            chroma_format = ChromaFormat::YUV420_8;
+            break;
+        default:
+            LOG_VERBOSE << std::format("Unhandled V4L2 pixel format {} ({:#010x})",
+                                       util::FourCcToString(fmtdesc.pixelformat),
+                                       fmtdesc.pixelformat);
+            return false;
+        }
+
+        // VIDIOC_ENUM_FRAMESIZES
+        struct v4l2_frmsizeenum frmsize = {};
+        frmsize.pixel_format = fmtdesc.pixelformat;
+        while (ioctl(fd_, VIDIOC_ENUM_FRAMESIZES, &frmsize) == 0) {
+            ++frmsize.index;
+
+            // Check frame size type.
+            if (frmsize.type != V4L2_FRMSIZE_TYPE_DISCRETE) {
+                LOG_VERBOSE << std::format("Ignoring v4l2_frmsizeenum::type != V4L2_FRMSIZE_TYPE_DISCRETE");
+                continue;
+            }
+
+            LOG_VERBOSE << std::format("frmsize: width = {}, height = {}", frmsize.discrete.width, frmsize.discrete.height);
+
+            // Check if the frame height is allowed.
+            if (frmsize.discrete.height < min_frame_height ||
+                frmsize.discrete.height > max_frame_height)
+            {
+                LOG_VERBOSE << std::format("Ignoring v4l2_frmsize_discrete::height {} out of bounds [{}, {}]",
+                                           frmsize.discrete.height, min_frame_height, max_frame_height);
+                continue;
+            }
+
+            // VIDIOC_ENUM_FRAMEINTERVALS
+            struct v4l2_frmivalenum frmival = {};
+            frmival.pixel_format = frmsize.pixel_format;
+            frmival.width = frmsize.discrete.width;
+            frmival.height = frmsize.discrete.height;
+            while (ioctl(fd_, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) == 0) {
+                ++frmival.index;
+
+                // Check frame interval type.
+                if (frmival.type != V4L2_FRMIVAL_TYPE_DISCRETE) {
+                    LOG_VERBOSE << std::format("Ignoring v4l2_frmivalenum::type != V4L2_FRMIVAL_TYPE_DISCRETE");
+                    continue;
+                }
+
+                float frame_rate = (float)frmival.discrete.denominator / (float)frmival.discrete.numerator;
+                LOG_VERBOSE << std::format("frmival: frame rate = {}", frame_rate);
+
+                // Check if the frame rate is allowed.
+                if (frame_rate < min_frame_rate || frame_rate > max_frame_rate) {
+                    LOG_VERBOSE << std::format("Ignoring frame rate {} out of bounds [{}, {}]",
+                                               frame_rate, min_frame_rate, max_frame_rate);
+                    continue;
+                }
+
+                // Add this frame rate + frame size + pixel format combination
+                // to the list of camera formats.
+                struct v4l2_format fmt          = {};
+                fmt.type                        = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                fmt.fmt.pix.width               = frmsize.discrete.width;
+                fmt.fmt.pix.height              = frmsize.discrete.height;
+                fmt.fmt.pix.pixelformat         = fmtdesc.pixelformat;
+
+                struct v4l2_streamparm parm     = {};
+                parm.type                       = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                parm.parm.capture.timeperframe  = frmival.discrete;
+
+                formats_.emplace_back(CameraFormat {
+                    .frame_rate     = frame_rate,
+                    .chroma_format  = chroma_format,
+                    .width          = frmsize.discrete.width,
+                    .height         = frmsize.discrete.height,
+                    .fmt            = fmt,
+                    .parm           = parm,
+                });
+
+            } // VIDIOC_ENUM_FRAMEINTERVALS
+        } // VIDIOC_ENUM_FRAMESIZES
+    } // VIDIOC_ENUM_FMT
+
+    // Sort the camera formats from most preferred to least preferred.
+    //
+    // Frame rate is most important:
+    // - 60 fps is better than 30 fps
+    //
+    // Then lines of resolution (but not more important than frame rate):
+    // - 1080p60 is better than 720p60
+    // - 720p60 is better than 1080p30
+    //
+    // Then frame width:
+    // - 1280x720@60 is better than 960x720@60
+    //
+    // Then chroma format:
+    // - 4:2:2 1920x1080@60 is better than 4:2:0 1920x1080@60
+    // - 4:2:0 1920x1080@60 is better than 4:2:2 1280x720@60
+    //
+    std::sort(formats_.begin(), formats_.end(),
+              [](const CameraFormat& a, const CameraFormat& b) { return a.chroma_format > b.chroma_format; });
+    std::sort(formats_.begin(), formats_.end(),
+              [](const CameraFormat& a, const CameraFormat& b) { return a.width > b.width; });
+    std::sort(formats_.begin(), formats_.end(),
+              [](const CameraFormat& a, const CameraFormat& b) { return a.height > b.height; });
+    std::sort(formats_.begin(), formats_.end(),
+              [](const CameraFormat& a, const CameraFormat& b) { return a.frame_rate > b.frame_rate; });
+
+    for (auto& format : formats_) {
+        LOG_DEBUG << std::format("Preferred format: {}x{}@{} {}",
+                                 format.width, format.height, format.frame_rate,
+                                 util::FourCcToString(format.fmt.fmt.pix.pixelformat));
+    }
+
+    if (formats_.empty()) {
+        LOG_ERROR << "No usable camera formats found!";
+        return false;
     }
 
     // Success.
