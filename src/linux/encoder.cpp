@@ -24,15 +24,19 @@
 #include <format>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
 #include <mfx.h>
 #include <plog/Log.h>
 
+#include "event.hpp"
 #include "linux/camera.hpp"
 #include "linux/mfx.hpp"
 #include "linux/video_frame.hpp"
 #include "util.hpp"
+
+using namespace std::chrono_literals;
 
 namespace vacon {
 namespace linux {
@@ -49,6 +53,13 @@ std::unique_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 
 Encoder::~Encoder()
 {
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Trying to join video encoder thread ID " << thread_.get_id();
+        thread_.request_stop();
+        thread_.join();
+        thread_ = {};
+    }
+
     if (mfx_session_) {
         LOG_VERBOSE << std::format("Closing MFX session @ {}", (void*)mfx_session_);
         MFXVideoENCODE_Close(mfx_session_);
@@ -67,6 +78,63 @@ Encoder::~Encoder()
 }
 
 bool Encoder::Init()
+{
+    thread_ = std::jthread([&](std::stop_token st) { RunEncoder(st); });
+    return true;
+}
+
+void Encoder::RunEncoder(std::stop_token st)
+{
+    LOG_DEBUG << "Starting video encoder thread ID " << std::this_thread::get_id();
+
+    // Encoder initialization will start a number of background worker threads
+    // when libvpl is initialized. Make sure the names of those worker threads
+    // are distinct from this thread's name.
+    util::SetThreadName("VMfxWorker");
+
+    PushEvent(Event::EncoderStarting);
+    if (!InitEncoder()) {
+        LOG_ERROR << "Video encoder initialization failed !!!";
+        PushEvent(Event::EncoderFailed);
+        return;
+    }
+    PushEvent(Event::EncoderStarted);
+
+    util::SetThreadName("VEncoderVideo");
+
+    while (!st.stop_requested()) {
+        // Get the next camera frame from the queue.
+        std::shared_ptr<CameraBufferRef> cref = nullptr;
+        if (params_.encoder_queue->wait_dequeue_timed(cref, 250ms)) {
+            // Encode the camera frame.
+            auto video_frame = EncodeCameraBuffer(*cref);
+
+            // Get rid of this CameraFrame as soon as possible so the buffer
+            // can be re-enqueued to the kernel.
+            cref = nullptr;
+
+            if (!video_frame) {
+                LOG_ERROR << "EncodeCameraFrame() failed!";
+                continue;
+            }
+
+            // Enqueue the compressed video frame for network transport.
+            if (params_.outgoing_video_packet_queue) {
+                while (!st.stop_requested()) {
+                    if (params_.outgoing_video_packet_queue->wait_enqueue_timed(video_frame, 10ms)) {
+                        break;
+                    } else {
+                        LOG_VERBOSE << "Stalled enqueuing packet onto outgoing video packet queue, retrying";
+                    }
+                }
+            }
+        }
+    }
+
+    LOG_DEBUG << "Stopping video encoder thread ID " << std::this_thread::get_id();
+}
+
+bool Encoder::InitEncoder()
 {
     LOG_DEBUG <<
         std::format("EncoderParams: camera format {}, bitrate {}",

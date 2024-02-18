@@ -18,10 +18,12 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include <mfx.h>
 
 #include "linux/camera.hpp"
+#include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
 
 namespace vacon {
@@ -31,6 +33,12 @@ struct EncoderParams {
     CameraFormat camera_format;
 
     uint32_t bitrate_kbps;
+
+    std::shared_ptr<CameraBufferQueue>
+        encoder_queue = nullptr;
+
+    std::shared_ptr<VideoPacketQueue>
+        outgoing_video_packet_queue = nullptr;
 };
 
 class Encoder {
@@ -40,17 +48,21 @@ class Encoder {
         ~Encoder();
         bool Init();
 
-        std::shared_ptr<VideoFrame> EncodeCameraBuffer(const CameraBufferRef&);
-
     private:
         Encoder() = default;
         Encoder(const EncoderParams& params)
             : params_(params) {};
+        void RunEncoder(std::stop_token);
+        bool InitEncoder();
         bool InitMfxVideoParams();
         bool SetMfxFourCc();
         bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);
+        std::shared_ptr<VideoFrame> EncodeCameraBuffer(const CameraBufferRef&);
 
         EncoderParams       params_;
+
+        std::jthread        thread_ = {};
+
         mfxLoader           mfx_loader_ = nullptr;
         mfxSession          mfx_session_ = nullptr;
         mfxVideoParam       mfx_videoparam_encode_ = {};
