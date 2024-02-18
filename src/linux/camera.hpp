@@ -103,8 +103,8 @@ class Camera {
         Camera(const CameraParams& params)
             : params_(params) {};
         bool OpenDevice();
-        bool InitV4L2();
         bool EnumerateFormats();
+        bool InitV4L2(const CameraFormat&);
         bool InitBuffers();
         bool ExportBufferToVaapi(CameraBuffer&);
         bool ExportBufferToMfx(CameraBuffer&);

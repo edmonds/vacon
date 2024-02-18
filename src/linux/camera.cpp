@@ -100,7 +100,12 @@ bool Camera::Init()
         return false;
     }
 
-    if (!InitV4L2()) {
+    if (!EnumerateFormats()) {
+        LOG_ERROR << "EnumerateFormats() failed";
+        return false;
+    }
+
+    if (!InitV4L2(formats_.front())) {
         LOG_ERROR << "InitV4L2() failed";
         return false;
     }
@@ -342,7 +347,7 @@ bool Camera::EnumerateFormats()
     return true;
 }
 
-bool Camera::InitV4L2()
+bool Camera::InitV4L2(const CameraFormat& format)
 {
     // VIDIOC_QUERYCAP
     struct v4l2_capability cap = {};
@@ -386,15 +391,7 @@ bool Camera::InitV4L2()
     }
 
     // VIDIOC_S_FMT
-    struct v4l2_format force_fmt    = {};
-    force_fmt.type                  = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    force_fmt.fmt.pix.width         = params_.width;
-    force_fmt.fmt.pix.height        = params_.height;
-    force_fmt.fmt.pix.pixelformat   = fmt.fmt.pix.pixelformat;
-    if (params_.pixel_format.length() == 4) {
-        auto f = params_.pixel_format.c_str();
-        force_fmt.fmt.pix.pixelformat = v4l2_fourcc(f[0], f[1], f[2], f[3]);
-    }
+    auto force_fmt = format.fmt;
     LOG_VERBOSE << "Trying to force camera data format:";
     LogV4L2Format(&force_fmt);
     if (ioctl(fd_, VIDIOC_S_FMT, &force_fmt) == 0) {
@@ -411,9 +408,7 @@ bool Camera::InitV4L2()
     fmt_ = force_fmt.fmt.pix;
 
     // VIDIOC_S_PARM
-    struct v4l2_streamparm parm     = {};
-    parm.type                       = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    parm.parm.capture.timeperframe  = {1, (uint32_t)params_.frame_rate};
+    auto parm = format.parm;
     if (ioctl(fd_, VIDIOC_S_PARM, &parm) == 0) {
         auto frame_time =
             double(parm.parm.capture.timeperframe.numerator) /
