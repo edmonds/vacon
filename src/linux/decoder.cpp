@@ -35,6 +35,7 @@
 #include <va/va_wayland.h>
 #include <wayland-client.h>
 
+#include "event.hpp"
 #include "linux/mfx.hpp"
 #include "util.hpp"
 
@@ -74,6 +75,55 @@ Decoder::~Decoder()
 }
 
 bool Decoder::Init()
+{
+    thread_ = std::jthread([&](std::stop_token st) { RunDecoder(st); });
+    return true;
+}
+
+void Decoder::RequestStop()
+{
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Requesting stop of decoder thread ID " << thread_.get_id();
+        thread_.request_stop();
+    }
+}
+
+void Decoder::Join()
+{
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Joining decoder thread ID " << thread_.get_id();
+        thread_.join();
+        thread_ = {};
+    }
+}
+
+void Decoder::RunDecoder(std::stop_token st)
+{
+    LOG_DEBUG << "Starting video decoder thread ID " << std::this_thread::get_id();
+    util::SetThreadName("VDecoderVideo");
+
+    PushEvent(Event::DecoderStarting);
+    if (!InitDecoder()) {
+        LOG_ERROR << "InitDecoder() failed!";
+        PushEvent(Event::DecoderFailed);
+        return;
+    }
+    PushEvent(Event::DecoderStarted);
+
+    while (!st.stop_requested()) {
+        std::shared_ptr<PacketRef> pref;
+
+        if (params_.incoming_video_packet_queue->wait_dequeue_timed(pref, 10ms)) {
+            DecodePacket(pref);
+        } else {
+            LOG_VERBOSE << "Stalled dequeuing packet from incoming video packet queue, retrying";
+        }
+    }
+
+    LOG_DEBUG << "Stopping video decoder thread ID " << std::this_thread::get_id();
+}
+
+bool Decoder::InitDecoder()
 {
     auto t_start = std::chrono::steady_clock::now();
 
@@ -120,30 +170,11 @@ bool Decoder::Init()
         return false;
     }
 
-    thread_ = std::jthread([&](std::stop_token st) { RunDecoder(st); });
-
     auto t_end = std::chrono::steady_clock::now();
     auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
     LOG_INFO << std::format("Initialized video decoder in {} ms", millis);
 
     return true;
-}
-
-void Decoder::RequestStop()
-{
-    if (thread_.joinable()) {
-        LOG_DEBUG << "Requesting stop of decoder thread ID " << thread_.get_id();
-        thread_.request_stop();
-    }
-}
-
-void Decoder::Join()
-{
-    if (thread_.joinable()) {
-        LOG_DEBUG << "Joining decoder thread ID " << thread_.get_id();
-        thread_.join();
-        thread_ = {};
-    }
 }
 
 bool Decoder::InitVaapi()
@@ -182,24 +213,6 @@ bool Decoder::InitVaapi()
 
     // Success.
     return true;
-}
-
-void Decoder::RunDecoder(std::stop_token st)
-{
-    LOG_DEBUG << "Starting video decoder thread ID " << std::this_thread::get_id();
-    util::SetThreadName("VDecoderVideo");
-
-    while (!st.stop_requested()) {
-        std::shared_ptr<PacketRef> pref;
-
-        if (params_.incoming_video_packet_queue->wait_dequeue_timed(pref, 10ms)) {
-            DecodePacket(pref);
-        } else {
-            LOG_VERBOSE << "Stalled dequeuing packet from incoming video packet queue, retrying";
-        }
-    }
-
-    LOG_DEBUG << "Stopping video decoder thread ID " << std::this_thread::get_id();
 }
 
 void Decoder::DecodePacket(std::shared_ptr<PacketRef> pref)

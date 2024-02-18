@@ -22,6 +22,10 @@ enum class Event {
     CameraStarted,
     CameraFailed,
 
+    DecoderStarting,
+    DecoderStarted,
+    DecoderFailed,
+
     EncoderStarting,
     EncoderStarted,
     EncoderFailed,

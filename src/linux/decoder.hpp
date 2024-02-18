@@ -67,6 +67,7 @@ class Decoder {
             : params_(params) {};
         bool InitVaapi();
         void RunDecoder(std::stop_token);
+        bool InitDecoder();
         void DecodePacket(std::shared_ptr<PacketRef>);
 
         DecoderParams       params_;

@@ -162,6 +162,18 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         LOG_FATAL << "[CameraFailed]";
         break;
 
+    case Event::DecoderStarting:
+        LOG_DEBUG << "[DecoderStarting]";
+        break;
+
+    case Event::DecoderStarted:
+        LOG_DEBUG << "[DecoderStarted]";
+        break;
+
+    case Event::DecoderFailed:
+        LOG_FATAL << "[DecoderFailed]";
+        break;
+
     case Event::EncoderStarting:
         LOG_DEBUG << "[EncoderStarting]";
         break;
