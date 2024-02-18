@@ -71,12 +71,6 @@ void App::ParseArgs(int argc, char *argv[])
          .help("setup simulated packet loss SIGUSR1 handler")
          .flag();
 
-    args_.add_argument("--xxx-force-start-network-handler").flag();
-
-    args_.add_argument("--xxx-force-start-video-handler").flag();
-
-    args_.add_argument("--xxx-headless").flag();
-
     try {
         args_.parse_args(argc, argv);
     } catch (const std::exception& err) {

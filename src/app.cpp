@@ -71,16 +71,6 @@ int App::AppInit(int argc, char *argv[])
         return -1;
     }
 
-#if 0
-    if (args["--xxx-force-start-network-handler"] == true) {
-        StartNetworkHandlerBackground();
-    }
-
-    if (args["--xxx-force-start-video-handler"] == true) {
-        StartVideoHandlerBackground();
-    }
-#endif
-
     return 0;
 }
 
