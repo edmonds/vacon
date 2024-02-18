@@ -92,17 +92,15 @@ bool Camera::Init()
 
 void Camera::RunCamera(std::stop_token st)
 {
-    LOG_DEBUG << "Starting Linux camera capture thread ID " << std::this_thread::get_id();
+    LOG_DEBUG << "Starting camera capture thread ID " << std::this_thread::get_id();
     util::SetThreadName("VCameraCapture");
 
     PushEvent(Event::CameraStarting);
-
     if (!InitCamera()) {
         LOG_ERROR << "InitCamera() failed!";
         PushEvent(Event::CameraFailed);
         return;
     }
-
     PushEvent(Event::CameraStarted);
 
     uint32_t last_sequence = 0;
@@ -132,7 +130,7 @@ void Camera::RunCamera(std::stop_token st)
         }
     }
 
-    LOG_DEBUG << "Stopping Linux camera capture thread ID " << std::this_thread::get_id();
+    LOG_DEBUG << "Stopping camera capture thread ID " << std::this_thread::get_id();
 }
 
 bool Camera::InitCamera()
@@ -176,6 +174,13 @@ bool Camera::InitCamera()
 
 Camera::~Camera()
 {
+    if (thread_.joinable()) {
+        LOG_DEBUG << "Trying to join camera capture thread ID " << thread_.get_id();
+        thread_.request_stop();
+        thread_.join();
+        thread_ = {};
+    }
+
     for (auto& buf : bufs_) {
         // Destroy the OpenGL texture.
         if (buf.texture) {
