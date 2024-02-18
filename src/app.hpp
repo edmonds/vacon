@@ -74,8 +74,8 @@ class App {
 
         int             verbosity_                      = 0;
 
-        float           font_size_sans_                 = 12.0f;
-        float           font_size_mono_                 = 12.0f;
+        float           font_size_sans_                 = 14.0f;
+        float           font_size_mono_                 = 10.0f;
         bool            enable_my_camera_               = true;
         bool            enable_my_microphone_           = true;
         bool            enable_stats_overlay_           = true;
