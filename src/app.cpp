@@ -22,6 +22,7 @@
 #include <plog/Log.h>
 
 #include "event.hpp"
+#include "linux/camera.hpp"
 #include "linux/decoder.hpp"
 #include "network_handler.hpp"
 #include "util.hpp"

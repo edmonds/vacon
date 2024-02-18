@@ -104,7 +104,7 @@ class App {
 
         SDL_Texture*    sdl_texture_placeholder_        = nullptr;
 
-        std::shared_ptr<linux::Camera>
+        std::unique_ptr<linux::Camera>
             camera_                                     = nullptr;
 
         std::shared_ptr<linux::CameraBufferQueue>

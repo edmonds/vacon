@@ -79,9 +79,9 @@ static void LogV4L2Format(const struct v4l2_format *fmt)
     }
 }
 
-std::shared_ptr<Camera> Camera::Create(const CameraParams& params)
+std::unique_ptr<Camera> Camera::Create(const CameraParams& params)
 {
-    return std::make_shared<Camera>(Camera(params));
+    return std::make_unique<Camera>(Camera(params));
 }
 
 bool Camera::Init()

@@ -107,7 +107,7 @@ class CameraBufferRef {
 
 class Camera {
     public:
-        static std::shared_ptr<Camera> Create(const CameraParams&);
+        static std::unique_ptr<Camera> Create(const CameraParams&);
         Camera(Camera&&) = default;
         ~Camera();
         bool Init();
