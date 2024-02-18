@@ -28,16 +28,14 @@ namespace vacon {
 namespace linux {
 
 struct EncoderParams {
-    std::string pixel_format;
-    uint32_t width;
-    uint32_t height;
-    uint32_t frame_rate;
+    CameraFormat camera_format;
+
     uint32_t bitrate_kbps;
 };
 
 class Encoder {
     public:
-        static std::shared_ptr<Encoder> Create(const EncoderParams&);
+        static std::unique_ptr<Encoder> Create(const EncoderParams&);
         Encoder(Encoder&&) = default;
         ~Encoder();
         bool Init();
@@ -46,6 +44,8 @@ class Encoder {
 
     private:
         Encoder() = default;
+        Encoder(const EncoderParams& params)
+            : params_(params) {};
         bool InitMfxVideoParams();
         bool SetMfxFourCc();
         bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);

@@ -37,23 +37,14 @@
 namespace vacon {
 namespace linux {
 
-std::shared_ptr<Encoder> Encoder::Create(const EncoderParams& params)
+std::unique_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 {
-    if (params.pixel_format == "") {
-        LOG_ERROR << "Camera pixel format must be specified";
+    if (!params.encoder_queue) {
+        LOG_ERROR << "Encoder CameraBufferQueue must be provided";
         return nullptr;
     }
 
-    auto enc = std::make_shared<Encoder>(Encoder {});
-    enc->params_ = params;
-
-    // Convert pixel format parameter to uppercase.
-    std::transform(enc->params_.pixel_format.begin(),
-                   enc->params_.pixel_format.end(),
-                   enc->params_.pixel_format.begin(),
-                   ::toupper);
-
-    return enc;
+    return std::make_unique<Encoder>(Encoder(params));
 }
 
 Encoder::~Encoder()
@@ -78,11 +69,8 @@ Encoder::~Encoder()
 bool Encoder::Init()
 {
     LOG_DEBUG <<
-        std::format("EncoderParams: pixel format '{}', width {}, height {}, frame rate {}, bitrate {}",
-                    params_.pixel_format,
-                    params_.width,
-                    params_.height,
-                    params_.frame_rate,
+        std::format("EncoderParams: camera format {}, bitrate {}",
+                    params_.camera_format.Str(),
                     params_.bitrate_kbps);
 
     auto t_start = std::chrono::steady_clock::now();
@@ -217,37 +205,37 @@ bool Encoder::InitMfxVideoParams()
     mfx_videoparam_vpp_.vpp.In.FrameRateExtN =
     mfx_videoparam_vpp_.vpp.Out.FrameRateExtN =
     mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtN =
-        params_.frame_rate;
+        params_.camera_format.FrameRateN();
 
     // Frame rate denominator.
     mfx_videoparam_vpp_.vpp.In.FrameRateExtD =
     mfx_videoparam_vpp_.vpp.Out.FrameRateExtD =
     mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtD =
-        1;
+        params_.camera_format.FrameRateD();
 
     // Width of the video frame in pixels. Must be a multiple of 16.
     mfx_videoparam_vpp_.vpp.In.Width =
     mfx_videoparam_vpp_.vpp.Out.Width =
     mfx_videoparam_encode_.mfx.FrameInfo.Width =
-        VACON_ALIGN16(params_.width);
+        VACON_ALIGN16(params_.camera_format.Width());
 
     // Height of the video frame in pixels. Must be a multiple of 16.
     mfx_videoparam_vpp_.vpp.In.Height =
     mfx_videoparam_vpp_.vpp.Out.Height =
     mfx_videoparam_encode_.mfx.FrameInfo.Height =
-        VACON_ALIGN16(params_.height);
+        VACON_ALIGN16(params_.camera_format.Height());
 
     // Width in pixels.
     mfx_videoparam_vpp_.vpp.In.CropW =
     mfx_videoparam_vpp_.vpp.Out.CropW =
     mfx_videoparam_encode_.mfx.FrameInfo.CropW =
-        params_.width;
+        params_.camera_format.Width();
 
     // Height in pixels.
     mfx_videoparam_vpp_.vpp.In.CropH =
     mfx_videoparam_vpp_.vpp.Out.CropH =
     mfx_videoparam_encode_.mfx.FrameInfo.CropH =
-        params_.height;
+        params_.camera_format.Height();
 
     // PicStruct
     mfx_videoparam_vpp_.vpp.In.PicStruct =
@@ -319,7 +307,7 @@ bool Encoder::SetMfxFourCc()
     map["Y210"] = { MFX_FOURCC_Y210, MFX_CHROMAFORMAT_YUV422, 10, 10, 1 };
 
     // Set pixel format parameters.
-    auto it = map.find(params_.pixel_format);
+    auto it = map.find(params_.camera_format.FourCcStr());
     if (it != map.end()) {
         LOG_DEBUG << std::format("Using {} for video pixel format", it->first);
 
@@ -343,7 +331,7 @@ bool Encoder::SetMfxFourCc()
             return false;
         }
     } else {
-        LOG_ERROR << "Unhandled input pixel format: " << params_.pixel_format;
+        LOG_ERROR << "Unhandled input pixel format: " << params_.camera_format.FourCcStr();
         return false;
     }
 
