@@ -29,6 +29,7 @@
 #include <SDL3/SDL.h>
 
 #include "linux/typedefs.hpp"
+#include "util.hpp"
 
 namespace vacon {
 namespace linux {
@@ -49,15 +50,32 @@ enum class ChromaFormat {
 };
 
 struct CameraFormat {
-    // The sort key.
-    float           frame_rate = 0.0f;
-    ChromaFormat    chroma_format = ChromaFormat::Invalid;
-    uint32_t        width = 0;
-    uint32_t        height = 0;
-
-    // The parameters to pass to VIDIOC_S_FMT, VIDIOC_S_PARM.
+    // The V4L2 parameters to pass to VIDIOC_S_FMT and VIDIOC_S_PARM when
+    // initializing a V4L2 device.
     v4l2_format     fmt = {};
     v4l2_streamparm parm = {};
+
+    // Helper functions to grovel around in the V4L2 parameters.
+    std::string FourCcStr() const { return util::FourCcToString(FourCc()); }
+    uint32_t FourCc() const { return fmt.fmt.pix.pixelformat; }
+    uint32_t Width() const { return fmt.fmt.pix.width; }
+    uint32_t Height() const { return fmt.fmt.pix.height; }
+    uint32_t FrameTimeN() const { return parm.parm.capture.timeperframe.numerator; }
+    uint32_t FrameTimeD() const { return parm.parm.capture.timeperframe.denominator; }
+    uint32_t FrameRateN() const { return parm.parm.capture.timeperframe.denominator; }
+    uint32_t FrameRateD() const { return parm.parm.capture.timeperframe.numerator; }
+    float FrameTime() const { return (float)FrameTimeN() / (float)FrameTimeD(); }
+    float FrameRate() const { return (float)FrameRateN() / (float)FrameRateD(); }
+    ChromaFormat Chroma() const
+    {
+        switch (FourCc()) {
+        case V4L2_PIX_FMT_YUYV: [[fallthrough]];
+        case V4L2_PIX_FMT_UYVY: return ChromaFormat::YUV422_8;
+        case V4L2_PIX_FMT_NV12: return ChromaFormat::YUV420_8;
+        default: return ChromaFormat::Invalid;
+        }
+    }
+    std::string Str() const { return std::format("{}x{}@{} {}", Width(), Height(), FrameRate(), FourCcStr()); }
 };
 
 struct CameraBuffer {
@@ -94,6 +112,7 @@ class Camera {
         ~Camera();
         bool Init();
         bool ExportBuffersToOpenGL(SDL_Renderer*);
+        CameraFormat GetCameraFormat();
 
     private:
         Camera() = default;
@@ -104,22 +123,22 @@ class Camera {
 
         bool OpenDevice();
         bool EnumerateFormats();
-        bool InitV4L2(const CameraFormat&);
+        bool InitV4L2();
         bool InitBuffers();
         bool StartCapturing();
 
         std::shared_ptr<CameraBufferRef> NextFrame();
 
-        CameraParams params_;
+        CameraParams                params_ = {};
+        CameraFormat                format_ = {};
+        int                         fd_ = -1;
+        std::jthread                thread_ = {};
+        std::vector<CameraBuffer>   bufs_ = {};
+        std::vector<CameraFormat>   formats_ = {};
+        v4l2_pix_format             pixfmt_ = {};
 
-        std::jthread thread_ = {};
-
-        int fd_ = -1;
-        std::vector<CameraBuffer> bufs_ = {};
-        std::chrono::time_point<std::chrono::steady_clock> t_last_;
-
-        struct v4l2_pix_format fmt_ = {};
-        std::vector<CameraFormat> formats_ = {};
+        std::chrono::time_point<std::chrono::steady_clock>
+                                    t_last_ = {};
 };
 
 } // namespace linux

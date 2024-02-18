@@ -19,9 +19,13 @@
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <format>
+#include <memory>
+#include <thread>
 #include <utility>
+#include <vector>
 
 #include <linux/version.h>
 #include <linux/videodev2.h>
@@ -146,8 +150,9 @@ bool Camera::InitCamera()
         return false;
     }
 
-    if (!InitV4L2(formats_.front())) {
+    if (!InitV4L2()) {
         LOG_ERROR << "InitV4L2() failed";
+        format_ = {};
         return false;
     }
 
@@ -163,7 +168,8 @@ bool Camera::InitCamera()
 
     t_last_ = std::chrono::steady_clock::now();
     auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_last_ - t_start).count();
-    LOG_INFO << std::format("Initialized V4L2 device {} in {} ms", params_.device, millis);
+    LOG_INFO << std::format("Initialized V4L2 device {} with format {} in {} ms",
+                            params_.device, format_.Str(), millis);
 
     return true;
 }
@@ -217,6 +223,11 @@ Camera::~Camera()
     }
 }
 
+CameraFormat Camera::GetCameraFormat()
+{
+    return format_;
+}
+
 bool Camera::OpenDevice()
 {
     // Open the V4L2 device's character node.
@@ -265,22 +276,6 @@ bool Camera::EnumerateFormats()
             continue;
         }
 
-        ChromaFormat chroma_format = ChromaFormat::Invalid;
-        switch (fmtdesc.pixelformat) {
-        case V4L2_PIX_FMT_YUYV: [[fallthrough]];
-        case V4L2_PIX_FMT_UYVY:
-            chroma_format = ChromaFormat::YUV422_8;
-            break;
-        case V4L2_PIX_FMT_NV12:
-            chroma_format = ChromaFormat::YUV420_8;
-            break;
-        default:
-            LOG_VERBOSE << std::format("Unhandled V4L2 pixel format {} ({:#010x})",
-                                       util::FourCcToString(fmtdesc.pixelformat),
-                                       fmtdesc.pixelformat);
-            return false;
-        }
-
         // VIDIOC_ENUM_FRAMESIZES
         struct v4l2_frmsizeenum frmsize = {};
         frmsize.pixel_format = fmtdesc.pixelformat;
@@ -318,18 +313,7 @@ bool Camera::EnumerateFormats()
                     continue;
                 }
 
-                float frame_rate = (float)frmival.discrete.denominator / (float)frmival.discrete.numerator;
-                LOG_VERBOSE << std::format("frmival: frame rate = {}", frame_rate);
-
-                // Check if the frame rate is allowed.
-                if (frame_rate < min_frame_rate || frame_rate > max_frame_rate) {
-                    LOG_VERBOSE << std::format("Ignoring frame rate {} out of bounds [{}, {}]",
-                                               frame_rate, min_frame_rate, max_frame_rate);
-                    continue;
-                }
-
-                // Add this frame rate + frame size + pixel format combination
-                // to the list of camera formats.
+                // Construct the CameraFormat and its members.
                 struct v4l2_format fmt          = {};
                 fmt.type                        = V4L2_BUF_TYPE_VIDEO_CAPTURE;
                 fmt.fmt.pix.width               = frmsize.discrete.width;
@@ -340,14 +324,22 @@ bool Camera::EnumerateFormats()
                 parm.type                       = V4L2_BUF_TYPE_VIDEO_CAPTURE;
                 parm.parm.capture.timeperframe  = frmival.discrete;
 
-                formats_.emplace_back(CameraFormat {
-                    .frame_rate     = frame_rate,
-                    .chroma_format  = chroma_format,
-                    .width          = frmsize.discrete.width,
-                    .height         = frmsize.discrete.height,
-                    .fmt            = fmt,
-                    .parm           = parm,
-                });
+                auto format = CameraFormat {
+                    .fmt    = fmt,
+                    .parm   = parm,
+                };
+
+                LOG_VERBOSE << std::format("frmival: frame rate = {}", format.FrameRate());
+
+                // Check if the frame rate is allowed.
+                if (format.FrameRate() < min_frame_rate || format.FrameRate() > max_frame_rate) {
+                    LOG_VERBOSE << std::format("Ignoring frame rate {} out of bounds [{}, {}]",
+                                               format.FrameRate(), min_frame_rate, max_frame_rate);
+                    continue;
+                }
+
+                // Add the CameraFormat to the list of approved formats.
+                formats_.push_back(format);
 
             } // VIDIOC_ENUM_FRAMEINTERVALS
         } // VIDIOC_ENUM_FRAMESIZES
@@ -370,18 +362,16 @@ bool Camera::EnumerateFormats()
     // - 4:2:0 1920x1080@60 is better than 4:2:2 1280x720@60
     //
     std::sort(formats_.begin(), formats_.end(),
-              [](const CameraFormat& a, const CameraFormat& b) { return a.chroma_format > b.chroma_format; });
+              [](const CameraFormat& a, const CameraFormat& b) { return a.Chroma() > b.Chroma(); });
     std::sort(formats_.begin(), formats_.end(),
-              [](const CameraFormat& a, const CameraFormat& b) { return a.width > b.width; });
+              [](const CameraFormat& a, const CameraFormat& b) { return a.Width() > b.Width(); });
     std::sort(formats_.begin(), formats_.end(),
-              [](const CameraFormat& a, const CameraFormat& b) { return a.height > b.height; });
+              [](const CameraFormat& a, const CameraFormat& b) { return a.Height() > b.Height(); });
     std::sort(formats_.begin(), formats_.end(),
-              [](const CameraFormat& a, const CameraFormat& b) { return a.frame_rate > b.frame_rate; });
+              [](const CameraFormat& a, const CameraFormat& b) { return a.FrameRate() > b.FrameRate(); });
 
     for (auto& format : formats_) {
-        LOG_DEBUG << std::format("Preferred format: {}x{}@{} {}",
-                                 format.width, format.height, format.frame_rate,
-                                 util::FourCcToString(format.fmt.fmt.pix.pixelformat));
+        LOG_DEBUG << std::format("Usable camera format: {}", format.Str());
     }
 
     if (formats_.empty()) {
@@ -393,8 +383,14 @@ bool Camera::EnumerateFormats()
     return true;
 }
 
-bool Camera::InitV4L2(const CameraFormat& format)
+bool Camera::InitV4L2()
 {
+    if (formats_.empty()) {
+        LOG_ERROR << "No usable camera formats found!";
+        return false;
+    }
+    format_ = formats_.front();
+
     // VIDIOC_QUERYCAP
     struct v4l2_capability cap = {};
     if (ioctl(fd_, VIDIOC_QUERYCAP, &cap) == 0) {
@@ -437,7 +433,7 @@ bool Camera::InitV4L2(const CameraFormat& format)
     }
 
     // VIDIOC_S_FMT
-    auto force_fmt = format.fmt;
+    auto force_fmt = format_.fmt;
     LOG_VERBOSE << "Trying to force camera data format:";
     LogV4L2Format(&force_fmt);
     if (ioctl(fd_, VIDIOC_S_FMT, &force_fmt) == 0) {
@@ -448,25 +444,34 @@ bool Camera::InitV4L2(const CameraFormat& format)
         return false;
     }
 
-    // Save the actual pixel format selected by the V4L2 driver, so we know the
-    // various parameters of the captured camera frames like width, height,
-    // pixel format, and pitch.
-    fmt_ = force_fmt.fmt.pix;
-
     // VIDIOC_S_PARM
-    auto parm = format.parm;
-    if (ioctl(fd_, VIDIOC_S_PARM, &parm) == 0) {
-        auto frame_time =
-            double(parm.parm.capture.timeperframe.numerator) /
-            double(parm.parm.capture.timeperframe.denominator);
-        LOG_VERBOSE << std::format("Time per frame set to {}/{} ({:f}) seconds",
-                                    parm.parm.capture.timeperframe.numerator,
-                                    parm.parm.capture.timeperframe.denominator,
-                                    frame_time);
-    } else {
+    auto force_parm = format_.parm;
+    if (ioctl(fd_, VIDIOC_S_PARM, &force_parm) != 0) {
         LOG_ERROR << std::format("ioctl(VIDIO_S_PARM) on fd {} failed: {} ({})", fd_, errno, strerror(errno));
         return false;
     }
+
+    // Check the actual parameters selected by the driver. Since the parameters
+    // sent to the driver with VIDIOC_S_FMT were originally enumerated by the
+    // driver, they ought to be supported, so if they differ something has gone
+    // horribly wrong.
+    auto actual = CameraFormat {
+        .fmt = force_fmt,
+        .parm = force_parm,
+    };
+    if (actual.Width() != format_.Width() ||
+        actual.Height() != format_.Height() ||
+        actual.FourCc() != format_.FourCc() ||
+        actual.FrameRate() != format_.FrameRate())
+    {
+        LOG_ERROR << std::format("Unable to set capture parameters! Tried to set {}, but driver used {}!",
+                                 format_.Str(), actual.Str());
+        return false;
+    }
+
+    // Save the additional capture parameters returned by VIDIOC_S_FMT, e.g.
+    // pixel pitch.
+    pixfmt_ = force_fmt.fmt.pix;
 
     // Success.
     return true;
@@ -538,7 +543,7 @@ bool Camera::InitBuffers()
         bufs_.emplace_back(CameraBuffer {
             .vbuf   = buf,
             .expbuf = expbuf,
-            .fmt    = fmt_,
+            .fmt    = pixfmt_,
             .mmap   = std::span<const std::byte>(static_cast<const std::byte*>(data),
                                                  static_cast<size_t>(buf.length)),
         });
@@ -552,15 +557,15 @@ bool Camera::InitBuffers()
 
 bool Camera::ExportBuffersToOpenGL(SDL_Renderer* sdl_renderer)
 {
-    switch (fmt_.pixelformat) {
+    switch (pixfmt_.pixelformat) {
     case V4L2_PIX_FMT_NV12: [[fallthrough]];
     case V4L2_PIX_FMT_UYVY: [[fallthrough]];
     case V4L2_PIX_FMT_YUYV:
         break;
     default:
         LOG_ERROR << std::format("Unhandled V4L2 pixel format {} ({:#010x})",
-                                 util::FourCcToString(fmt_.pixelformat),
-                                 fmt_.pixelformat);
+                                 util::FourCcToString(pixfmt_.pixelformat),
+                                 pixfmt_.pixelformat);
         return false;
     }
 
@@ -576,20 +581,20 @@ bool Camera::ExportBuffersToOpenGL(SDL_Renderer* sdl_renderer)
         // `EGL_EXT_image_dma_buf_import` extension. These attributes are
         // sufficient for single plane pixel formats like YUYV.
         std::vector<EGLAttrib> attrs = {
-            EGL_WIDTH,                      static_cast<EGLint>(fmt_.width),
-            EGL_HEIGHT,                     static_cast<EGLint>(fmt_.height),
-            EGL_LINUX_DRM_FOURCC_EXT,       static_cast<EGLint>(fmt_.pixelformat),
-            EGL_DMA_BUF_PLANE0_PITCH_EXT,   static_cast<EGLint>(fmt_.bytesperline),
+            EGL_WIDTH,                      static_cast<EGLint>(pixfmt_.width),
+            EGL_HEIGHT,                     static_cast<EGLint>(pixfmt_.height),
+            EGL_LINUX_DRM_FOURCC_EXT,       static_cast<EGLint>(pixfmt_.pixelformat),
+            EGL_DMA_BUF_PLANE0_PITCH_EXT,   static_cast<EGLint>(pixfmt_.bytesperline),
             EGL_DMA_BUF_PLANE0_OFFSET_EXT,  0,
             EGL_DMA_BUF_PLANE0_FD_EXT,      buf.expbuf.fd,
         };
 
-        if (fmt_.pixelformat == V4L2_PIX_FMT_NV12) {
+        if (pixfmt_.pixelformat == V4L2_PIX_FMT_NV12) {
             // NV12 is a "semi-planar" format and needs additional attributes
             // specifying the UV plane.
             std::vector<EGLAttrib> more_attrs = {
-                EGL_DMA_BUF_PLANE1_PITCH_EXT,   static_cast<EGLint>(fmt_.bytesperline),
-                EGL_DMA_BUF_PLANE1_OFFSET_EXT,  static_cast<EGLint>(fmt_.bytesperline * fmt_.height),
+                EGL_DMA_BUF_PLANE1_PITCH_EXT,   static_cast<EGLint>(pixfmt_.bytesperline),
+                EGL_DMA_BUF_PLANE1_OFFSET_EXT,  static_cast<EGLint>(pixfmt_.bytesperline * pixfmt_.height),
                 EGL_DMA_BUF_PLANE1_FD_EXT,      buf.expbuf.fd,
             };
             attrs.insert(attrs.end(), more_attrs.begin(), more_attrs.end());
@@ -614,8 +619,8 @@ bool Camera::ExportBuffersToOpenGL(SDL_Renderer* sdl_renderer)
             SDL_CreateTexture(sdl_renderer,
                               SDL_PIXELFORMAT_EXTERNAL_OES,
                               SDL_TEXTUREACCESS_STATIC,
-                              fmt_.width,
-                              fmt_.height);
+                              pixfmt_.width,
+                              pixfmt_.height);
         if (!buf.texture) {
             LOG_ERROR << "SDL_CreateTexture() failed: " << SDL_GetError();
             return false;
