@@ -509,6 +509,8 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
 
     auto t_stop = std::chrono::steady_clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_stop - t_start).count();
+    s_encode_time_.Update(micros);
+
     auto msg = std::format("Encoded frame from buffer {}, sequence {} in {} us, {} bytes",
                            cref.buf_.vbuf.index,
                            cref.buf_.vbuf.sequence,

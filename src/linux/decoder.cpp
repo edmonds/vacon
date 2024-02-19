@@ -343,7 +343,8 @@ void Decoder::DecodePacket(std::shared_ptr<PacketRef> pref)
 
     auto t_end = std::chrono::steady_clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start).count();
-    LOG_DEBUG << std::format("Decoded video packet in {} us", micros);
+    s_decode_time_.Update(micros);
+    LOG_VERBOSE << std::format("Decoded video packet in {} us", micros);
 
     // Enqueue the decoded video frame onto the queue for the renderer.
     if (params_.decoded_video_frame_queue) {

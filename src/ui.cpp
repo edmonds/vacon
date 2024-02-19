@@ -167,10 +167,26 @@ void App::ShowStatsOverlay(bool* p_open)
         if (g_imfont_mono) {
             ImGui::PushFont(g_imfont_mono);
         }
-        ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
+
+        if (decoder_) {
+            auto s = decoder_->s_decode_time_.Result();
+            ImGui::Text("Decode: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
+        }
+
+        if (encoder_) {
+            auto s = encoder_->s_encode_time_.Result();
+            ImGui::Text("Encode: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
+        }
+
         ImGui::Separator();
-        ImGui::Text("Display time: %d us", int(1'000'000.0f / io.Framerate));
+
+        ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
+
+        ImGui::Separator();
+
+        ImGui::Text("Display time: %d µs", int(1'000'000.0f / io.Framerate));
         ImGui::Text("Display rate: %.3f fps", io.Framerate);
+
         if (g_imfont_mono) {
             ImGui::PopFont();
         }

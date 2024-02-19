@@ -30,6 +30,7 @@
 #include "linux/camera.hpp"
 #include "linux/typedefs.hpp"
 #include "packet_ref.hpp"
+#include "stats.hpp"
 
 namespace vacon {
 namespace linux {
@@ -60,6 +61,8 @@ class Decoder {
         bool Init();
         void RequestStop();
         void Join();
+
+        Welford             s_decode_time_ = {};
 
     private:
         Decoder() = default;

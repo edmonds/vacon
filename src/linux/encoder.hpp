@@ -25,6 +25,7 @@
 #include "linux/camera.hpp"
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
+#include "stats.hpp"
 
 namespace vacon {
 namespace linux {
@@ -49,6 +50,8 @@ class Encoder {
         bool Init();
         void RequestStop();
         void Join();
+
+        Welford             s_encode_time_ = {};
 
     private:
         Encoder() = default;
