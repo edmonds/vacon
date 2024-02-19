@@ -712,6 +712,7 @@ bool Camera::StartCapturing()
 
         auto status = poll(&pfd, 1, 3000 /* timeout in ms */);
         if (status == -1) {
+            PushEvent(Event::CameraTimeout);
             LOG_ERROR << std::format("poll() on fd {} failed: {} ({})", fd_, errno, strerror(errno));
             return false;
         }

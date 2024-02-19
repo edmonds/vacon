@@ -137,18 +137,27 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         break;
 
     case Event::CameraStarted:
-        if (camera_) {
-            if (sdl_renderer_) {
-                LOG_DEBUG << "[CameraStarted] Calling Camera::ExportBuffersToOpenGL() on render thread";
-                camera_->ExportBuffersToOpenGL(sdl_renderer_);
-            }
-            LOG_DEBUG << "[CameraStarted] Creating encoder";
-            StartVideoEncoder();
+        n_camera_timeouts_ = 0;
+        if (sdl_renderer_) {
+            LOG_DEBUG << "[CameraStarted] Calling Camera::ExportBuffersToOpenGL() on render thread";
+            camera_->ExportBuffersToOpenGL(sdl_renderer_);
         }
+        LOG_DEBUG << "[CameraStarted] Starting video encoder";
+        StartVideoEncoder();
         break;
 
-    case Event::CameraFailed:
+    case Event::CameraFailed: {
         LOG_FATAL << "[CameraFailed]";
+        const int MAX_CAMERA_TIMEOUTS = 3;
+        if (n_camera_timeouts_ < MAX_CAMERA_TIMEOUTS) {
+            StartVideoCamera();
+        }
+        break;
+    }
+
+    case Event::CameraTimeout:
+        LOG_DEBUG << "[CameraTimeout]";
+        ++n_camera_timeouts_;
         break;
 
     case Event::DecoderStarting:
