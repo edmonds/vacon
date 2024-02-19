@@ -370,7 +370,6 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
 void NetworkHandler::ReceivePacket(rtc::binary pkt)
 {
     // This is an RTP packet.
-    LOG_VERBOSE << std::format("RECEIVED AN RTP PACKET !!! length {}", pkt.size());
     if (rtp_depacketizer_) {
         rtp_depacketizer_->submitRtpPacket(pkt);
     }

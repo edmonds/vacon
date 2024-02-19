@@ -209,7 +209,6 @@ int RtpDepacketizer::readAvioPacketRTP(void *opaque, uint8_t *buf, int buf_size)
     rtc::binary packet;
     for (;;) {
         dpkt->rtp_packet_queue.wait_dequeue(packet);
-        LOG_VERBOSE << std::format("Dequeued RTP packet size {}", packet.size());
         if (vacon::gUSR1) {
             vacon::gUSR1 = 0;
             LOG_DEBUG << "Dropping a packet due to signal!";
@@ -268,7 +267,6 @@ int RtpDepacketizer::writeAvioPacketRTP(void *opaque __attribute__((unused)),
 
 void RtpDepacketizer::submitRtpPacket(rtc::binary packet)
 {
-    LOG_VERBOSE << std::format("Enqueuing RTP packet size {}", packet.size());
     this->rtp_packet_queue.emplace(packet);
 }
 
