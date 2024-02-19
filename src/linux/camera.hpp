@@ -29,6 +29,7 @@
 #include <SDL3/SDL.h>
 
 #include "linux/typedefs.hpp"
+#include "stats.hpp"
 #include "util.hpp"
 
 namespace vacon {
@@ -115,6 +116,8 @@ class Camera {
         void Join();
         bool ExportBuffersToOpenGL(SDL_Renderer*);
         CameraFormat GetCameraFormat();
+
+        Welford                     s_capture_time_ = {};
 
     private:
         Camera() = default;

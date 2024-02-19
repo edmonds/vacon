@@ -168,6 +168,11 @@ void App::ShowStatsOverlay(bool* p_open)
             ImGui::PushFont(g_imfont_mono);
         }
 
+        if (camera_) {
+            auto s = camera_->s_capture_time_.Result();
+            ImGui::Text("Camera: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
+        }
+
         if (decoder_) {
             auto s = decoder_->s_decode_time_.Result();
             ImGui::Text("Decode: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);

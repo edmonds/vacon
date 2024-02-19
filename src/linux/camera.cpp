@@ -775,6 +775,7 @@ std::shared_ptr<CameraBufferRef> Camera::NextFrame()
 
         auto t_now = std::chrono::steady_clock::now();
         auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_now - t_last_).count();
+        s_capture_time_.Update(micros);
         t_last_ = t_now;
 
         // Update the v4l2_buffer embedded in the CameraBuffer in order to
