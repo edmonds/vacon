@@ -190,6 +190,11 @@ void App::ShowStatsOverlay(bool* p_open)
             ImGui::Text("Render: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
         }
 
+        {
+            auto s = s_present_time_.Result();
+            ImGui::Text("Present: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
+        }
+
         ImGui::Separator();
 
         ImGui::Text("Remote frames:  %u (%u)", stats_.n_remote, stats_.n_remote_underflow);
@@ -255,11 +260,15 @@ void App::RenderFrame()
                        io.DisplayFramebufferScale.y);
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData());
 
-    auto t_stop = std::chrono::steady_clock::now();
-    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_stop - t_start).count();
+    auto t_render = std::chrono::steady_clock::now();
+    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_render - t_start).count();
     s_render_time_.Update(micros);
 
     SDL_RenderPresent(sdl_renderer_);
+
+    auto t_present = std::chrono::steady_clock::now();
+    micros = std::chrono::duration_cast<std::chrono::microseconds>(t_present - t_render).count();
+    s_present_time_.Update(micros);
 }
 
 void App::ShowDecodedVideoFrame()
