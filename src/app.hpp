@@ -129,6 +129,8 @@ class App {
             outgoing_video_packet_queue_                = std::make_shared<linux::VideoPacketQueue>(2);
 
         struct {
+            unsigned    n_decoded                       = 0;
+            unsigned    n_decoded_underflow             = 0;
             unsigned    n_preview                       = 0;
             unsigned    n_preview_underflow             = 0;
         } stats_;

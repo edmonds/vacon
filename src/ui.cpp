@@ -192,6 +192,7 @@ void App::ShowStatsOverlay(bool* p_open)
 
         ImGui::Separator();
 
+        ImGui::Text("Decoded frames: %u (%u)", stats_.n_decoded, stats_.n_decoded_underflow);
         ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
 
         ImGui::Separator();
@@ -265,12 +266,12 @@ void App::ShowDecodedVideoFrame()
 {
     // Get the next decoded video frame from the decoder.
     if (decoded_video_frame_queue_->try_dequeue(decoded_frame_)) {
-        LOG_VERBOSE << std::format("Got next decoded video frame: VASurfaceID = {}, DRM PRIME fd = {}",
-                                   decoded_frame_->exported_surface_->vaSurfaceID,
-                                   decoded_frame_->prime_.objects[0].fd);
+        ++stats_.n_decoded;
     } else {
         // No new video frame available from the decoder.
-        if (!decoded_frame_) {
+        if (decoded_frame_) [[likely]] {
+            ++stats_.n_decoded_underflow;
+        } else {
             // No previous frame, either.
             return;
         }
