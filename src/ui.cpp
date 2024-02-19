@@ -307,13 +307,13 @@ void App::ShowPreview()
         // iteration (i.e., if the preview queue underflows).
         preview_cref_ = cref;
     } else {
-        // No new preview frame, use the previous frame.
-        ++stats_.n_preview_underflow;
+        // No new preview frame, use the previous frame if available.
+        if (preview_cref_) [[likely]] {
+            ++stats_.n_preview_underflow;
+        }
     }
 
     if (enable_self_view_) {
-        ++stats_.n_preview;
-
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ShowPreviewWindow();
@@ -337,6 +337,8 @@ void App::ShowPreviewWindow()
     }
 
     if (preview_cref_) {
+        ++stats_.n_preview;
+
         // Show the frame from the camera.
         if (mirror_self_view_) {
             ImGui::Image(static_cast<void*>(preview_cref_->buf_.texture),
