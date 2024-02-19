@@ -45,6 +45,9 @@ class App {
         void ProcessUserEvent(const SDL_UserEvent*);
         void StartNetworkHandler();
         void StartVideo();
+        void StartVideoCamera();
+        void StartVideoDecoder();
+        void StartVideoEncoder();
         void StopNetworkHandler();
         void StopVideo();
 

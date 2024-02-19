@@ -142,19 +142,8 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
                 LOG_DEBUG << "[CameraStarted] Calling Camera::ExportBuffersToOpenGL() on render thread";
                 camera_->ExportBuffersToOpenGL(sdl_renderer_);
             }
-
             LOG_DEBUG << "[CameraStarted] Creating encoder";
-            encoder_ = linux::Encoder::Create(linux::EncoderParams {
-                .camera_format                  = camera_->GetCameraFormat(),
-                .bitrate_kbps                   = args_.get<unsigned>("--video-encoder-bitrate"),
-                .encoder_queue                  = encoder_queue_,
-                .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
-            });
-            if (!encoder_) {
-                LOG_FATAL << "[CameraStarted] linux::Encoder::Create() failed!";
-                break;
-            }
-            encoder_->Init();
+            StartVideoEncoder();
         }
         break;
 
@@ -238,7 +227,12 @@ void App::StartVideo()
         return;
     }
 
-    // Start the linux::Camera.
+    StartVideoCamera();
+    StartVideoDecoder();
+}
+
+void App::StartVideoCamera()
+{
     camera_ = linux::Camera::Create(linux::CameraParams {
         .device         = args_.get<std::string>("--camera-device"),
         .encoder_queue  = encoder_queue_,
@@ -249,8 +243,10 @@ void App::StartVideo()
         return;
     }
     camera_->Init();
+}
 
-    // Start the linux::Decoder.
+void App::StartVideoDecoder()
+{
     decoder_ = linux::Decoder::Create(linux::DecoderParams {
         .incoming_video_packet_queue    = incoming_video_packet_queue_,
         .decoded_video_frame_queue      = decoded_video_frame_queue_,
@@ -262,6 +258,20 @@ void App::StartVideo()
     decoder_->Init();
 }
 
+void App::StartVideoEncoder()
+{
+    encoder_ = linux::Encoder::Create(linux::EncoderParams {
+        .camera_format                  = camera_->GetCameraFormat(),
+        .bitrate_kbps                   = args_.get<unsigned>("--video-encoder-bitrate"),
+        .encoder_queue                  = encoder_queue_,
+        .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
+    });
+    if (!encoder_) {
+        LOG_FATAL << "[CameraStarted] linux::Encoder::Create() failed!";
+        return;
+    }
+    encoder_->Init();
+}
 
 void App::StopVideo()
 {
