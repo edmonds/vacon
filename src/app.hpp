@@ -28,6 +28,7 @@
 #include "linux/video_frame.hpp"
 #include "packet_ref.hpp"
 #include "network_handler.hpp"
+#include "stats.hpp"
 
 namespace vacon {
 
@@ -91,6 +92,8 @@ class App {
         SDL_Renderer*   sdl_renderer_                   = nullptr;
         SDL_Texture*    sdl_texture_placeholder_        = nullptr;
         SDL_Window*     sdl_window_                     = nullptr;
+
+        Welford         s_render_time_                  = {};
 
         std::unique_ptr<linux::Camera>
             camera_                                     = nullptr;

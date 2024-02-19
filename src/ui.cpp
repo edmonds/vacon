@@ -15,6 +15,8 @@
 
 #include "app.hpp"
 
+#include <chrono>
+
 #include <SDL3/SDL.h>
 #include <plog/Log.h>
 #include <imgui.h>
@@ -183,6 +185,11 @@ void App::ShowStatsOverlay(bool* p_open)
             ImGui::Text("Encode: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
         }
 
+        {
+            auto s = s_render_time_.Result();
+            ImGui::Text("Render: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
+        }
+
         ImGui::Separator();
 
         ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
@@ -201,6 +208,8 @@ void App::ShowStatsOverlay(bool* p_open)
 
 void App::RenderFrame()
 {
+    auto t_start = std::chrono::steady_clock::now();
+
     // Start the Dear ImGui frame.
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
@@ -244,6 +253,10 @@ void App::RenderFrame()
                        io.DisplayFramebufferScale.x,
                        io.DisplayFramebufferScale.y);
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData());
+
+    auto t_stop = std::chrono::steady_clock::now();
+    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_stop - t_start).count();
+    s_render_time_.Update(micros);
 
     SDL_RenderPresent(sdl_renderer_);
 }
