@@ -192,7 +192,7 @@ void App::ShowStatsOverlay(bool* p_open)
 
         ImGui::Separator();
 
-        ImGui::Text("Decoded frames: %u (%u)", stats_.n_decoded, stats_.n_decoded_underflow);
+        ImGui::Text("Remote frames:  %u (%u)", stats_.n_remote, stats_.n_remote_underflow);
         ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
 
         ImGui::Separator();
@@ -266,11 +266,11 @@ void App::ShowDecodedVideoFrame()
 {
     // Get the next decoded video frame from the decoder.
     if (decoded_video_frame_queue_->try_dequeue(decoded_frame_)) {
-        ++stats_.n_decoded;
+        ++stats_.n_remote;
     } else {
         // No new video frame available from the decoder.
         if (decoded_frame_) [[likely]] {
-            ++stats_.n_decoded_underflow;
+            ++stats_.n_remote_underflow;
         } else {
             // No previous frame, either.
             return;
