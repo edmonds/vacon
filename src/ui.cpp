@@ -195,6 +195,11 @@ void App::ShowStatsOverlay(bool* p_open)
             ImGui::Text("Present: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
         }
 
+        {
+            auto s = s_display_time_.Result();
+            ImGui::Text("Display: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
+        }
+
         ImGui::Separator();
 
         ImGui::Text("Camera frames:  %zu (M:%zu, OE:%zu, OP:%zu)",
@@ -218,7 +223,6 @@ void App::ShowStatsOverlay(bool* p_open)
 
         ImGui::Separator();
 
-        ImGui::Text("Display time:  %d µs", int(1'000'000.0f / io.Framerate));
         ImGui::Text("Display rate:  %.3f fps", io.Framerate);
         ImGui::Text("Incoming rate: %.3f fps", n_network_incoming_fpks.load(std::memory_order_relaxed) / 1000.0);
         ImGui::Text("Outgoing rate: %.3f fps", n_network_outgoing_fpks.load(std::memory_order_relaxed) / 1000.0);
@@ -239,6 +243,7 @@ void App::RenderFrame()
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
     ImGuiIO& io = ImGui::GetIO();
+    s_display_time_.Update(1'000'000.0f / io.Framerate);
 
     // Fill the window with the background color.
     SDL_SetRenderDrawColor(sdl_renderer_, 58, 110, 165, SDL_ALPHA_OPAQUE);

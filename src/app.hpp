@@ -98,6 +98,7 @@ class App {
         SDL_Texture*    sdl_texture_placeholder_        = nullptr;
         SDL_Window*     sdl_window_                     = nullptr;
 
+        Welford         s_display_time_                 = {};
         Welford         s_present_time_                 = {};
         Welford         s_render_time_                  = {};
 
