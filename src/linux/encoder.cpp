@@ -16,6 +16,7 @@
 #include "linux/encoder.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cerrno>
 #include <chrono>
@@ -40,6 +41,10 @@ using namespace std::chrono_literals;
 
 namespace vacon {
 namespace linux {
+
+std::atomic_size_t n_frames_encode_success  = 0;
+std::atomic_size_t n_frames_encode_fail     = 0;
+std::atomic_size_t n_frames_encode_stall    = 0;
 
 std::unique_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 {
@@ -128,8 +133,11 @@ void Encoder::RunEncoder(std::stop_token st)
 
             if (!video_frame) {
                 LOG_ERROR << "EncodeCameraFrame() failed!";
+                n_frames_encode_fail.fetch_add(1, std::memory_order_relaxed);
                 continue;
             }
+
+            n_frames_encode_success.fetch_add(1, std::memory_order_relaxed);
 
             // Enqueue the compressed video frame for network transport.
             if (params_.outgoing_video_packet_queue) {
@@ -138,6 +146,7 @@ void Encoder::RunEncoder(std::stop_token st)
                         break;
                     } else {
                         LOG_VERBOSE << "Stalled enqueuing packet onto outgoing video packet queue, retrying";
+                        n_frames_encode_stall.fetch_add(1, std::memory_order_relaxed);
                     }
                 }
             }

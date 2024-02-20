@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -29,6 +30,10 @@
 
 namespace vacon {
 namespace linux {
+
+extern std::atomic_size_t n_frames_encode_success;
+extern std::atomic_size_t n_frames_encode_fail;
+extern std::atomic_size_t n_frames_encode_stall;
 
 struct EncoderParams {
     CameraFormat camera_format;
