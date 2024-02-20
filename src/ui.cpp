@@ -208,6 +208,11 @@ void App::ShowStatsOverlay(bool* p_open)
                     linux::n_frames_decode_fail     .load(std::memory_order_relaxed),
                     linux::n_frames_decode_overflow .load(std::memory_order_relaxed)
         );
+        ImGui::Text("Encoded frames: %zu (%zu, %zu)",
+                    linux::n_frames_encode_success  .load(std::memory_order_relaxed),
+                    linux::n_frames_encode_fail     .load(std::memory_order_relaxed),
+                    linux::n_frames_encode_stall    .load(std::memory_order_relaxed)
+        );
         ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
         ImGui::Text("Remote frames:  %u (%u)", stats_.n_remote, stats_.n_remote_underflow);
 
