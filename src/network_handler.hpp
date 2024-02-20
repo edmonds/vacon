@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -32,6 +33,9 @@
 #include "rtp_depacketizer.hpp"
 
 namespace vacon {
+
+extern std::atomic_size_t n_network_incoming_fpks;
+extern std::atomic_size_t n_network_outgoing_fpks;
 
 struct NetworkHandlerParams {
     std::string signaling_base_url;

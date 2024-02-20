@@ -15,6 +15,7 @@
 
 #include "network_handler.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <exception>
 #include <format>
@@ -45,6 +46,9 @@ using namespace std::chrono_literals;
 using nlohmann::json;
 
 namespace vacon {
+
+std::atomic_size_t n_network_incoming_fpks = 0;
+std::atomic_size_t n_network_outgoing_fpks = 0;
 
 std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParams& params)
 {
@@ -158,8 +162,9 @@ void NetworkHandler::RunOutgoingDrain(std::stop_token st)
             if (t_dur >= 1s) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
                 auto fps = count_frames / std::chrono::duration<double>(t_dur).count();
-                LOG_INFO << std::format("Processed {} outgoing camera frames in {} ms, {:.3f} fps",
-                                        count_frames, ms, fps);
+                n_network_outgoing_fpks.store(fps * 1000, std::memory_order_relaxed);
+                LOG_VERBOSE << std::format("Processed {} outgoing camera frames in {} ms, {:.3f} fps",
+                                           count_frames, ms, fps);
                 t_last = t_now;
                 count_frames = 0;
             }
@@ -223,8 +228,9 @@ void NetworkHandler::RunIncomingFill(std::stop_token st)
         if (t_dur >= 1s) {
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
             auto fps = count_frames / std::chrono::duration<double>(t_dur).count();
-            LOG_INFO << std::format("Processed {} incoming video frames in {} ms, {:.3f} fps",
-                                    count_frames, ms, fps);
+            n_network_incoming_fpks.store(fps * 1000, std::memory_order_relaxed);
+            LOG_VERBOSE << std::format("Processed {} incoming video frames in {} ms, {:.3f} fps",
+                                       count_frames, ms, fps);
             t_last = t_now;
             count_frames = 0;
         }
