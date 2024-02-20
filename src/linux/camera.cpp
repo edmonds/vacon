@@ -16,6 +16,7 @@
 #include "camera.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
@@ -46,6 +47,11 @@ using namespace std::chrono_literals;
 
 namespace vacon {
 namespace linux {
+
+std::atomic_size_t n_frames_camera_success          = 0;
+std::atomic_size_t n_frames_camera_missed           = 0;
+std::atomic_size_t n_frames_camera_overflow_encoder = 0;
+std::atomic_size_t n_frames_camera_overflow_preview = 0;
 
 static void LogV4L2RequestBuffers(const struct v4l2_requestbuffers *reqbuf)
 {
@@ -179,23 +185,27 @@ void Camera::RunCamera(std::stop_token st)
         if (!cref) {
             continue;
         }
+        n_frames_camera_success.fetch_add(1, std::memory_order_relaxed);
 
         // Check if any frames have been dropped.
         uint32_t sequence = cref->buf_.vbuf.sequence;
         if (last_sequence > 0 && (sequence != last_sequence + 1)) {
             LOG_DEBUG << std::format("Gap in camera frame sequence, current sequence {}, last sequence {}",
                                      sequence, last_sequence);
+            n_frames_camera_missed.fetch_add(sequence - last_sequence, std::memory_order_relaxed);
         }
         last_sequence = sequence;
 
         // Enqueue the camera frame onto the encoder queue.
         if (params_.encoder_queue && !params_.encoder_queue->try_enqueue(cref)) {
             LOG_VERBOSE << "Failed to enqueue frame onto encoder queue, discarding!";
+            n_frames_camera_overflow_encoder.fetch_add(1, std::memory_order_relaxed);
         }
 
         // Enqueue the camera frame onto the preview queue.
         if (params_.preview_queue && !params_.preview_queue->try_enqueue(cref)) {
             LOG_VERBOSE << "Failed to enqueue frame onto preview queue, discarding!";
+            n_frames_camera_overflow_preview.fetch_add(1, std::memory_order_relaxed);
         }
     }
 

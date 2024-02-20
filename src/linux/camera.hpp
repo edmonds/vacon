@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -34,6 +35,11 @@
 
 namespace vacon {
 namespace linux {
+
+extern std::atomic_size_t n_frames_camera_success;
+extern std::atomic_size_t n_frames_camera_missed;
+extern std::atomic_size_t n_frames_camera_overflow_encoder;
+extern std::atomic_size_t n_frames_camera_overflow_preview;
 
 struct CameraParams {
     std::string device;
