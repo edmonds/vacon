@@ -15,6 +15,7 @@
 
 #include "linux/decoder.hpp"
 
+#include <atomic>
 #include <cerrno>
 #include <chrono>
 #include <format>
@@ -43,6 +44,10 @@ using namespace std::chrono_literals;
 
 namespace vacon {
 namespace linux {
+
+std::atomic_size_t n_frames_decode_success  = 0;
+std::atomic_size_t n_frames_decode_fail     = 0;
+std::atomic_size_t n_frames_decode_overflow = 0;
 
 std::unique_ptr<Decoder> Decoder::Create(const DecoderParams& params)
 {
@@ -258,7 +263,7 @@ void Decoder::DecodePacket(std::shared_ptr<PacketRef> pref)
             }
         } else {
             LOG_DEBUG << "MFXVideoDECODE_DecodeHeader() failed: " << MfxStatusStr(status);
-            ++n_frames_failed_;
+            n_frames_decode_fail.fetch_add(1, std::memory_order_relaxed);
             return;
         }
     }
@@ -290,7 +295,7 @@ void Decoder::DecodePacket(std::shared_ptr<PacketRef> pref)
             return;
         }
     } else if (status != MFX_ERR_NONE) {
-        ++n_frames_failed_;
+        n_frames_decode_fail.fetch_add(1, std::memory_order_relaxed);
         LOG_ERROR << "MFXVideoDECODE_DecodeFrameAsync() failed: " << MfxStatusStr(status);
         return;
     }
@@ -300,9 +305,9 @@ void Decoder::DecodePacket(std::shared_ptr<PacketRef> pref)
         status = MFXVideoCORE_SyncOperation(mfx_session_, syncp, 10 /* wait ms */);
     } while (status == MFX_WRN_IN_EXECUTION);
     if (status == MFX_ERR_NONE) {
-        ++n_frames_decoded_;
+        n_frames_decode_success.fetch_add(1, std::memory_order_relaxed);
     } else {
-        ++n_frames_failed_;
+        n_frames_decode_fail.fetch_add(1, std::memory_order_relaxed);
         LOG_ERROR << "MFXVideoCORE_SyncOperation() failed: " << MfxStatusStr(status);
         return;
     }
@@ -350,7 +355,7 @@ void Decoder::DecodePacket(std::shared_ptr<PacketRef> pref)
     if (params_.decoded_video_frame_queue) {
         if (!params_.decoded_video_frame_queue->try_enqueue(frame)) {
             LOG_DEBUG << "Failed to enqueue frame onto decoder output queue, discarding!";
-            ++n_frames_discarded_;
+            n_frames_decode_overflow.fetch_add(1, std::memory_order_relaxed);
         }
     }
 }

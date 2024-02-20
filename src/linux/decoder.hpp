@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <stop_token>
@@ -34,6 +35,10 @@
 
 namespace vacon {
 namespace linux {
+
+extern std::atomic_size_t n_frames_decode_success;
+extern std::atomic_size_t n_frames_decode_fail;
+extern std::atomic_size_t n_frames_decode_overflow;
 
 struct DecoderParams {
     std::shared_ptr<PacketRefQueue>     incoming_video_packet_queue = nullptr;
@@ -84,10 +89,6 @@ class Decoder {
 
         VADisplay           va_display_ = {};
         wl_display*         wl_display_ = nullptr;
-
-        uint32_t            n_frames_decoded_ = 0;
-        uint32_t            n_frames_discarded_ = 0;
-        uint32_t            n_frames_failed_ = 0;
 };
 
 } // namespace linux
