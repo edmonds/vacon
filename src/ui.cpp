@@ -218,8 +218,10 @@ void App::ShowStatsOverlay(bool* p_open)
 
         ImGui::Separator();
 
-        ImGui::Text("Display time: %d µs", int(1'000'000.0f / io.Framerate));
-        ImGui::Text("Display rate: %.3f fps", io.Framerate);
+        ImGui::Text("Display time:  %d µs", int(1'000'000.0f / io.Framerate));
+        ImGui::Text("Display rate:  %.3f fps", io.Framerate);
+        ImGui::Text("Incoming rate: %.3f fps", n_network_incoming_fpks.load(std::memory_order_relaxed) / 1000.0);
+        ImGui::Text("Outgoing rate: %.3f fps", n_network_outgoing_fpks.load(std::memory_order_relaxed) / 1000.0);
 
         if (g_imfont_mono) {
             ImGui::PopFont();
