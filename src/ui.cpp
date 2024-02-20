@@ -197,24 +197,24 @@ void App::ShowStatsOverlay(bool* p_open)
 
         ImGui::Separator();
 
-        ImGui::Text("Camera frames:  %zu (%zu, %zu, %zu)",
+        ImGui::Text("Camera frames:  %zu (M:%zu, OE:%zu, OP:%zu)",
                     linux::n_frames_camera_success          .load(std::memory_order_relaxed),
                     linux::n_frames_camera_missed           .load(std::memory_order_relaxed),
                     linux::n_frames_camera_overflow_encoder .load(std::memory_order_relaxed),
                     linux::n_frames_camera_overflow_preview .load(std::memory_order_relaxed)
         );
-        ImGui::Text("Decoded frames: %zu (%zu, %zu)",
+        ImGui::Text("Decoded frames: %zu (F:%zu, O:%zu)",
                     linux::n_frames_decode_success  .load(std::memory_order_relaxed),
                     linux::n_frames_decode_fail     .load(std::memory_order_relaxed),
                     linux::n_frames_decode_overflow .load(std::memory_order_relaxed)
         );
-        ImGui::Text("Encoded frames: %zu (%zu, %zu)",
+        ImGui::Text("Encoded frames: %zu (F:%zu, S:%zu)",
                     linux::n_frames_encode_success  .load(std::memory_order_relaxed),
                     linux::n_frames_encode_fail     .load(std::memory_order_relaxed),
                     linux::n_frames_encode_stall    .load(std::memory_order_relaxed)
         );
-        ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
-        ImGui::Text("Remote frames:  %u (%u)", stats_.n_remote, stats_.n_remote_underflow);
+        ImGui::Text("Preview frames: %u (U:%u)", stats_.n_preview, stats_.n_preview_underflow);
+        ImGui::Text("Remote frames:  %u (U:%u)", stats_.n_remote, stats_.n_remote_underflow);
 
         ImGui::Separator();
 
