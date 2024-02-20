@@ -170,6 +170,33 @@ void App::ShowStatsOverlay(bool* p_open)
             ImGui::PushFont(g_imfont_mono);
         }
 
+        ImGui::Text("Display rate:  %.3f fps", io.Framerate);
+        ImGui::Text("Incoming rate: %.3f fps", n_network_incoming_fpks.load(std::memory_order_relaxed) / 1000.0);
+        ImGui::Text("Outgoing rate: %.3f fps", n_network_outgoing_fpks.load(std::memory_order_relaxed) / 1000.0);
+
+        ImGui::Separator();
+
+        ImGui::Text("Camera frames:  %zu (M:%zu, OE:%zu, OP:%zu)",
+                    linux::n_frames_camera_success          .load(std::memory_order_relaxed),
+                    linux::n_frames_camera_missed           .load(std::memory_order_relaxed),
+                    linux::n_frames_camera_overflow_encoder .load(std::memory_order_relaxed),
+                    linux::n_frames_camera_overflow_preview .load(std::memory_order_relaxed)
+        );
+        ImGui::Text("Decoded frames: %zu (F:%zu, O:%zu)",
+                    linux::n_frames_decode_success  .load(std::memory_order_relaxed),
+                    linux::n_frames_decode_fail     .load(std::memory_order_relaxed),
+                    linux::n_frames_decode_overflow .load(std::memory_order_relaxed)
+        );
+        ImGui::Text("Encoded frames: %zu (F:%zu, S:%zu)",
+                    linux::n_frames_encode_success  .load(std::memory_order_relaxed),
+                    linux::n_frames_encode_fail     .load(std::memory_order_relaxed),
+                    linux::n_frames_encode_stall    .load(std::memory_order_relaxed)
+        );
+        ImGui::Text("Preview frames: %u (U:%u)", stats_.n_preview, stats_.n_preview_underflow);
+        ImGui::Text("Remote frames:  %u (U:%u)", stats_.n_remote, stats_.n_remote_underflow);
+
+        ImGui::Separator();
+
         if (camera_) {
             auto s = camera_->s_capture_time_.Result();
             ImGui::Text("Camera: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
@@ -199,33 +226,6 @@ void App::ShowStatsOverlay(bool* p_open)
             auto s = s_display_time_.Result();
             ImGui::Text("Display: %d ± %d µs [%d, %d]", (int)s.mean, (int)s.stdev, (int)s.min, (int)s.max);
         }
-
-        ImGui::Separator();
-
-        ImGui::Text("Camera frames:  %zu (M:%zu, OE:%zu, OP:%zu)",
-                    linux::n_frames_camera_success          .load(std::memory_order_relaxed),
-                    linux::n_frames_camera_missed           .load(std::memory_order_relaxed),
-                    linux::n_frames_camera_overflow_encoder .load(std::memory_order_relaxed),
-                    linux::n_frames_camera_overflow_preview .load(std::memory_order_relaxed)
-        );
-        ImGui::Text("Decoded frames: %zu (F:%zu, O:%zu)",
-                    linux::n_frames_decode_success  .load(std::memory_order_relaxed),
-                    linux::n_frames_decode_fail     .load(std::memory_order_relaxed),
-                    linux::n_frames_decode_overflow .load(std::memory_order_relaxed)
-        );
-        ImGui::Text("Encoded frames: %zu (F:%zu, S:%zu)",
-                    linux::n_frames_encode_success  .load(std::memory_order_relaxed),
-                    linux::n_frames_encode_fail     .load(std::memory_order_relaxed),
-                    linux::n_frames_encode_stall    .load(std::memory_order_relaxed)
-        );
-        ImGui::Text("Preview frames: %u (U:%u)", stats_.n_preview, stats_.n_preview_underflow);
-        ImGui::Text("Remote frames:  %u (U:%u)", stats_.n_remote, stats_.n_remote_underflow);
-
-        ImGui::Separator();
-
-        ImGui::Text("Display rate:  %.3f fps", io.Framerate);
-        ImGui::Text("Incoming rate: %.3f fps", n_network_incoming_fpks.load(std::memory_order_relaxed) / 1000.0);
-        ImGui::Text("Outgoing rate: %.3f fps", n_network_outgoing_fpks.load(std::memory_order_relaxed) / 1000.0);
 
         if (g_imfont_mono) {
             ImGui::PopFont();
