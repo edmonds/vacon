@@ -197,6 +197,11 @@ void App::ShowStatsOverlay(bool* p_open)
 
         ImGui::Separator();
 
+        ImGui::Text("Decoded frames: %zu (%zu, %zu)",
+                    linux::n_frames_decode_success.load(std::memory_order_relaxed),
+                    linux::n_frames_decode_overflow.load(std::memory_order_relaxed),
+                    linux::n_frames_decode_fail.load(std::memory_order_relaxed)
+        );
         ImGui::Text("Remote frames:  %u (%u)", stats_.n_remote, stats_.n_remote_underflow);
         ImGui::Text("Preview frames: %u (%u)", stats_.n_preview, stats_.n_preview_underflow);
 
