@@ -53,7 +53,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: intel/libvpl
-        ref: "v2.10.1"
+        ref: "v2.10.2"
         path: libvpl
 
     - name: Checkout oneVPL-intel-gpu
