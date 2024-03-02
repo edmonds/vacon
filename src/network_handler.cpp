@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <exception>
 #include <format>
 #include <memory>
@@ -252,14 +253,20 @@ void NetworkHandler::ConnectWebRTC()
     });
 
     ws_->onMessage([&](std::variant<rtc::binary, rtc::string> data) {
-        if (std::holds_alternative<rtc::string>(data)) {
+        if (std::holds_alternative<rtc::binary>(data)) {
+            const auto &binary_data = std::get<rtc::binary>(data);
+            if (binary_data.size() == 1 && binary_data[0] == std::byte{0}) {
+                LOG_DEBUG << "Got session start indicator, creating peer connection and sending offer";
+                CreatePeerConnection();
+            }
+        } else if (std::holds_alternative<rtc::string>(data)) {
             auto string_data = std::get<rtc::string>(data);
             json message = json::parse(std::get<rtc::string>(data));
             OnWsMessage(message);
         }
     });
 
-    const std::string url = params_.signaling_base_url + "/" + params_.signaling_secret;
+    const std::string url = params_.signaling_base_url + "?" + params_.signaling_secret;
     LOG_INFO << std::format("Opening WebSocket URL {}", url);
     ws_->open(url);
 }
@@ -288,12 +295,6 @@ void NetworkHandler::OnWsMessage(json message)
         return;
     }
     auto type = message.find("type")->get<std::string>();
-
-    if (type == "start_session") {
-        LOG_DEBUG << "Got start_session, creating peer connection and sending offer";
-        CreatePeerConnection();
-        return;
-    }
 
     if (type == "offer") {
         LOG_DEBUG << "Got offer, creating peer connection and sending answer";

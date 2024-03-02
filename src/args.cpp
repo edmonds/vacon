@@ -24,7 +24,7 @@ namespace vacon {
 
 static const char *kDefaultCameraDevice                 = "/dev/video0";
 static const unsigned kDefaultVideoEncoderBitrateKbps   = 10'000;
-static const char *kDefaultSignalingUrl                 = "ws://127.0.0.1:8000/v1/ooo";
+static const char *kDefaultSignalingUrl                 = "wss://public.vacon.vc:30307/api/v1/offer-answer";
 static const char *kDefaultStunServer                   = "stun:stun.l.google.com:19302";
 
 void App::ParseArgs(int argc, char *argv[])
