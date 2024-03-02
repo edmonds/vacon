@@ -1,0 +1,7 @@
+[wrap-git]
+url = https://github.com/edmonds/libhydrogen.git
+revision = 1acbb21fae1c7bef840bf63be45bbbee526b9962
+depth = 1
+
+[provide]
+libhydrogen = libhydrogen_dep
