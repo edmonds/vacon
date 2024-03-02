@@ -107,6 +107,7 @@ ffmpeg = [
 argparse = dependency('argparse', version: '>=3')
 imgui = dependency('imgui', static: true)
 libdatachannel = dependency('LibDataChannel')
+libhydrogen = dependency('libhydrogen')
 nlohmann_json = dependency('nlohmann_json')
 plog = dependency('plog')
 readerwriterqueue = dependency('readerwriterqueue')
@@ -139,6 +140,7 @@ vacon_dependencies = [
   ffmpeg,
   imgui,
   libdatachannel,
+  libhydrogen,
   nlohmann_json,
   os_deps,
   plog,
