@@ -13,10 +13,11 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-#include <stdexcept>
 #include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace base64
 {
@@ -65,7 +66,7 @@ namespace base64
 		return encoded;
 	}
 
-	inline std::vector<byte> decode(const std::string& input)
+	inline std::vector<byte> decode(std::string_view input)
 	{
 		if(input.length() % 4)
 			throw std::runtime_error("Invalid base64 length!");
