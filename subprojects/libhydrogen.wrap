@@ -1,6 +1,6 @@
 [wrap-git]
-url = https://github.com/edmonds/libhydrogen.git
-revision = 1acbb21fae1c7bef840bf63be45bbbee526b9962
+url = https://github.com/jedisct1/libhydrogen.git
+revision = 79fa39ade44cb85fbdaef2118c4c209aaac2e4ac
 depth = 1
 
 [provide]
