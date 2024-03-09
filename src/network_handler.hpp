@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <stop_token>
 #include <string>
 #include <thread>
 #include <vector>
@@ -58,8 +59,9 @@ class NetworkHandler {
         void ConnectWebRTC();
         void CloseWebSocket();
         bool IsConnectedToPeer();
-        void RunOutgoingDrain(std::stop_token);
+        void RunConnect(std::stop_token);
         void RunIncomingFill(std::stop_token);
+        void RunOutgoingDrain(std::stop_token);
         void ReceivePacket(rtc::binary);
         void OnWsMessage(nlohmann::json message);
         void CreatePeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);

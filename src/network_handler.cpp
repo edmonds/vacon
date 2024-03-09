@@ -109,35 +109,38 @@ void NetworkHandler::StartAsync()
     }
     starting_ = true;
 
-    std::jthread([&]() {
-        PushEvent(Event::NetworkStarting);
+    threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunConnect(st); } });
+}
 
-        // Start connecting to the signaling server and the WebRTC peer.
-        ConnectWebRTC();
+void NetworkHandler::RunConnect(std::stop_token st)
+{
+    PushEvent(Event::NetworkStarting);
 
-        // Wait for the NetworkHandler to bring up the peer-to-peer connection.
-        while (!IsConnectedToPeer() && !vacon::gShuttingDown) {
-            std::this_thread::sleep_for(100ms);
+    // Start connecting to the signaling server and the WebRTC peer.
+    ConnectWebRTC();
+
+    // Wait for the NetworkHandler to bring up the peer-to-peer connection.
+    while (!st.stop_requested() && !IsConnectedToPeer() && !vacon::gShuttingDown) {
+        std::this_thread::sleep_for(100ms);
+    }
+
+    if (IsConnectedToPeer() && !vacon::gShuttingDown) {
+        // Start the incoming video packet fill thread.
+        if (rtp_depacketizer_) {
+            // XXX: FFmpeg can hang in av_read_frame(), so for now detach
+            // the incoming fill thread.
+            //
+            //threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunIncomingFill(st); } });
+            std::jthread([&](std::stop_token st) { RunIncomingFill(st); }).detach();
         }
 
-        if (IsConnectedToPeer() && !vacon::gShuttingDown) {
-            // Start the incoming video packet fill thread.
-            if (rtp_depacketizer_) {
-                // XXX: FFmpeg can hang in av_read_frame(), so for now detach
-                // the incoming fill thread.
-                //
-                //threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunIncomingFill(st); } });
-                std::jthread([&](std::stop_token st) { RunIncomingFill(st); }).detach();
-            }
+        LOG_FATAL << "PEER-TO-PEER CONNECTION IS READY !!!";
+        PushEvent(Event::NetworkStarted);
+    }
 
-            LOG_FATAL << "PEER-TO-PEER CONNECTION IS READY !!!";
-            PushEvent(Event::NetworkStarted);
-        }
-
-        // WebRTC peer connection is up, so close the connection to the
-        // signaling server.
-        CloseWebSocket();
-    }).detach();
+    // WebRTC peer connection is up, so close the connection to the
+    // signaling server.
+    CloseWebSocket();
 }
 
 void NetworkHandler::RunOutgoingDrain(std::stop_token st)
