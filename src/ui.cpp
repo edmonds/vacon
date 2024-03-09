@@ -128,12 +128,6 @@ void App::ShowMenu()
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("XXX")) {
-            ImGui::MenuItem("Demo window", "",              &xenable_demo_window_);
-            ImGui::MenuItem("Toggle NetworkHandler", "",    &xenable_network_handler_);
-            ImGui::MenuItem("Toggle Video", "",             &xenable_video_);
-            ImGui::EndMenu();
-        }
         ImGui::EndMainMenuBar();
     }
 }
@@ -257,24 +251,13 @@ void App::RenderFrame()
 
     ShowMenu();
 
-    if (xenable_demo_window_) {
-        ImGui::ShowDemoWindow(&xenable_demo_window_);
-    }
-
     if (enable_stats_overlay_) {
         ShowStatsOverlay(&enable_stats_overlay_);
     }
 
-    if (xenable_network_handler_) {
-        StartNetworkHandler();
-    } else {
-        StopNetworkHandler();
-    }
 
-    if (xenable_video_) {
-        StartVideo();
-    } else {
-        StopVideo();
+    if (xxx_enable_imgui_demo_window_) {
+        ImGui::ShowDemoWindow(&xxx_enable_imgui_demo_window_);
     }
 
     ImGui::Render();

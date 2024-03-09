@@ -102,11 +102,18 @@ int App::AppEvent(const SDL_Event *event)
 
     case SDL_EVENT_KEY_UP: {
         auto key = &event->key.keysym;
-        if ((key->sym == SDLK_q) &&
-            (key->mod & SDL_KMOD_ALT) &&
-            (key->mod & SDL_KMOD_SHIFT))
-        {
-            return ShutdownEvent();
+        switch (key->sym) {
+            case SDLK_d:
+                if (key->mod & (SDL_KMOD_ALT | SDL_KMOD_SHIFT)) {
+                    xxx_enable_imgui_demo_window_ = !xxx_enable_imgui_demo_window_;
+                }
+            break;
+
+            case SDLK_q:
+                if (key->mod & (SDL_KMOD_ALT | SDL_KMOD_SHIFT)) {
+                    return ShutdownEvent();
+                }
+            break;
         }
         break;
     }
