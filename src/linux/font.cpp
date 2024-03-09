@@ -34,7 +34,8 @@ std::optional<std::string> GetTrueTypeFileNameByPattern(std::string_view name)
     FcFontSet*      fontset = nullptr;
     FcResult        fcresult = {};
 
-    auto name_cstr = reinterpret_cast<const FcChar8*>(std::string(name).c_str());
+    auto name_str = std::string(name);
+    auto name_cstr = reinterpret_cast<const FcChar8 *>(name_str.c_str());
 
     config = FcInitLoadConfigAndFonts();
     if (!config) {
