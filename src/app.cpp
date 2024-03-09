@@ -22,6 +22,7 @@
 #include <plog/Log.h>
 
 #include "event.hpp"
+#include "invite.hpp"
 #include "linux/camera.hpp"
 #include "linux/decoder.hpp"
 #include "linux/encoder.hpp"
@@ -214,27 +215,33 @@ int App::AppIterate()
 
 void App::StartNetworkHandler()
 {
-    if (nh_) {
+    if (nh_ || !invite_) {
+        LOG_FATAL << "NetworkHandler or Invite not set, cannot start network handler";
         return;
     }
 
     // Get network parameters.
     auto params = NetworkHandlerParams {
-        .signaling_base_url             = args_.get<std::string>("--network-signaling-url"),
-        .signaling_secret               = args_.get<std::string>("--network-signaling-secret"),
+        .invite                         = invite_,
         .stun_server                    = args_.get<std::string>("--network-stun-server"),
         .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
         .incoming_video_packet_queue    = incoming_video_packet_queue_,
     };
 
+    // Start the NetworkHandler.
     nh_ = NetworkHandler::Create(params);
-    nh_->Init();
-    nh_->StartAsync();
+    if (nh_) {
+        nh_->Init();
+        nh_->StartAsync();
+    } else {
+        LOG_DEBUG << "NetworkHandler::Create() failed";
+    }
 }
 
 void App::StopNetworkHandler()
 {
     nh_ = nullptr;
+    invite_ = nullptr;
 }
 
 void App::StartVideo()
@@ -319,6 +326,21 @@ void App::StopVideo()
     camera_     = nullptr;
     decoder_    = nullptr;
     encoder_    = nullptr;
+}
+
+void App::CreateConference()
+{
+    invite_ = Invite::Create(InviteParams {
+        .signaling_server   = vacon::kAppDefaultSignalingServer,
+        .description        = std::string(""),
+    });
+
+    if (invite_) {
+        StartNetworkHandler();
+        StartVideo();
+    } else {
+        LOG_FATAL << "Invite::Create() failed!";
+    }
 }
 
 } // namespace vacon

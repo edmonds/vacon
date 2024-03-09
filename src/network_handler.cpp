@@ -53,11 +53,15 @@ std::atomic_size_t n_network_outgoing_fpks = 0;
 
 std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParams& params)
 {
-    LOG_DEBUG <<
-        std::format("NetworkHandlerParams: signaling_base_url {}, signaling secret {}, stun_server {}",
-                    params.signaling_base_url,
-                    params.signaling_secret,
-                    params.stun_server);
+    if (!params.invite) {
+        LOG_ERROR << "NetworkHandlerParams.invite must be set";
+        return nullptr;
+    }
+
+    if (!params.incoming_video_packet_queue) {
+        LOG_ERROR << "NetworkHandlerParams.incoming_video_packet_queue must be set";
+        return nullptr;
+    }
 
     if (!params.outgoing_video_packet_queue) {
         LOG_ERROR << "NetworkHandlerParams.outgoing_video_packet_queue must be set";
@@ -274,9 +278,9 @@ void NetworkHandler::ConnectWebRTC()
         }
     });
 
-    const std::string url = params_.signaling_base_url + "?" + params_.signaling_secret;
-    LOG_INFO << std::format("Opening WebSocket URL {}", url);
-    ws_->open(url);
+    auto session_url = params_.invite->SessionUrl();
+    LOG_INFO << "Opening WebSocket URL " << session_url;
+    ws_->open(session_url);
 }
 
 bool NetworkHandler::IsConnectedToPeer()

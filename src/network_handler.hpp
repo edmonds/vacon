@@ -28,6 +28,7 @@
 #include <nlohmann/json.hpp>
 #include <rtc/rtc.hpp>
 
+#include "invite.hpp"
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
 #include "packet_ref.hpp"
@@ -39,8 +40,7 @@ extern std::atomic_size_t n_network_incoming_fpks;
 extern std::atomic_size_t n_network_outgoing_fpks;
 
 struct NetworkHandlerParams {
-    std::string signaling_base_url;
-    std::string signaling_secret;
+    std::shared_ptr<Invite> invite;
     std::string stun_server;
     std::shared_ptr<linux::VideoPacketQueue> outgoing_video_packet_queue;
     std::shared_ptr<PacketRefQueue> incoming_video_packet_queue;

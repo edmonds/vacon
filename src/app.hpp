@@ -21,6 +21,7 @@
 #include <SDL3/SDL.h>
 #include <argparse/argparse.hpp>
 
+#include "invite.hpp"
 #include "linux/camera.hpp"
 #include "linux/decoder.hpp"
 #include "linux/encoder.hpp"
@@ -31,6 +32,8 @@
 #include "stats.hpp"
 
 namespace vacon {
+
+static const std::string kAppDefaultSignalingServer = "public.vacon.vc:30307";
 
 class App {
     public:
@@ -50,6 +53,7 @@ class App {
         void StartVideoEncoder();
         void StopNetworkHandler();
         void StopVideo();
+        void CreateConference();
 
         // args.cpp
         void ParseArgs(int argc, char *argv[]);
@@ -139,6 +143,9 @@ class App {
             unsigned    n_preview                       = 0;
             unsigned    n_preview_underflow             = 0;
         } stats_;
+
+        std::shared_ptr<Invite>
+            invite_                                     = nullptr;
 };
 
 extern volatile std::sig_atomic_t gShuttingDown;
