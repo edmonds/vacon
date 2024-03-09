@@ -24,7 +24,6 @@ namespace vacon {
 
 static const char *kDefaultCameraDevice                 = "/dev/video0";
 static const unsigned kDefaultVideoEncoderBitrateKbps   = 10'000;
-static const char *kDefaultSignalingUrl                 = "wss://public.vacon.vc:30307/api/v1/offer-answer";
 static const char *kDefaultStunServer                   = "stun:stun.l.google.com:19302";
 
 void App::ParseArgs(int argc, char *argv[])
@@ -48,17 +47,6 @@ void App::ParseArgs(int argc, char *argv[])
          .help("video encoder bitrate (Kbps)")
          .default_value(kDefaultVideoEncoderBitrateKbps)
          .scan<'u', unsigned>()
-         .nargs(1);
-
-    args_.add_argument("-s", "--network-signaling-secret")
-         .metavar("SECRET")
-         .help("signaling shared secret to identify peer")
-         .required();
-
-    args_.add_argument("-u", "--network-signaling-url")
-         .metavar("URL")
-         .help("signaling URL for offer/answer exchange")
-         .default_value(kDefaultSignalingUrl)
          .nargs(1);
 
     args_.add_argument("--network-stun-server")
