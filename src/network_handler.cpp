@@ -114,6 +114,9 @@ void NetworkHandler::StartAsync()
 
 void NetworkHandler::RunConnect(std::stop_token st)
 {
+    LOG_DEBUG << "Starting WebRTC connection thread ID " << std::this_thread::get_id();
+    util::SetThreadName("VWebRtcConnect");
+
     PushEvent(Event::NetworkStarting);
 
     // Start connecting to the signaling server and the WebRTC peer.
@@ -141,6 +144,8 @@ void NetworkHandler::RunConnect(std::stop_token st)
     // WebRTC peer connection is up, so close the connection to the
     // signaling server.
     CloseWebSocket();
+
+    LOG_DEBUG << "Stopping WebRTC connection thread ID " << std::this_thread::get_id();
 }
 
 void NetworkHandler::RunOutgoingDrain(std::stop_token st)
