@@ -120,6 +120,7 @@ vacon_sources = [
   'src/app.cpp',
   'src/args.cpp',
   'src/event.cpp',
+  'src/invite.cpp',
   'src/linux/camera.cpp',
   'src/linux/decoder.cpp',
   'src/linux/encoder.cpp',
