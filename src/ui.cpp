@@ -98,9 +98,8 @@ void App::ShowMenu()
                 LOG_FATAL << "Conference -> Join";
                 // TODO
             }
-            if (ImGui::MenuItem("Create")) {
-                LOG_FATAL << "Conference -> Create";
-                // TODO
+            if (ImGui::MenuItem("Create", "", &menu_conference_create_)) {
+                LOG_INFO << "Conference -> Create";
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Quit")) {
@@ -255,6 +254,10 @@ void App::RenderFrame()
         ShowStatsOverlay(&enable_stats_overlay_);
     }
 
+    if (menu_conference_create_) {
+        menu_conference_create_ = false;
+        CreateConference();
+    }
 
     if (xxx_enable_imgui_demo_window_) {
         ImGui::ShowDemoWindow(&xxx_enable_imgui_demo_window_);
