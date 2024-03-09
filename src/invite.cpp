@@ -31,22 +31,22 @@ static const char kHydrogenContext[hydro_hash_CONTEXTBYTES] = {
      'V','a','c','o','n','I','n','v'
 };
 
-std::optional<Invite> Invite::Create(const InviteParams& params)
+std::shared_ptr<Invite> Invite::Create(const InviteParams& params)
 {
     if (hydro_init() != 0) {
         LOG_FATAL << "hydro_init() failed";
-        return std::nullopt;
+        return nullptr;
     }
     auto invite = Invite(params);
     hydro_secretbox_keygen(invite.secret_key_.data());
-    return invite;
+    return std::make_shared<Invite>(invite);
 }
 
-std::optional<Invite> Invite::Decode(std::string_view data)
+std::shared_ptr<Invite> Invite::Decode(std::string_view data)
 {
     // Consistency check.
     if (data.size() < 6 || !data.starts_with("vacon:")) {
-        return std::nullopt;
+        return nullptr;
     }
 
     // Remove the "vacon:" URI scheme.
@@ -68,12 +68,12 @@ std::optional<Invite> Invite::Decode(std::string_view data)
         invite.secret_key_.assign(key.begin(), key.end());
 
         // Success.
-        return invite;
+        return std::make_shared<Invite>(invite);
     } catch (const std::exception &e) {
         LOG_ERROR << "Unable to decode invite URI: " << e.what();
     }
 
-    return std::nullopt;
+    return nullptr;
 }
 
 Invite::~Invite()

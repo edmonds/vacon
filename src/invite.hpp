@@ -17,7 +17,7 @@
 
 #include <cstdint>
 #include <cstdio>
-#include <optional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,8 +33,8 @@ struct InviteParams {
 
 class Invite {
     public:
-        static std::optional<Invite> Create(const InviteParams&);
-        static std::optional<Invite> Decode(std::string_view);
+        static std::shared_ptr<Invite> Create(const InviteParams&);
+        static std::shared_ptr<Invite> Decode(std::string_view);
         ~Invite();
         std::string Encode() const;
         std::string SessionId() const;
