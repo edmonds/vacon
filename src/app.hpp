@@ -94,8 +94,6 @@ class App {
         bool            enable_stats_overlay_           = true;
         bool            xxx_enable_imgui_demo_window_   = false;
 
-        bool            menu_conference_create_         = false;
-
         bool            enable_self_view_               = true;
         bool            mirror_self_view_               = true;
         int             self_view_width_                = 512;
