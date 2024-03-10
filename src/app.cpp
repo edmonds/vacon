@@ -128,6 +128,12 @@ int App::AppEvent(const SDL_Event *event)
                 }
             break;
 
+            case SDLK_n:
+                if (key->mod & (SDL_KMOD_CTRL)) {
+                    CreateConference();
+                }
+            break;
+
             case SDLK_q:
                 if (key->mod & (SDL_KMOD_ALT | SDL_KMOD_SHIFT)) {
                     return ShutdownEvent();

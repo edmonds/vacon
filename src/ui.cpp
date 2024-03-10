@@ -94,7 +94,7 @@ void App::ShowMenu()
 {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("Conference")) {
-            if (ImGui::MenuItem("Create")) {
+            if (ImGui::MenuItem("Create", "Ctrl+N")) {
                 LOG_INFO << "Conference -> Create";
                 CreateConference();
             }
