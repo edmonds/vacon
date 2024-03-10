@@ -114,7 +114,7 @@ void App::ShowMenu()
                 JoinConferenceFromClipboard();
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Quit")) {
+            if (ImGui::MenuItem("Quit", "Ctrl+Shift+Q")) {
                 LOG_FATAL << "Conference -> Quit";
 
                 SDL_Event ev = {};

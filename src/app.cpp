@@ -135,7 +135,7 @@ int App::AppEvent(const SDL_Event *event)
             break;
 
             case SDLK_q:
-                if (key->mod & (SDL_KMOD_ALT | SDL_KMOD_SHIFT)) {
+                if (key->mod & (SDL_KMOD_CTRL | SDL_KMOD_SHIFT)) {
                     return ShutdownEvent();
                 }
             break;
