@@ -61,6 +61,8 @@ bool App::InitImgui()
     ImGui::GetStyle().Colors[ImGuiCol_TitleBg] = bgColor;
     ImGui::GetStyle().Colors[ImGuiCol_TitleBgActive] = bgColor;
     ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = bgColor;
+    const ImVec4 disabledColor = ImVec4(0.3, 0.3, 0.3, 1.0);
+    ImGui::GetStyle().Colors[ImGuiCol_TextDisabled] = disabledColor;
 
     // ImGui/SDL initialization.
     ImGui_ImplSDL3_InitForSDLRenderer(sdl_window_, sdl_renderer_);
