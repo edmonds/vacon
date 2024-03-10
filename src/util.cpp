@@ -92,9 +92,9 @@ plog::Severity FfmpegLogLevelToPlogSeverity(const int av_log_level)
     case AV_LOG_QUIET:      severity = plog::none;      break;
     case AV_LOG_PANIC:      severity = plog::fatal;     break;
     case AV_LOG_FATAL:      severity = plog::fatal;     break;
-    case AV_LOG_ERROR:      severity = plog::error;     break;
-    case AV_LOG_WARNING:    severity = plog::warning;   break;
-    case AV_LOG_INFO:       severity = plog::info;      break;
+    case AV_LOG_ERROR:      severity = plog::debug;     break;
+    case AV_LOG_WARNING:    severity = plog::debug;     break;
+    case AV_LOG_INFO:       severity = plog::debug;     break;
     case AV_LOG_VERBOSE:    severity = plog::debug;     break;
     case AV_LOG_DEBUG:      // Fallthrough.
     case AV_LOG_TRACE:      // Fallthrough.
