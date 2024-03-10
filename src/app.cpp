@@ -226,7 +226,7 @@ int App::AppIterate()
 void App::StartNetworkHandler()
 {
     if (nh_ || !invite_) {
-        LOG_FATAL << "NetworkHandler or Invite not set, cannot start network handler";
+        LOG_FATAL << "NetworkHandler already exists or Invite not set, cannot start network handler";
         return;
     }
 
