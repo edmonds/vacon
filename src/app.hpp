@@ -53,7 +53,10 @@ class App {
         void StartVideoEncoder();
         void StopNetworkHandler();
         void StopVideo();
+
         void CreateConference();
+        void CopyInviteToClipboard();
+        void JoinConferenceFromClipboard();
 
         // args.cpp
         void ParseArgs(int argc, char *argv[]);

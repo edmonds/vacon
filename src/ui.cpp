@@ -94,12 +94,21 @@ void App::ShowMenu()
 {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("Conference")) {
+            if (ImGui::MenuItem("Create", "", &menu_conference_create_)) {
+                LOG_INFO << "Conference -> Create";
+            }
             if (ImGui::MenuItem("Join")) {
                 LOG_FATAL << "Conference -> Join";
                 // TODO
             }
-            if (ImGui::MenuItem("Create", "", &menu_conference_create_)) {
-                LOG_INFO << "Conference -> Create";
+            ImGui::Separator();
+            if (ImGui::MenuItem("Copy invite to clipboard", "Ctrl+C", false, invite_ != nullptr)) {
+                LOG_INFO << "Conference -> Copy invite to clipboard";
+                CopyInviteToClipboard();
+            }
+            if (ImGui::MenuItem("Join from clipboard invite", "Ctrl+V")) {
+                LOG_INFO << "Conference -> Join from clipboard invite";
+                JoinConferenceFromClipboard();
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Quit")) {

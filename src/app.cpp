@@ -15,7 +15,9 @@
 
 #include "app.hpp"
 
+#include <cassert>
 #include <csignal>
+#include <cstdlib>
 #include <format>
 
 #include <SDL3/SDL.h>
@@ -114,6 +116,12 @@ int App::AppEvent(const SDL_Event *event)
     case SDL_EVENT_KEY_UP: {
         auto key = &event->key.keysym;
         switch (key->sym) {
+            case SDLK_c:
+                if (key->mod & (SDL_KMOD_CTRL)) {
+                    CopyInviteToClipboard();
+                }
+            break;
+
             case SDLK_d:
                 if (key->mod & (SDL_KMOD_ALT | SDL_KMOD_SHIFT)) {
                     xxx_enable_imgui_demo_window_ = !xxx_enable_imgui_demo_window_;
@@ -123,6 +131,12 @@ int App::AppEvent(const SDL_Event *event)
             case SDLK_q:
                 if (key->mod & (SDL_KMOD_ALT | SDL_KMOD_SHIFT)) {
                     return ShutdownEvent();
+                }
+            break;
+
+            case SDLK_v:
+                if (key->mod & (SDL_KMOD_CTRL)) {
+                    JoinConferenceFromClipboard();
                 }
             break;
         }
@@ -348,11 +362,58 @@ void App::CreateConference()
     }
 
     if (invite_) {
-        LOG_INFO << "Creating conference using invite " << invite_->Encode();
+        LOG_INFO << "Starting conference using invite " << invite_->Encode();
         StartNetworkHandler();
         StartVideo();
     } else {
         LOG_FATAL << "Invite::Create() failed!";
+    }
+}
+
+static const void* app_clipboard_data_cb(void* userdata, const char* mime_type, size_t* size)
+{
+    if (mime_type) {
+        *size = strlen(reinterpret_cast<char*>(userdata));
+        return userdata;
+    }
+    return nullptr;
+}
+
+void App::CopyInviteToClipboard()
+{
+    if (invite_) {
+        auto ctext = invite_->Encode();
+        auto ctext_cstr = strdup(ctext.c_str());
+        assert(ctext_cstr != nullptr);
+
+        auto mime_type = "text/plain";
+        if (SDL_SetClipboardData(app_clipboard_data_cb,
+                                 free,
+                                 reinterpret_cast<void*>(ctext_cstr),
+                                 &mime_type, 1)
+            != 0)
+        {
+            LOG_ERROR << "SDL_SetClipboardData() failed: " << SDL_GetError();
+        }
+        LOG_DEBUG << "Copied invite to clipboard";
+    } else {
+        LOG_DEBUG << "No invite, cannot copy to clipboard";
+    }
+}
+
+void App::JoinConferenceFromClipboard()
+{
+    auto ctext = SDL_GetClipboardText();
+    if (ctext && ctext[0] != '\0') {
+        invite_ = Invite::Decode(ctext);
+        SDL_free(ctext);
+        if (invite_) {
+            CreateConference();
+        } else {
+            LOG_ERROR << "Invite::Decode() failed!";
+        }
+    } else {
+        LOG_ERROR << "SDL_GetClipboardText() failed: " << SDL_GetError();
     }
 }
 
