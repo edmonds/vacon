@@ -37,8 +37,8 @@ class Invite {
         static std::shared_ptr<Invite> Decode(std::string_view);
         ~Invite();
         std::string Encode() const;
-        std::string SessionId() const;
-        std::string SessionUrl() const;
+        std::string SessionId();
+        std::string SessionUrl();
 
         InviteParams            params_ = {};
 
@@ -48,6 +48,7 @@ class Invite {
             : params_(params) {};
 
         std::vector<uint8_t>    secret_key_ = std::vector<uint8_t>(hydro_secretbox_KEYBYTES);
+        std::uint64_t           timestamp_ = 0;
 };
 
 } // namespace vacon

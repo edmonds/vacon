@@ -97,22 +97,21 @@ std::string Invite::Encode() const
     return url;
 }
 
-std::string Invite::SessionId() const
+std::string Invite::SessionId()
 {
     // Get the current time in seconds since the Unix epoch.
     auto now = std::chrono::system_clock::now();
-    auto timestamp =
-        std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+    timestamp_ = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
 
     // Truncate the timestamp using a prime modulus. This avoids some clock
     // skew between the conference participants but still has a hard cutoff at
     // multiples of the modulus. Using a prime modulus rather than a round
     // number like 3600 will avoid having a hard cutoff on hour boundaries most
     // of the time.
-    timestamp -= (timestamp % 7213);
+    timestamp_ -= (timestamp_ % 7213);
 
     // Convert the timestamp to a string.
-    auto ts = std::format("{}", timestamp);
+    auto ts = std::format("{}", timestamp_);
 
     // Hash the truncated timestamp using the Invite's secret key.
     auto hash = std::vector<uint8_t>(hydro_hash_BYTES);
@@ -125,7 +124,7 @@ std::string Invite::SessionId() const
     return base64::encode(hash);
 }
 
-std::string Invite::SessionUrl() const
+std::string Invite::SessionUrl()
 {
     return std::format("wss://{}/api/v1/offer-answer?{}", params_.signaling_server, SessionId());
 }
