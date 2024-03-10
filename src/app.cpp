@@ -72,6 +72,16 @@ int App::AppInit(int argc, char *argv[])
         return -1;
     }
 
+    auto invite_str = args_.get<std::string>("invite");
+    if (invite_str != "") {
+        invite_ = Invite::Decode(invite_str);
+        if (!invite_) {
+            LOG_FATAL << "Unable to decode invite: " << invite_str;
+            return -1;
+        }
+        CreateConference();
+    }
+
     return 0;
 }
 
@@ -330,12 +340,15 @@ void App::StopVideo()
 
 void App::CreateConference()
 {
-    invite_ = Invite::Create(InviteParams {
-        .signaling_server   = vacon::kAppDefaultSignalingServer,
-        .description        = std::string(""),
-    });
+    if (!invite_) {
+        invite_ = Invite::Create(InviteParams {
+            .signaling_server   = vacon::kAppDefaultSignalingServer,
+            .description        = std::string(""),
+        });
+    }
 
     if (invite_) {
+        LOG_INFO << "Creating conference using invite " << invite_->Encode();
         StartNetworkHandler();
         StartVideo();
     } else {

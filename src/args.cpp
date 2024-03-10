@@ -59,6 +59,12 @@ void App::ParseArgs(int argc, char *argv[])
          .help("setup simulated packet loss SIGUSR1 handler")
          .flag();
 
+    args_.add_argument("invite")
+         .metavar("INVITE-URL")
+         .help("Join conference using specified invite")
+         .default_value("")
+         .nargs(0, 1);
+
     try {
         args_.parse_args(argc, argv);
     } catch (const std::exception& err) {
