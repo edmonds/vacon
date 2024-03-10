@@ -33,10 +33,6 @@ static const char kHydrogenContext[hydro_hash_CONTEXTBYTES] = {
 
 std::shared_ptr<Invite> Invite::Create(const InviteParams& params)
 {
-    if (hydro_init() != 0) {
-        LOG_FATAL << "hydro_init() failed";
-        return nullptr;
-    }
     auto invite = Invite(params);
     hydro_secretbox_keygen(invite.secret_key_.data());
     return std::make_shared<Invite>(invite);

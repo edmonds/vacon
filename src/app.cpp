@@ -21,6 +21,7 @@
 #include <format>
 
 #include <SDL3/SDL.h>
+#include <hydrogen.h>
 #include <plog/Log.h>
 
 #include "event.hpp"
@@ -62,6 +63,11 @@ int App::AppInit(int argc, char *argv[])
 
     if (!util::SetupRealtimePriority()) {
         LOG_ERROR << "Unable to set real-time thread priority, performance may be affected!";
+    }
+
+    if (hydro_init() != 0) {
+        LOG_FATAL << "hydro_init() failed";
+        return -1;
     }
 
     if (!InitSDL()) {
