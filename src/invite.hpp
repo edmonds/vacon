@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <hydrogen.h>
+#include <nlohmann/json_fwd.hpp>
 
 namespace vacon {
 
@@ -39,6 +40,8 @@ class Invite {
         std::string Encode() const;
         std::string SessionId();
         std::string SessionUrl();
+        std::vector<std::byte> EncryptJson(const nlohmann::json&);
+        nlohmann::json DecryptJson(const std::vector<std::byte>&);
 
         InviteParams            params_ = {};
 

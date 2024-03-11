@@ -129,4 +129,58 @@ std::string Invite::SessionUrl()
     return std::format("wss://{}/api/v1/offer-answer?{}", params_.signaling_server, SessionId());
 }
 
+std::vector<std::byte> Invite::EncryptJson(const nlohmann::json& message)
+{
+    // Encode the JSON message using MessagePack.
+    std::vector<std::uint8_t> plaintext;
+    try {
+        plaintext = nlohmann::json::to_msgpack(message);
+    } catch (const std::exception &e) {
+        // Return empty vector as error indicator.
+        LOG_ERROR << "Unable to encode JSON message: " << e.what();
+        return {};
+    }
+
+    // Allocate space for the encrypted message.
+    std::vector<std::byte>
+        ciphertext(hydro_secretbox_HEADERBYTES + plaintext.size());
+
+    // Encrypt the MessagePack-encoded data.
+    hydro_secretbox_encrypt(reinterpret_cast<std::uint8_t*>(ciphertext.data()),
+                            plaintext.data(),
+                            plaintext.size(),
+                            timestamp_,
+                            kHydrogenContext,
+                            secret_key_.data());
+
+    return ciphertext;
+}
+
+nlohmann::json Invite::DecryptJson(const std::vector<std::byte>& ciphertext)
+{
+    // Allocate space for the decrypted message.
+    std::vector<std::uint8_t>
+        plaintext(ciphertext.size() - hydro_secretbox_HEADERBYTES);
+
+    // Decrypt the encrypted message.
+    if (0 != hydro_secretbox_decrypt(plaintext.data(),
+                                     reinterpret_cast<const std::uint8_t*>(ciphertext.data()),
+                                     ciphertext.size(),
+                                     timestamp_,
+                                     kHydrogenContext,
+                                     secret_key_.data()))
+    {
+        LOG_ERROR << std::format("Unable to decrypt message (message tag {})", timestamp_);
+        return {};
+    }
+
+    // Decode the MessagePack-encoded message to JSON.
+    try {
+        return nlohmann::json::from_msgpack(plaintext);
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Unable to decode MessagePack payload: " << e.what();
+        return {};
+    }
+}
+
 } // namespace vacon
