@@ -22,7 +22,6 @@
 #include <format>
 #include <memory>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <variant>
@@ -270,11 +269,17 @@ void NetworkHandler::ConnectWebRTC()
             if (binary_data.size() == 1 && binary_data[0] == std::byte{0}) {
                 LOG_DEBUG << "Got session start indicator, creating peer connection and sending offer";
                 CreatePeerConnection();
+            } else {
+                json message = params_.invite->DecryptJson(binary_data);
+                if (message == json{}) {
+                    LOG_ERROR << "Failed to decrypt binary WebSocket data with invite key";
+                } else {
+                    OnWsMessage(message);
+                }
             }
         } else if (std::holds_alternative<rtc::string>(data)) {
             auto string_data = std::get<rtc::string>(data);
-            json message = json::parse(std::get<rtc::string>(data));
-            OnWsMessage(message);
+            LOG_DEBUG << "Expecting binary WebSocket data but received string data instead: " << string_data;
         }
     });
 
@@ -303,7 +308,7 @@ void NetworkHandler::OnWsMessage(json message)
     LOG_DEBUG << "Received WebSocket message: " << message.dump();
 
     if (!message.contains("type")) {
-        LOG_ERROR << "Message lacks key 'type'";
+        LOG_ERROR << "Got JSON message, but key 'type' missing";
         return;
     }
     auto type = message.find("type")->get<std::string>();
@@ -318,6 +323,8 @@ void NetworkHandler::OnWsMessage(json message)
         auto sdp = message["sdp"].get<std::string>();
         auto description = rtc::Description(sdp, type);
         peer_->setRemoteDescription(description);
+    } else {
+        LOG_DEBUG << std::format("Unknown message type '{}'", type);
     }
 }
 
@@ -334,10 +341,14 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
                 { "type", description->typeString() },
                 { "sdp", std::string(description.value()) },
             };
-            auto message_dump = message.dump();
-            LOG_DEBUG << "[PeerConnection] Sending WebSocket message: " << message_dump;
-            if (auto ws = wws.lock()) {
-                ws->send(message_dump);
+            auto message_crypted = params_.invite->EncryptJson(message);
+            if (message_crypted == std::vector<std::byte>{}) {
+                LOG_ERROR << "Failed to encrypt binary WebSocket data";
+            } else {
+                LOG_DEBUG << "[PeerConnection] Sending WebSocket message: " << message.dump();
+                if (auto ws = wws.lock()) {
+                    ws->send(message_crypted);
+                }
             }
         }
     });

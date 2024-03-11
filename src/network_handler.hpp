@@ -25,13 +25,11 @@
 #include <thread>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <rtc/rtc.hpp>
 
 #include "invite.hpp"
 #include "linux/typedefs.hpp"
-#include "linux/video_frame.hpp"
-#include "packet_ref.hpp"
 #include "rtp_depacketizer.hpp"
 
 namespace vacon {
