@@ -35,8 +35,8 @@ bool App::InitSDL()
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
     SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
 
-    Uint32 window_flags = SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_OPENGL;
-    sdl_window_ = SDL_CreateWindow(PROJECT_NAME, 1920, 1080, window_flags);
+    SDL_WindowFlags flags = SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_OPENGL;
+    sdl_window_ = SDL_CreateWindow(PROJECT_NAME, 1920, 1080, flags);
     if (!sdl_window_) {
         LOG_FATAL << "SDL_CreateWindow() failed: " << SDL_GetError();
         return false;
