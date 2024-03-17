@@ -81,11 +81,10 @@ bool App::InitSDLRenderer()
         }
 
         // Log the pixel formats that the renderer supports.
-        for (Uint32 i = 0; i < info.num_texture_formats; ++i) {
-            Uint32 pixel_format = info.texture_formats[i];
+        for (int i = 0; i < info.num_texture_formats; ++i) {
+            auto pixel_format = info.texture_formats[i];
             const char *pixel_format_name = SDL_GetPixelFormatName(pixel_format);
-            LOG_VERBOSE << std::format("Renderer supports texture pixel format: {} ({})",
-                                        pixel_format_name, pixel_format);
+            LOG_VERBOSE << "Renderer supports texture pixel format: " << pixel_format_name;
         }
     }
 
