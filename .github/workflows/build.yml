@@ -142,6 +142,7 @@ jobs:
           -DSDL_JOYSTICK_DEFAULT=OFF \
           -DSDL_KMSDRM=OFF \
           -DSDL_KMSDRM_SHARED=OFF \
+          -DSDL_OFFSCREEN=OFF \
           -DSDL_OPENGL=ON \
           -DSDL_OPENGLES=ON \
           -DSDL_OSS=OFF \
