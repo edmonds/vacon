@@ -357,6 +357,10 @@ bool Encoder::InitMfxVideoParams()
     // Encoding scenario.
     mfx_eco3_.ScenarioInfo = MFX_SCENARIO_VIDEO_CONFERENCE;
 
+    // Controls frame size tolerance, supposedly more strictly obeys average
+    // frame size set by MaxKbps.
+    mfx_eco3_.LowDelayBRC = MFX_CODINGOPTION_ON;
+
     // Attach mfx_eco's to mfx_videoparam_encode_.
     mfx_eco1_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION;
     mfx_eco2_.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
