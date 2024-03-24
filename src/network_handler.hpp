@@ -16,6 +16,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -72,6 +73,13 @@ class NetworkHandler {
         std::shared_ptr<rtc::RtcpSrReporter>            sender_reporter_;
         std::shared_ptr<rtc::RtpPacketizationConfig>    rtp_config_;
         std::shared_ptr<rtc::Track>                     track_;
+
+        struct {
+            ssize_t                                     n_frames_recv = -1;
+
+            std::chrono::time_point<std::chrono::steady_clock>
+                                                        t_last_recv = {};
+        } stats_;
 };
 
 } // namespace vacon

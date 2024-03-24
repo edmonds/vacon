@@ -331,11 +331,29 @@ void NetworkHandler::ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_in
 
     auto packet = RtcPacket::Create(msg, frame_info);
 
+    // Enqueue the incoming video packet.
     while (!vacon::gShuttingDown) {
         if (params_.incoming_video_packet_queue->wait_enqueue_timed(packet, 250ms)) {
             break;
         } else {
             LOG_DEBUG << "Stalled enqueuing packet onto incoming video packet queue, retrying";
+        }
+    }
+
+    // Stats.
+    auto t_now = std::chrono::steady_clock::now();
+    if (stats_.n_frames_recv++ == -1) [[unlikely]] {
+        stats_.t_last_recv = t_now;
+    } else {
+        auto t_dur = t_now - stats_.t_last_recv;
+        if (t_dur >= 1s) {
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
+            auto fps = stats_.n_frames_recv / std::chrono::duration<double>(t_dur).count();
+            n_network_incoming_fpks.store(fps * 1000, std::memory_order_relaxed);
+            LOG_VERBOSE << std::format("Processed {} incoming video packets in {} ms, {:.3f} fps",
+                                       stats_.n_frames_recv, ms, fps);
+            stats_.t_last_recv = t_now;
+            stats_.n_frames_recv = 0;
         }
     }
 }
