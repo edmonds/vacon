@@ -15,7 +15,6 @@
 
 #include "linux/encoder.hpp"
 
-#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <cerrno>
