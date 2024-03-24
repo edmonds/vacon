@@ -72,6 +72,12 @@ Decoder::~Decoder()
         mfx_loader_ = nullptr;
     }
 
+    if (va_display_) {
+        LOG_VERBOSE << std::format("Terminating VADisplay @ {}", (void*)va_display_);
+        vaTerminate(va_display_);
+        va_display_ = nullptr;
+    }
+
     if (wl_display_) {
         LOG_VERBOSE << std::format("Disconnecting Wayland display @ {}", (void*)wl_display_);
         wl_display_disconnect(wl_display_);
@@ -206,6 +212,7 @@ bool Decoder::InitVaapi()
                                  vaStatusStr(va_status), va_status);
         return false;
     }
+    LOG_VERBOSE << std::format("Initialized VADisplay @ {}", va_display_);
 
     // Pass the VADisplay to the MFX library.
     auto mfx_status = MFXVideoCORE_SetHandle(mfx_session_,
