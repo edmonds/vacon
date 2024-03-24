@@ -56,6 +56,7 @@ class Encoder {
         void RequestStop();
         void Join();
 
+        Welford             s_encode_size_ = {};
         Welford             s_encode_time_ = {};
 
     private:

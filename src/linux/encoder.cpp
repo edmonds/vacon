@@ -516,10 +516,10 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
     // Deallocate the uncompressed surface data.
     frame->FreeMfxSurface();
 
+    // Stats.
     auto t_stop = std::chrono::steady_clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(t_stop - t_start).count();
     s_encode_time_.Update(micros);
-
     auto msg = std::format("Encoded frame from buffer {}, sequence {} in {} us, {} bytes",
                            cref.buf_.vbuf.index,
                            cref.buf_.vbuf.sequence,
@@ -530,6 +530,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
     } else {
         LOG_VERBOSE << msg;
     }
+    s_encode_size_.Update(frame->CompressedDataLength());
 
     // Success.
     return frame;
