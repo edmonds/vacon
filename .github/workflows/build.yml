@@ -85,8 +85,6 @@ jobs:
           libxcb-present-dev \
           libxkbcommon-dev \
           linux-libc-dev \
-          meson \
-          ninja-build \
           nlohmann-json3-dev \
           pkg-config \
           wayland-protocols \
