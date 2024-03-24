@@ -103,7 +103,6 @@ jobs:
       run: |
         sudo apt-get install -y --no-install-recommends -V libdecor-0-dev/unstable
         sudo apt-get build-dep -y libsdl3-dev
-        sudo dpkg -P libdecor-0-0 libdecor-0-dev
 
     - name: Build LibDataChannel
       working-directory: "./libdatachannel"
@@ -163,6 +162,8 @@ jobs:
           -DSDL_VIVANTE=OFF \
           -DSDL_VULKAN=OFF \
           -DSDL_WAYLAND=ON \
+          -DSDL_WAYLAND_LIBDECOR=ON \
+          -DSDL_WAYLAND_LIBDECOR_SHARED=ON \
           -DSDL_WAYLAND_SHARED=ON \
           -DSDL_X11=ON \
           -DSDL_X11_SHARED=ON \
