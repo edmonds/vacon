@@ -284,12 +284,16 @@ bool Encoder::InitMfxVideoParams()
     // interlaced content, B-frames and produced stream is not HRD compliant."
     mfx_videoparam_encode_.mfx.RateControlMethod = MFX_RATECONTROL_VCM;
 
-    // Maximum possible size of any compressed frames.
+    // Supposedly, maximum possible size of any compressed frames.
     mfx_videoparam_encode_.mfx.BufferSizeInKB = 256;
 
     // For CBR and VCM, used to estimate the targeted frame size by dividing
     // the frame rate by the bitrate.
     mfx_videoparam_encode_.mfx.TargetKbps = params_.bitrate_kbps;
+
+    // "The maximum bitrate at which the encoded data enters the Video Buffering
+    // Verifier (VBV) buffer."
+    mfx_videoparam_encode_.mfx.MaxKbps = params_.bitrate_kbps;
 
     // Frame rate numerator.
     mfx_videoparam_vpp_.vpp.In.FrameRateExtN =
