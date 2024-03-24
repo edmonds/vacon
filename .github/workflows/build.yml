@@ -165,7 +165,7 @@ jobs:
           -DSDL_WAYLAND=ON \
           -DSDL_WAYLAND_SHARED=ON \
           -DSDL_X11=ON \
-          -DSDL_X11_SHARED=OFF \
+          -DSDL_X11_SHARED=ON \
         ;
         ninja -v -C build
         sudo ninja -C build install
