@@ -15,7 +15,6 @@
 
 #include "network_handler.hpp"
 
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <exception>
@@ -42,9 +41,6 @@ using namespace std::chrono_literals;
 using nlohmann::json;
 
 namespace vacon {
-
-std::atomic_size_t n_network_incoming_fpks = 0;
-std::atomic_size_t n_network_outgoing_fpks = 0;
 
 std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParams& params)
 {
@@ -143,28 +139,26 @@ void NetworkHandler::RunOutgoingDrain(std::stop_token st)
     LOG_DEBUG << "Starting outgoing video packet queue drain thread ID " << std::this_thread::get_id();
     util::SetThreadName("VOutVideo");
 
-    auto t_last_send = std::chrono::steady_clock::now();
-    ssize_t n_frames_send = -1;
-
     while (!st.stop_requested()) {
+        auto t_now = std::chrono::steady_clock::now();
+
         std::shared_ptr<linux::VideoFrame> frame;
         if (params_.outgoing_video_packet_queue->wait_dequeue_timed(frame, 250ms)) {
             SendVideoPacket(frame->CompressedData(), frame->CompressedDataLength(), frame->pts);
 
             // Stats.
-            auto t_now = std::chrono::steady_clock::now();
-            if (n_frames_send++ == -1) [[unlikely]] {
-                t_last_send = t_now;
+            if (stats_.n_frames_send++ == -1) [[unlikely]] {
+                stats_.t_last_send = t_now;
             }
-            auto t_dur = t_now - t_last_send;
+            auto t_dur = t_now - stats_.t_last_send;
             if (t_dur >= 1s) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
-                auto fps = n_frames_send / std::chrono::duration<double>(t_dur).count();
-                n_network_outgoing_fpks.store(fps * 1000, std::memory_order_relaxed);
+                auto fps = stats_.n_frames_send / std::chrono::duration<double>(t_dur).count();
+                s_send_fps_.Update(fps);
                 LOG_VERBOSE << std::format("Processed {} outgoing video packets in {} ms, {:.3f} fps",
-                                           n_frames_send, ms, fps);
-                t_last_send = t_now;
-                n_frames_send = 0;
+                                           stats_.n_frames_send, ms, fps);
+                stats_.t_last_send = t_now;
+                stats_.n_frames_send = 0;
             }
         } else {
             LOG_VERBOSE << "Stalled dequeuing packet from outgoing video packet queue, retrying";
@@ -325,10 +319,11 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
 
 void NetworkHandler::ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_info)
 {
+    auto t_now = std::chrono::steady_clock::now();
+    auto packet = RtcPacket::Create(msg, frame_info);
+
     LOG_VERBOSE << std::format("Received video packet, size {}, timestamp {}",
                                msg.size(), frame_info.timestamp);
-
-    auto packet = RtcPacket::Create(msg, frame_info);
 
     // Enqueue the incoming video packet.
     while (!vacon::gShuttingDown) {
@@ -340,7 +335,6 @@ void NetworkHandler::ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_in
     }
 
     // Stats.
-    auto t_now = std::chrono::steady_clock::now();
     if (stats_.n_frames_recv++ == -1) [[unlikely]] {
         stats_.t_last_recv = t_now;
     } else {
@@ -348,7 +342,7 @@ void NetworkHandler::ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_in
         if (t_dur >= 1s) {
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
             auto fps = stats_.n_frames_recv / std::chrono::duration<double>(t_dur).count();
-            n_network_incoming_fpks.store(fps * 1000, std::memory_order_relaxed);
+            s_recv_fps_.Update(fps);
             LOG_VERBOSE << std::format("Processed {} incoming video packets in {} ms, {:.3f} fps",
                                        stats_.n_frames_recv, ms, fps);
             stats_.t_last_recv = t_now;

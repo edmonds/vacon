@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -31,11 +30,9 @@
 
 #include "invite.hpp"
 #include "linux/typedefs.hpp"
+#include "stats.hpp"
 
 namespace vacon {
-
-extern std::atomic_size_t n_network_incoming_fpks;
-extern std::atomic_size_t n_network_outgoing_fpks;
 
 struct NetworkHandlerParams {
     std::shared_ptr<Invite> invite;
@@ -51,6 +48,9 @@ class NetworkHandler {
         ~NetworkHandler();
         void Init();
         void StartAsync();
+
+        Welford                                         s_recv_fps_ = {};
+        Welford                                         s_send_fps_ = {};
 
     private:
         NetworkHandler() = default;
@@ -76,9 +76,12 @@ class NetworkHandler {
 
         struct {
             ssize_t                                     n_frames_recv = -1;
+            ssize_t                                     n_frames_send = -1;
 
             std::chrono::time_point<std::chrono::steady_clock>
                                                         t_last_recv = {};
+            std::chrono::time_point<std::chrono::steady_clock>
+                                                        t_last_send = {};
         } stats_;
 };
 

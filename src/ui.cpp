@@ -175,9 +175,17 @@ void App::ShowStatsOverlay(bool* p_open)
             ImGui::PushFont(g_imfont_mono);
         }
 
-        ImGui::Text("Display rate:  %.3f fps", io.Framerate);
-        ImGui::Text("Incoming rate: %.3f fps", n_network_incoming_fpks.load(std::memory_order_relaxed) / 1000.0);
-        ImGui::Text("Outgoing rate: %.3f fps", n_network_outgoing_fpks.load(std::memory_order_relaxed) / 1000.0);
+        ImGui::Text("Draw: %.3f fps", io.Framerate);
+
+        if (nh_) {
+            auto s = nh_->s_recv_fps_.Result();
+            ImGui::Text("Recv: %.3f ± %.2f fps [%.1f, %.1f]", s.mean, s.stdev, s.min, s.max);
+        }
+
+        if (nh_) {
+            auto s = nh_->s_send_fps_.Result();
+            ImGui::Text("Send: %.3f ± %.2f fps [%.1f, %.1f]", s.mean, s.stdev, s.min, s.max);
+        }
 
         ImGui::Separator();
 
