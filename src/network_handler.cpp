@@ -143,29 +143,28 @@ void NetworkHandler::RunOutgoingDrain(std::stop_token st)
     LOG_DEBUG << "Starting outgoing video packet queue drain thread ID " << std::this_thread::get_id();
     util::SetThreadName("VOutVideo");
 
-    auto t_last = std::chrono::steady_clock::now();
-    int count_frames = -1;
+    auto t_last_send = std::chrono::steady_clock::now();
+    ssize_t n_frames_send = -1;
 
     while (!st.stop_requested()) {
         std::shared_ptr<linux::VideoFrame> frame;
         if (params_.outgoing_video_packet_queue->wait_dequeue_timed(frame, 250ms)) {
             SendVideoPacket(frame->CompressedData(), frame->CompressedDataLength(), frame->pts);
 
+            // Stats.
             auto t_now = std::chrono::steady_clock::now();
-            if (count_frames == -1) {
-                t_last = t_now;
+            if (n_frames_send++ == -1) [[unlikely]] {
+                t_last_send = t_now;
             }
-            ++count_frames;
-            auto t_dur = t_now - t_last;
-
+            auto t_dur = t_now - t_last_send;
             if (t_dur >= 1s) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
-                auto fps = count_frames / std::chrono::duration<double>(t_dur).count();
+                auto fps = n_frames_send / std::chrono::duration<double>(t_dur).count();
                 n_network_outgoing_fpks.store(fps * 1000, std::memory_order_relaxed);
-                LOG_VERBOSE << std::format("Processed {} outgoing camera frames in {} ms, {:.3f} fps",
-                                           count_frames, ms, fps);
-                t_last = t_now;
-                count_frames = 0;
+                LOG_VERBOSE << std::format("Processed {} outgoing video packets in {} ms, {:.3f} fps",
+                                           n_frames_send, ms, fps);
+                t_last_send = t_now;
+                n_frames_send = 0;
             }
         } else {
             LOG_VERBOSE << "Stalled dequeuing packet from outgoing video packet queue, retrying";
