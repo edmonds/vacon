@@ -140,6 +140,7 @@ jobs:
           -DSDL_JACK=OFF \
           -DSDL_JACK_SHARED=OFF \
           -DSDL_JOYSTICK_DEFAULT=OFF \
+          -DSDL_KMSDRM=OFF \
           -DSDL_KMSDRM_SHARED=OFF \
           -DSDL_OPENGL=ON \
           -DSDL_OPENGLES=ON \
