@@ -208,6 +208,15 @@ void App::ShowStatsOverlay(bool* p_open)
         ImGui::Text("Preview frames: %u (U:%u)", stats_.n_preview, stats_.n_preview_underflow);
         ImGui::Text("Remote frames:  %u (U:%u)", stats_.n_remote, stats_.n_remote_underflow);
 
+        if (encoder_) {
+            ImGui::Separator();
+
+            auto s = encoder_->s_encode_size_.Result();
+            ImGui::Text("Encoded frame: %d ± %d KB [%d, %d]",
+                        (int)(s.mean/1024.0), (int)(s.stdev/1024.0),
+                        (int)(s.min/1024.0), (int)(s.max/1024.0));
+        }
+
         ImGui::Separator();
 
         if (camera_) {
