@@ -21,7 +21,6 @@
 #include <format>
 #include <memory>
 #include <thread>
-#include <tuple>
 #include <vector>
 
 #include <SDL3/SDL.h>

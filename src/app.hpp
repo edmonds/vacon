@@ -26,7 +26,6 @@
 #include "linux/decoder.hpp"
 #include "linux/encoder.hpp"
 #include "linux/typedefs.hpp"
-#include "linux/video_frame.hpp"
 #include "network_handler.hpp"
 #include "stats.hpp"
 
