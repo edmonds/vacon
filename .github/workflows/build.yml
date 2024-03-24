@@ -149,6 +149,7 @@ jobs:
           -DSDL_PIPEWIRE_SHARED=ON \
           -DSDL_POWER_DEFAULT=OFF \
           -DSDL_PULSEAUDIO_SHARED=OFF \
+          -DSDL_RENDER_VULKAN=OFF \
           -DSDL_RPATH=OFF \
           -DSDL_RPI=OFF \
           -DSDL_SENSOR_DEFAULT=OFF \
@@ -157,6 +158,7 @@ jobs:
           -DSDL_TESTS=OFF \
           -DSDL_TEST_LIBRARY=OFF \
           -DSDL_VIVANTE=OFF \
+          -DSDL_VULKAN=OFF \
           -DSDL_WAYLAND=ON \
           -DSDL_WAYLAND_SHARED=OFF \
           -DSDL_X11=ON \
