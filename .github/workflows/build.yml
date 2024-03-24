@@ -154,7 +154,6 @@ jobs:
           -DSDL_STATIC=OFF \
           -DSDL_TESTS=OFF \
           -DSDL_TEST_LIBRARY=OFF \
-          -DSDL_VIDEO_CAPTURE=OFF \
           -DSDL_VIVANTE=OFF \
           -DSDL_WAYLAND=ON \
           -DSDL_WAYLAND_SHARED=OFF \
