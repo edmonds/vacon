@@ -23,24 +23,11 @@
 
 #define VACON_ALIGN16(value) (((value + 15) >> 4) << 4)
 
-// Replacement for the ffmpeg av_err2str() macro which doesn't work in C++.
-#ifdef av_err2str
-#undef av_err2str
-av_always_inline std::string av_err2string(int errnum) {
-	char str[AV_ERROR_MAX_STRING_SIZE];
-	return av_make_error_string(str, AV_ERROR_MAX_STRING_SIZE, errnum);
-}
-#define av_err2str(err) av_err2string(err).c_str()
-#endif
-
 namespace vacon {
 namespace util {
 
 template <class T> std::weak_ptr<T> make_weak_ptr(std::shared_ptr<T> ptr) { return ptr; }
 
-void FfmpegLogCallback(void *ptr, int level, const char *fmt, std::va_list vl_orig);
-plog::Severity FfmpegLogLevelToPlogSeverity(const int av_log_level);
-int PlogSeverityToFfmpegLogLevel(const plog::Severity plog_severity);
 void SetupLogging(const int verbosity);
 bool SetupRealtimePriority();
 void SetThreadName(const char *name);

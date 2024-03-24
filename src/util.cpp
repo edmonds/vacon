@@ -32,95 +32,12 @@
 #include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Formatters/TxtFormatter.h>
 
-extern "C" {
-#include <libavutil/log.h>
-}
-
 namespace vacon {
 namespace util {
 
 #if defined(VACON_USE_BACKWARD)
 backward::SignalHandling g_backward_signal_handling;
 #endif
-
-void FfmpegLogCallback([[maybe_unused]] void *ptr,
-                       int level, const char *fmt, std::va_list vl_orig)
-{
-    // Apparently ffmpeg doesn't do this.
-    if (level > av_log_get_level()) {
-        return;
-    }
-
-    std::string msg;
-    std::va_list vl_copy1;
-    std::va_list vl_copy2;
-
-    va_copy(vl_copy1, vl_orig);
-    va_copy(vl_copy2, vl_orig);
-
-    // Calculate the required size of the log buffer.
-    const int len = std::vsnprintf(nullptr, 0, fmt, vl_copy1);
-    if (len < 0) {
-        LOG_DEBUG << "vsnprintf() failed";
-        va_end(vl_copy1);
-        va_end(vl_copy2);
-        return;
-    }
-
-    // Actually format the log message into a buffer and log it.
-    if (len > 0) {
-        msg.resize(len);
-        if (std::vsnprintf(msg.data(), len + 1, fmt, vl_copy2) > 0) {
-            if (msg.back() == '\n') {
-                msg.resize(msg.length() - 1);
-            }
-            auto severity = FfmpegLogLevelToPlogSeverity(level);
-            LOG(severity) << msg;
-        }
-    }
-
-    // Cleanup.
-    va_end(vl_copy1);
-    va_end(vl_copy2);
-}
-
-plog::Severity FfmpegLogLevelToPlogSeverity(const int av_log_level)
-{
-    auto severity = plog::verbose;
-
-    switch (av_log_level) {
-    case AV_LOG_QUIET:      severity = plog::none;      break;
-    case AV_LOG_PANIC:      severity = plog::fatal;     break;
-    case AV_LOG_FATAL:      severity = plog::fatal;     break;
-    case AV_LOG_ERROR:      severity = plog::debug;     break;
-    case AV_LOG_WARNING:    severity = plog::debug;     break;
-    case AV_LOG_INFO:       severity = plog::debug;     break;
-    case AV_LOG_VERBOSE:    severity = plog::debug;     break;
-    case AV_LOG_DEBUG:      // Fallthrough.
-    case AV_LOG_TRACE:      // Fallthrough.
-    default:                severity = plog::verbose;   break;
-    }
-
-    return severity;
-}
-
-int PlogSeverityToFfmpegLogLevel(const plog::Severity plog_severity)
-{
-    int av_log_level = AV_LOG_TRACE;
-
-    switch (plog_severity) {
-    case plog::none:    av_log_level = AV_LOG_QUIET;    break;
-    case plog::fatal:   av_log_level = AV_LOG_FATAL;    break;
-    case plog::error:   av_log_level = AV_LOG_ERROR;    break;
-    case plog::warning: av_log_level = AV_LOG_WARNING;  break;
-    case plog::info:    av_log_level = AV_LOG_INFO;     break;
-    case plog::debug:   av_log_level = AV_LOG_VERBOSE;  break;
-    case plog::verbose: // Fallthrough.
-    default:            av_log_level = AV_LOG_VERBOSE;  break;
-    }
-
-    return av_log_level;
-}
 
 void SetupLogging(const int verbosity)
 {
@@ -137,9 +54,6 @@ void SetupLogging(const int verbosity)
 
     static plog::ColorConsoleAppender<plog::TxtFormatter> plogConsoleAppender;
     plog::init(severity, &plogConsoleAppender);
-
-    av_log_set_level(PlogSeverityToFfmpegLogLevel(severity));
-    av_log_set_callback(FfmpegLogCallback);
 }
 
 bool SetupRealtimePriority()

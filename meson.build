@@ -94,14 +94,6 @@ else
   backward = []
 endif
 
-# ffmpeg
-
-ffmpeg = [
-  dependency('libavcodec'),
-  dependency('libavformat'),
-  dependency('libavutil'),
-]
-
 # other dependencies
 
 argparse = dependency('argparse', version: '>=3')
@@ -127,7 +119,6 @@ vacon_sources = [
   'src/linux/font.cpp',
   'src/linux/mfx.cpp',
   'src/network_handler.cpp',
-  'src/rtp_depacketizer.cpp',
   'src/rtp/generic_packetizer.cpp',
   'src/rtp/generic_depacketizer.cpp',
   'src/sdl.cpp',
@@ -139,7 +130,6 @@ vacon_sources = [
 vacon_dependencies = [
   argparse,
   backward,
-  ffmpeg,
   imgui,
   libdatachannel,
   libhydrogen,
