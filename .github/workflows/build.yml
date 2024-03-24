@@ -150,7 +150,8 @@ jobs:
           -DSDL_PIPEWIRE=ON \
           -DSDL_PIPEWIRE_SHARED=ON \
           -DSDL_POWER_DEFAULT=OFF \
-          -DSDL_PULSEAUDIO_SHARED=OFF \
+          -DSDL_PULSEAUDIO=ON \
+          -DSDL_PULSEAUDIO_SHARED=ON \
           -DSDL_RENDER_VULKAN=OFF \
           -DSDL_RPATH=OFF \
           -DSDL_RPI=OFF \
