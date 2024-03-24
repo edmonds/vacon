@@ -124,7 +124,7 @@ jobs:
       working-directory: "./sdl"
       run: |
         cmake -B build -G Ninja \
-          -DCMAKE_INSTALL_PREFIX=/opt/vacon \
+          --install-prefix /opt/vacon \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -ggdb3 -fno-omit-frame-pointer" \
           -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF \
