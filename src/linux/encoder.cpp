@@ -173,7 +173,7 @@ bool Encoder::InitEncoder()
 
     auto status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXCreateSession() failed: " << status;
+        LOG_ERROR << "MFXCreateSession() failed: " << MfxStatusStr(status);
         return false;
     }
 
@@ -199,7 +199,7 @@ bool Encoder::InitEncoder()
 
     status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXVideoVPP_Init() failed: " << status;
+        LOG_ERROR << "MFXVideoVPP_Init() failed: " << MfxStatusStr(status);
         return false;
     }
 
@@ -208,7 +208,7 @@ bool Encoder::InitEncoder()
 
     status = MFXVideoENCODE_Init(mfx_session_, &mfx_videoparam_encode_);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXVideoENCODE_Init() failed: " << status;
+        LOG_ERROR << "MFXVideoENCODE_Init() failed: " << MfxStatusStr(status);
         return false;
     }
 
@@ -441,14 +441,14 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
     mfxFrameSurface1 *surface_camera = nullptr;
     auto status = MFXMemory_GetSurfaceForVPPIn(mfx_session_, &surface_camera);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXMemory_GetSurfaceForVPPIn() failed: " << status;
+        LOG_ERROR << "MFXMemory_GetSurfaceForVPPIn() failed: " << MfxStatusStr(status);
         return nullptr;
     }
 
     // Map the new surface onto the CPU for writing.
     status = surface_camera->FrameInterface->Map(surface_camera, MFX_MAP_WRITE);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "mfxFrameSurfaceInterface->Map(MFX_MAP_WRITE) failed: " << status;
+        LOG_ERROR << "mfxFrameSurfaceInterface->Map(MFX_MAP_WRITE) failed: " << MfxStatusStr(status);
         return nullptr;
     }
 
@@ -461,7 +461,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
     // Unmap the camera surface from the CPU.
     status = surface_camera->FrameInterface->Unmap(surface_camera);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "mfxFrameSurfaceInterface->Unmap() failed: " << status;
+        LOG_ERROR << "mfxFrameSurfaceInterface->Unmap() failed: " << MfxStatusStr(status);
         return nullptr;
     }
 
@@ -471,13 +471,13 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
     // Decrement reference count on the camera surface.
     status = surface_camera->FrameInterface->Release(surface_camera);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "mfxFrameSurfaceInterface->Release() failed: " << status;
+        LOG_ERROR << "mfxFrameSurfaceInterface->Release() failed: " << MfxStatusStr(status);
         return nullptr;
     }
 
     // Check status of the scaling request.
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed: " << status;
+        LOG_ERROR << "MFXVideoVPP_RunFrameVPPAsync() failed: " << MfxStatusStr(status);
         return nullptr;
     }
 
@@ -490,7 +490,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
                                         &frame->bitstream,
                                         &syncp);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXVideoENCODE_EncodeFrameAsync() failed: " << status;
+        LOG_ERROR << "MFXVideoENCODE_EncodeFrameAsync() failed: " << MfxStatusStr(status);
         return nullptr;
     }
 
@@ -509,7 +509,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
         }
     } while (status == MFX_WRN_IN_EXECUTION);
     if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXVideoCORE_SyncOperation() failed: " << status;
+        LOG_ERROR << "MFXVideoCORE_SyncOperation() failed: " << MfxStatusStr(status);
         return nullptr;
     }
 
