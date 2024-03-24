@@ -163,7 +163,7 @@ jobs:
           -DSDL_VIVANTE=OFF \
           -DSDL_VULKAN=OFF \
           -DSDL_WAYLAND=ON \
-          -DSDL_WAYLAND_SHARED=OFF \
+          -DSDL_WAYLAND_SHARED=ON \
           -DSDL_X11=ON \
           -DSDL_X11_SHARED=OFF \
         ;
