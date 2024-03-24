@@ -147,6 +147,7 @@ jobs:
           -DSDL_OPENGL=ON \
           -DSDL_OPENGLES=ON \
           -DSDL_OSS=OFF \
+          -DSDL_PIPEWIRE=ON \
           -DSDL_PIPEWIRE_SHARED=ON \
           -DSDL_POWER_DEFAULT=OFF \
           -DSDL_PULSEAUDIO_SHARED=OFF \
