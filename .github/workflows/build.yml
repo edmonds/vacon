@@ -35,13 +35,6 @@ jobs:
         submodules: recursive
         path: libdatachannel
 
-    - name: Checkout FFmpeg
-      uses: actions/checkout@v4
-      with:
-        repository: FFmpeg/FFmpeg
-        ref: "n6.1.1"
-        path: ffmpeg
-
     - name: Checkout SDL3
       uses: actions/checkout@v4
       with:
@@ -128,86 +121,6 @@ jobs:
         ;
         ninja -v -C build
         sudo ninja -C build install
-
-    - name: Build FFmpeg
-      working-directory: "./ffmpeg"
-      run: |
-        mkdir build
-        cd build
-        $(pwd)/../configure \
-          --prefix=/opt/vacon \
-          --cc=gcc-13 \
-          --cxx=g++-13 \
-          --disable-everything \
-          --disable-programs \
-          --disable-static \
-          --enable-avcodec \
-          --enable-avfilter \
-          --enable-avformat \
-          --enable-avutil \
-          --enable-decoder=rawvideo \
-          --enable-demuxer=av1 \
-          --enable-demuxer=h264 \
-          --enable-demuxer=hevc \
-          --enable-demuxer=mjpeg \
-          --enable-demuxer=rawvideo \
-          --enable-demuxer=rtp \
-          --enable-demuxer=rtsp \
-          --enable-encoder=av1_vaapi \
-          --enable-encoder=h264_vaapi \
-          --enable-encoder=hevc_vaapi \
-          --enable-encoder=rawvideo \
-          --enable-encoder=vp9_vaapi \
-          --enable-filter=hwdownload \
-          --enable-filter=hwmap \
-          --enable-filter=hwupload \
-          --enable-filter=scale_vaapi \
-          --enable-hwaccel=av1_vaapi \
-          --enable-hwaccel=h264_vaapi \
-          --enable-hwaccel=hevc_vaapi \
-          --enable-hwaccel=mjpeg_vaapi \
-          --enable-hwaccel=vp9_vaapi \
-          --enable-libdrm \
-          --enable-muxer=h264 \
-          --enable-muxer=hevc \
-          --enable-muxer=rawvideo \
-          --enable-muxer=rtp \
-          --enable-muxer=rtsp \
-          --enable-parser=av1 \
-          --enable-parser=h264 \
-          --enable-parser=hevc \
-          --enable-parser=mjpeg \
-          --enable-parser=vp9 \
-          --enable-pixelutils \
-          --enable-protocol=file \
-          --enable-protocol=rtp \
-          --enable-pthreads \
-          --enable-shared \
-          --enable-vaapi \
-          --disable-dwt \
-          --disable-error-resilience \
-          --disable-faan \
-          --disable-iconv \
-          --disable-lsp \
-          --disable-postproc \
-          --disable-swresample \
-          --disable-swscale \
-          --disable-x86asm \
-          --disable-doc \
-          --disable-htmlpages \
-          --disable-manpages \
-          --disable-podpages \
-          --disable-txtpages \
-          --disable-bzlib \
-          --disable-libxcb \
-          --disable-libxcb_shm \
-          --disable-lzma \
-          --disable-xlib \
-          --disable-zlib \
-        ;
-        make -j$(nproc)
-        sudo make install
-        sudo rm -vrf /opt/vacon/share/ffmpeg
 
     - name: Build SDL3
       working-directory: "./sdl"
