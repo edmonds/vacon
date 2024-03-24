@@ -27,7 +27,6 @@
 #include "linux/encoder.hpp"
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
-#include "packet_ref.hpp"
 #include "network_handler.hpp"
 #include "stats.hpp"
 
@@ -134,8 +133,8 @@ class App {
         std::shared_ptr<linux::DecodedFrameQueue>
             decoded_video_frame_queue_                  = std::make_shared<linux::DecodedFrameQueue>(4);
 
-        std::shared_ptr<PacketRefQueue>
-            incoming_video_packet_queue_                = std::make_shared<PacketRefQueue>(2);
+        std::shared_ptr<RtcPacketQueue>
+            incoming_video_packet_queue_                = std::make_shared<RtcPacketQueue>(2);
 
         std::shared_ptr<linux::VideoPacketQueue>
             outgoing_video_packet_queue_                = std::make_shared<linux::VideoPacketQueue>(2);

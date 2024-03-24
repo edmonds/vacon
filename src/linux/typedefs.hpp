@@ -21,10 +21,10 @@
 
 namespace vacon {
 
-class PacketRef;
+class RtcPacket;
 
-typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<PacketRef>>
-    PacketRefQueue;
+typedef moodycamel::BlockingReaderWriterCircularBuffer<std::shared_ptr<RtcPacket>>
+    RtcPacketQueue;
 
 namespace linux {
 

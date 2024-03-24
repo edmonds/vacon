@@ -38,6 +38,7 @@
 
 #include "event.hpp"
 #include "linux/mfx.hpp"
+#include "rtc_packet.hpp"
 #include "util.hpp"
 
 using namespace std::chrono_literals;
@@ -122,10 +123,10 @@ void Decoder::RunDecoder(std::stop_token st)
     PushEvent(Event::DecoderStarted);
 
     while (!st.stop_requested()) {
-        std::shared_ptr<PacketRef> pref;
+        std::shared_ptr<RtcPacket> packet;
 
-        if (params_.incoming_video_packet_queue->wait_dequeue_timed(pref, 10ms)) {
-            DecodePacket(pref);
+        if (params_.incoming_video_packet_queue->wait_dequeue_timed(packet, 10ms)) {
+            DecodePacket(packet);
         } else {
             LOG_VERBOSE << "Stalled dequeuing packet from incoming video packet queue, retrying";
         }
@@ -227,7 +228,7 @@ bool Decoder::InitVaapi()
     return true;
 }
 
-void Decoder::DecodePacket(std::shared_ptr<PacketRef> pref)
+void Decoder::DecodePacket(std::shared_ptr<RtcPacket> rtc_packet)
 {
     auto t_start = std::chrono::steady_clock::now();
 
@@ -235,10 +236,10 @@ void Decoder::DecodePacket(std::shared_ptr<PacketRef> pref)
 
     mfxBitstream bitstream  = {};
     bitstream.CodecId       = mfx_videoparam_decode_.mfx.CodecId;
-    bitstream.Data          = static_cast<mfxU8*>(pref->packet_->data);
+    bitstream.Data          = reinterpret_cast<mfxU8*>(rtc_packet->msg_.data());
     bitstream.DataFlag      = MFX_BITSTREAM_COMPLETE_FRAME;
-    bitstream.DataLength    = pref->packet_->size;
-    bitstream.MaxLength     = pref->packet_->size;
+    bitstream.DataLength    = rtc_packet->msg_.size();
+    bitstream.MaxLength     = rtc_packet->msg_.size();
 
     // If the decoder needs to be initialized, decode the header of this frame
     // and then initialize the decoder.

@@ -30,7 +30,7 @@
 
 #include "linux/camera.hpp"
 #include "linux/typedefs.hpp"
-#include "packet_ref.hpp"
+#include "rtc_packet.hpp"
 #include "stats.hpp"
 
 namespace vacon {
@@ -41,7 +41,7 @@ extern std::atomic_size_t n_frames_decode_fail;
 extern std::atomic_size_t n_frames_decode_overflow;
 
 struct DecoderParams {
-    std::shared_ptr<PacketRefQueue>     incoming_video_packet_queue = nullptr;
+    std::shared_ptr<RtcPacketQueue>     incoming_video_packet_queue = nullptr;
     std::shared_ptr<DecodedFrameQueue>  decoded_video_frame_queue = nullptr;
 };
 
@@ -76,7 +76,7 @@ class Decoder {
         bool InitVaapi();
         void RunDecoder(std::stop_token);
         bool InitDecoder();
-        void DecodePacket(std::shared_ptr<PacketRef>);
+        void DecodePacket(std::shared_ptr<RtcPacket>);
 
         DecoderParams       params_;
 

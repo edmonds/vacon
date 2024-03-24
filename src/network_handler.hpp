@@ -31,6 +31,7 @@
 #include "invite.hpp"
 #include "linux/typedefs.hpp"
 #include "rtp_depacketizer.hpp"
+#include "rtc_packet.hpp"
 
 namespace vacon {
 
@@ -41,7 +42,7 @@ struct NetworkHandlerParams {
     std::shared_ptr<Invite> invite;
     std::string stun_server;
     std::shared_ptr<linux::VideoPacketQueue> outgoing_video_packet_queue;
-    std::shared_ptr<PacketRefQueue> incoming_video_packet_queue;
+    std::shared_ptr<RtcPacketQueue> incoming_video_packet_queue;
 };
 
 class NetworkHandler {
