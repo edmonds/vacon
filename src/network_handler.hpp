@@ -30,8 +30,6 @@
 
 #include "invite.hpp"
 #include "linux/typedefs.hpp"
-#include "rtp_depacketizer.hpp"
-#include "rtc_packet.hpp"
 
 namespace vacon {
 
@@ -59,12 +57,11 @@ class NetworkHandler {
         void CloseWebSocket();
         bool IsConnectedToPeer();
         void RunConnect(std::stop_token);
-        void RunIncomingFill(std::stop_token);
         void RunOutgoingDrain(std::stop_token);
-        void ReceivePacket(rtc::binary);
         void OnWsMessage(nlohmann::json message);
         void CreatePeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);
-        void SendVideoFrame(const std::byte *data, size_t size, uint64_t pts);
+        void ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_info);
+        void SendVideoPacket(const std::byte *data, size_t size, uint64_t pts);
 
         NetworkHandlerParams                            params_ = {};
         bool                                            starting_ = false;
@@ -75,7 +72,6 @@ class NetworkHandler {
         std::shared_ptr<rtc::RtcpSrReporter>            sender_reporter_;
         std::shared_ptr<rtc::RtpPacketizationConfig>    rtp_config_;
         std::shared_ptr<rtc::Track>                     track_;
-        std::shared_ptr<vacon::RtpDepacketizer>         rtp_depacketizer_;
 };
 
 } // namespace vacon

@@ -30,15 +30,11 @@
 #include <plog/Log.h>
 #include <rtc/rtc.hpp>
 
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/imgutils.h>
-}
-
 #include "app.hpp"
 #include "event.hpp"
-#include "packet_ref.hpp"
+#include "rtc_packet.hpp"
+#include "rtp/generic_depacketizer.hpp"
+#include "rtp/generic_packetizer.hpp"
 #include "util.hpp"
 
 using namespace std::chrono_literals;
@@ -131,21 +127,12 @@ void NetworkHandler::RunConnect(std::stop_token st)
     }
 
     if (IsConnectedToPeer() && !vacon::gShuttingDown) {
-        // Start the incoming video packet fill thread.
-        if (rtp_depacketizer_) {
-            // XXX: FFmpeg can hang in av_read_frame(), so for now detach
-            // the incoming fill thread.
-            //
-            //threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunIncomingFill(st); } });
-            std::jthread([&](std::stop_token st) { RunIncomingFill(st); }).detach();
-        }
-
         LOG_FATAL << "PEER-TO-PEER CONNECTION IS READY !!!";
         PushEvent(Event::NetworkStarted);
     }
 
-    // WebRTC peer connection is up, so close the connection to the
-    // signaling server.
+    // WebRTC peer connection is up, or we are shutting down, so close the
+    // connection to the signaling server.
     CloseWebSocket();
 
     LOG_DEBUG << "Stopping WebRTC connection thread ID " << std::this_thread::get_id();
@@ -162,7 +149,7 @@ void NetworkHandler::RunOutgoingDrain(std::stop_token st)
     while (!st.stop_requested()) {
         std::shared_ptr<linux::VideoFrame> frame;
         if (params_.outgoing_video_packet_queue->wait_dequeue_timed(frame, 250ms)) {
-            SendVideoFrame(frame->CompressedData(), frame->CompressedDataLength(), frame->pts);
+            SendVideoPacket(frame->CompressedData(), frame->CompressedDataLength(), frame->pts);
 
             auto t_now = std::chrono::steady_clock::now();
             if (count_frames == -1) {
@@ -186,69 +173,6 @@ void NetworkHandler::RunOutgoingDrain(std::stop_token st)
     }
 
     LOG_DEBUG << "Stopping outgoing video packet queue drain thread ID " << std::this_thread::get_id();
-}
-
-void NetworkHandler::RunIncomingFill(std::stop_token st)
-{
-    LOG_DEBUG << "Starting incoming video packet queue fill thread ID " << std::this_thread::get_id();
-    util::SetThreadName("VInVideo");
-
-    auto format = rtp_depacketizer_->fctx;
-
-    if (avformat_find_stream_info(format, nullptr) < 0) {
-        LOG_ERROR << "avformat_find_stream_info() failed";
-        return;
-    }
-
-    int stream_idx = av_find_best_stream(format, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-    if (stream_idx < 0) {
-        LOG_ERROR << "av_find_best_stream() returned no video streams";
-        return;
-    }
-
-    LOG_INFO
-        << "Opened incoming video stream, pixel format: "
-        << av_get_pix_fmt_name(static_cast<enum AVPixelFormat>(format->streams[stream_idx]->codecpar->format));
-
-    auto t_last = std::chrono::steady_clock::now();
-    int count_frames = -1;
-
-    while (!st.stop_requested()) {
-        auto pref = PacketRef::Create(av_packet_alloc());
-
-        auto ret = av_read_frame(format, pref->packet_);
-        if (ret < 0) {
-            LOG_DEBUG << "av_read_frame() returned: " << av_err2string(ret);
-            break;
-        }
-
-        while (!st.stop_requested()) {
-            if (params_.incoming_video_packet_queue->wait_enqueue_timed(pref, 250ms)) {
-                break;
-            } else {
-                LOG_DEBUG << "Stalled enqueuing packet onto incoming video packet queue, retrying";
-            }
-        }
-
-        auto t_now = std::chrono::steady_clock::now();
-        if (count_frames == -1) {
-            t_last = t_now;
-        }
-        ++count_frames;
-        auto t_dur = t_now - t_last;
-
-        if (t_dur >= 1s) {
-            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_dur).count();
-            auto fps = count_frames / std::chrono::duration<double>(t_dur).count();
-            n_network_incoming_fpks.store(fps * 1000, std::memory_order_relaxed);
-            LOG_VERBOSE << std::format("Processed {} incoming video frames in {} ms, {:.3f} fps",
-                                       count_frames, ms, fps);
-            t_last = t_now;
-            count_frames = 0;
-        }
-    }
-
-    LOG_DEBUG << "Stopping incoming video packet queue fill thread ID " << std::this_thread::get_id();
 }
 
 void NetworkHandler::ConnectWebRTC()
@@ -332,8 +256,6 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
 {
     peer_ = std::make_shared<rtc::PeerConnection>(config_);
 
-    rtp_depacketizer_ = vacon::RtpDepacketizer::Create();
-
     peer_->onGatheringStateChange([&, wws = util::make_weak_ptr(ws_)](rtc::PeerConnection::GatheringState state) {
         if (state == rtc::PeerConnection::GatheringState::Complete) {
             auto description = peer_->localDescription();
@@ -366,29 +288,34 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
     const rtc::SSRC ssrc = 42;
     const int video_payload_type = 96;
 
+    rtp_config_ = std::make_shared<rtc::RtpPacketizationConfig>
+        (ssrc, "video", video_payload_type, GenericRtpPacketizer::defaultClockRate);
+
     rtc::Description::Video video("video", rtc::Description::Direction::SendRecv);
-    video.addH265Codec(video_payload_type);
+    video.addVideoCodec(video_payload_type, "H265");
     video.addSSRC(ssrc, "video");
+
     track_ = peer_->addTrack(video);
 
-    rtp_config_ = std::make_shared<rtc::RtpPacketizationConfig>
-        (ssrc, "video", video_payload_type, rtc::H265RtpPacketizer::defaultClockRate);
-
-    auto packetizer = std::make_shared<rtc::H265RtpPacketizer>
-        (rtc::H265RtpPacketizer::Separator::LongStartSequence, rtp_config_);
-
+    auto packetizer = std::make_shared<GenericRtpPacketizer>(rtp_config_);
+    auto depacketizer = std::make_shared<GenericRtpDepacketizer>();
     sender_reporter_ = std::make_shared<rtc::RtcpSrReporter>(rtp_config_);
-    packetizer->addToChain(sender_reporter_);
-
-    auto nackResponder = std::make_shared<rtc::RtcpNackResponder>();
-    packetizer->addToChain(nackResponder);
-
+    auto nack_responder = std::make_shared<rtc::RtcpNackResponder>();
     auto session = std::make_shared<rtc::RtcpReceivingSession>();
-    packetizer->addToChain(session);
 
     track_->setMediaHandler(packetizer);
+    track_->chainMediaHandler(depacketizer);
+    track_->chainMediaHandler(sender_reporter_);
+    track_->chainMediaHandler(nack_responder);
+    track_->chainMediaHandler(session);
 
-    track_->onMessage([&](rtc::binary pkt) { ReceivePacket(pkt); }, nullptr);
+    track_->onFrame([&](rtc::binary msg, rtc::FrameInfo frame_info) {
+        ReceiveVideoPacket(msg, frame_info);
+    });
+
+    track_->onMessage([](rtc::binary pkt) {
+        LOG_DEBUG << "Discarding unhandled incoming message, size " << pkt.size();
+    }, nullptr);
 
     if (offer) {
         peer_->setRemoteDescription(offer.value());
@@ -397,15 +324,23 @@ void NetworkHandler::CreatePeerConnection(const std::optional<rtc::Description>&
     }
 }
 
-void NetworkHandler::ReceivePacket(rtc::binary pkt)
+void NetworkHandler::ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_info)
 {
-    // This is an RTP packet.
-    if (rtp_depacketizer_) {
-        rtp_depacketizer_->submitRtpPacket(pkt);
+    LOG_VERBOSE << std::format("Received video packet, size {}, timestamp {}",
+                               msg.size(), frame_info.timestamp);
+
+    auto packet = RtcPacket::Create(msg, frame_info);
+
+    while (!vacon::gShuttingDown) {
+        if (params_.incoming_video_packet_queue->wait_enqueue_timed(packet, 250ms)) {
+            break;
+        } else {
+            LOG_DEBUG << "Stalled enqueuing packet onto incoming video packet queue, retrying";
+        }
     }
 }
 
-void NetworkHandler::SendVideoFrame(const std::byte *data, size_t size, uint64_t pts)
+void NetworkHandler::SendVideoPacket(const std::byte *data, size_t size, uint64_t pts)
 {
     // Only send the packet if the connection is open.
     if (!track_ || !track_->isOpen()) {
