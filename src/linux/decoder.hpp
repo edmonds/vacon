@@ -16,10 +16,8 @@
 #pragma once
 
 #include <atomic>
-#include <cstdint>
 #include <memory>
 #include <stop_token>
-#include <string>
 #include <thread>
 
 #include <SDL3/SDL.h>
@@ -28,7 +26,6 @@
 #include <va/va_drmcommon.h>
 #include <wayland-client.h>
 
-#include "linux/camera.hpp"
 #include "linux/typedefs.hpp"
 #include "rtc_packet.hpp"
 #include "stats.hpp"
@@ -82,7 +79,6 @@ class Decoder {
 
         std::jthread        thread_ = {};
 
-        mfxLoader           mfx_loader_ = nullptr;
         mfxSession          mfx_session_ = nullptr;
         mfxVideoParam       mfx_videoparam_decode_ = {};
         bool                need_decode_init_ = true;

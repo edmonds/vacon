@@ -15,11 +15,8 @@
 
 #include "linux/mfx.hpp"
 
-#include <cstdint>
 #include <format>
 #include <string>
-#include <tuple>
-#include <vector>
 
 #include <mfx.h>
 #include <plog/Log.h>

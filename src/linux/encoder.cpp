@@ -33,6 +33,7 @@
 #include "event.hpp"
 #include "linux/camera.hpp"
 #include "linux/mfx.hpp"
+#include "linux/mfx_loader.hpp"
 #include "linux/video_frame.hpp"
 #include "util.hpp"
 
@@ -66,12 +67,6 @@ Encoder::~Encoder()
         MFXVideoVPP_Close(mfx_session_);
         MFXClose(mfx_session_);
         mfx_session_ = nullptr;
-    }
-
-    if (mfx_loader_) {
-        LOG_VERBOSE << std::format("Unloading MFX loader @ {}", (void*)mfx_loader_);
-        MFXUnload(mfx_loader_);
-        mfx_loader_ = nullptr;
     }
 
     free(mfx_videoparam_encode_.ExtParam);
@@ -164,13 +159,13 @@ bool Encoder::InitEncoder()
 
     auto t_start = std::chrono::steady_clock::now();
 
-    mfx_loader_ = MFXLoad();
-    if (!mfx_loader_) {
-        LOG_ERROR << "MFXLoad() failed";
+    auto mfx_loader = MfxLoader::GetInstance();
+    if (!mfx_loader) {
+        LOG_ERROR << "MFXLoader::GetInstance() failed";
         return false;
     }
 
-    auto status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_);
+    auto status = MFXCreateSession(mfx_loader->Get(), 0, &mfx_session_);
     if (status != MFX_ERR_NONE) {
         LOG_ERROR << "MFXCreateSession() failed: " << MfxStatusStr(status);
         return false;
@@ -181,7 +176,7 @@ bool Encoder::InitEncoder()
         return false;
     }
 
-    if (!SetMfxLoaderConfigFilters(mfx_loader_,
+    if (!SetMfxLoaderConfigFilters(mfx_loader->Get(),
         {
             { "mfxImplDescription.ApiVersion.Version", ((2 << 16) | 2) },
             { "mfxImplDescription.Impl", MFX_IMPL_TYPE_HARDWARE },

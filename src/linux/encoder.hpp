@@ -18,7 +18,6 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <thread>
 
 #include <mfx.h>
@@ -74,7 +73,6 @@ class Encoder {
 
         std::jthread        thread_ = {};
 
-        mfxLoader           mfx_loader_ = nullptr;
         mfxSession          mfx_session_ = nullptr;
         mfxVideoParam       mfx_videoparam_encode_ = {};
         mfxVideoParam       mfx_videoparam_vpp_ = {};

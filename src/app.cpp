@@ -29,6 +29,7 @@
 #include "linux/camera.hpp"
 #include "linux/decoder.hpp"
 #include "linux/encoder.hpp"
+#include "linux/mfx_loader.hpp"
 #include "network_handler.hpp"
 #include "util.hpp"
 
@@ -96,6 +97,7 @@ int App::AppInit(int argc, char *argv[])
 void App::AppQuit()
 {
     StopVideo();
+    linux::MfxLoader::DestroyInstance();
 }
 
 int App::AppEvent(const SDL_Event *event)

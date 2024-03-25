@@ -37,6 +37,7 @@
 
 #include "event.hpp"
 #include "linux/mfx.hpp"
+#include "linux/mfx_loader.hpp"
 #include "rtc_packet.hpp"
 #include "util.hpp"
 
@@ -64,12 +65,6 @@ Decoder::~Decoder()
         MFXVideoDECODE_Close(mfx_session_);
         MFXClose(mfx_session_);
         mfx_session_ = nullptr;
-    }
-
-    if (mfx_loader_) {
-        LOG_VERBOSE << std::format("Unloading MFX loader @ {}", (void*)mfx_loader_);
-        MFXUnload(mfx_loader_);
-        mfx_loader_ = nullptr;
     }
 
     if (va_display_) {
@@ -138,22 +133,22 @@ bool Decoder::InitDecoder()
 {
     auto t_start = std::chrono::steady_clock::now();
 
-    mfx_loader_ = MFXLoad();
-    if (!mfx_loader_) {
-        LOG_ERROR << "MFXLoad() failed";
+    auto mfx_loader = MfxLoader::GetInstance();
+    if (!mfx_loader) {
+        LOG_ERROR << "MfxLoader::GetInstance() failed";
         return false;
     }
 
     mfx_videoparam_decode_.mfx.CodecId = MFX_CODEC_HEVC;
     mfx_videoparam_decode_.IOPattern = MFX_IOPATTERN_OUT_VIDEO_MEMORY;
 
-    auto status = MFXCreateSession(mfx_loader_, 0 /* i */, &mfx_session_);
+    auto status = MFXCreateSession(mfx_loader->Get(), 0, &mfx_session_);
     if (status != MFX_ERR_NONE) {
         LOG_ERROR << "MFXCreateSession() failed: " << MfxStatusStr(status);
         return false;
     }
 
-    if (!SetMfxLoaderConfigFilters(mfx_loader_,
+    if (!SetMfxLoaderConfigFilters(mfx_loader->Get(),
         {
             { "mfxImplDescription.AccelerationMode", MFX_ACCEL_MODE_VIA_VAAPI },
             { "mfxImplDescription.ApiVersion.Version", ((2 << 16) | 9) },
@@ -165,7 +160,7 @@ bool Decoder::InitDecoder()
         return false;
     }
 
-    if (!SetMfxLoaderConfigFiltersCombined(mfx_loader_,
+    if (!SetMfxLoaderConfigFiltersCombined(mfx_loader->Get(),
         {
             { "mfxSurfaceTypesSupported.surftype.SurfaceType", MFX_SURFACE_TYPE_VAAPI },
             { "mfxSurfaceTypesSupported.surftype.surfcomp.SurfaceComponent", MFX_SURFACE_COMPONENT_DECODE },
