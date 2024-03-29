@@ -260,7 +260,7 @@ jobs:
     - name: Upload Debian package to artifact storage
       uses: actions/upload-artifact@v4
       with:
-        name: binary-vacon-deb
+        name: vacon-binary-deb
         path: deb/vacon_*.deb
         compression-level: 0
 
