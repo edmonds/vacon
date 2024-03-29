@@ -52,7 +52,7 @@ void MfxLoader::DestroyInstance()
 MfxLoader::~MfxLoader()
 {
     if (ptr_) {
-        LOG_ERROR << std::format("Destroying MFX loader @ {}", (void*)ptr_);
+        LOG_VERBOSE << std::format("Destroying MFX loader @ {}", (void*)ptr_);
         MFXUnload(ptr_);
         ptr_ = nullptr;
     }
