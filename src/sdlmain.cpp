@@ -15,6 +15,8 @@
 
 #include "app.hpp"
 
+#include <cstdlib>
+
 #define SDL_MAIN_HANDLED
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL_main.h>
@@ -98,5 +100,11 @@ static void AppQuit()
 
 int main(int argc, char **argv)
 {
+    if (getenv("WAYLAND_DISPLAY")) {
+        // Prevent SDL3 from incorrectly falling back to Xwayland when native
+        // Wayland is available.
+        setenv("SDL_VIDEODRIVER", "wayland", 0);
+    }
+
     return SDL_EnterAppMainCallbacks(argc, argv, AppInit, AppIterate, AppEvent, AppQuit);
 }
