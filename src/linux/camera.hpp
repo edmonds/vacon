@@ -117,7 +117,7 @@ class Camera {
         static std::unique_ptr<Camera> Create(const CameraParams&);
         Camera(Camera&&) = default;
         ~Camera();
-        bool Init();
+        void StartThread();
         void RequestStop();
         void Join();
         bool ExportBuffersToOpenGL(SDL_Renderer*);

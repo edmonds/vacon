@@ -142,10 +142,9 @@ Camera::~Camera()
     }
 }
 
-bool Camera::Init()
+void Camera::StartThread()
 {
     thread_ = std::jthread([&](std::stop_token st) { RunCamera(st); });
-    return true;
 }
 
 void Camera::RequestStop()

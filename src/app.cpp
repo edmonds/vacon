@@ -335,7 +335,7 @@ void App::StartVideoCamera()
         LOG_FATAL << "linux::Camera::Create() failed!";
         return;
     }
-    camera_->Init();
+    camera_->StartThread();
 }
 
 void App::StopConference()
