@@ -29,6 +29,7 @@ namespace linux {
 
 typedef std::vector<std::tuple<const char *, uint32_t>> mfxConfigFilters;
 
+mfxSession GetMfxSession();
 bool SetMfxLoaderConfigFilters(mfxLoader loader, mfxConfigFilters filters);
 bool SetMfxLoaderConfigFiltersCombined(mfxLoader loader, mfxConfigFilters filters);
 const char* MfxStatusStringConstant(mfxStatus status);

@@ -21,8 +21,50 @@
 #include <mfx.h>
 #include <plog/Log.h>
 
+#include "linux/mfx_loader.hpp"
+
 namespace vacon {
 namespace linux {
+
+mfxSession GetMfxSession()
+{
+    auto mfx_loader = MfxLoader::GetInstance();
+    if (!mfx_loader) {
+        LOG_ERROR << "MFXLoader::GetInstance() failed";
+        return {};
+    }
+
+    if (!SetMfxLoaderConfigFilters(mfx_loader->Get(),
+        {
+            { "mfxImplDescription.ApiVersion.Version", ((2 << 16) | 9) },
+            { "mfxImplDescription.Impl", MFX_IMPL_TYPE_HARDWARE },
+            { "mfxImplDescription.mfxVPPDescription.filter.FilterFourCC", MFX_EXTBUFF_VPP_SCALING },
+        }))
+    {
+        LOG_ERROR << "SetMfxLoaderConfigFilters() failed";
+        return {};
+    }
+
+    if (!SetMfxLoaderConfigFiltersCombined(mfx_loader->Get(),
+        {
+            { "mfxSurfaceTypesSupported.surftype.SurfaceType", MFX_SURFACE_TYPE_VAAPI },
+            { "mfxSurfaceTypesSupported.surftype.surfcomp.SurfaceComponent", MFX_SURFACE_COMPONENT_DECODE },
+            { "mfxSurfaceTypesSupported.surftype.surfcomp.SurfaceFlags", MFX_SURFACE_FLAG_EXPORT_SHARED },
+        }))
+    {
+        LOG_ERROR << "SetMfxLoaderConfigFilters() failed";
+        return {};
+    }
+
+    mfxSession mfx_session = {};
+    auto status = MFXCreateSession(mfx_loader->Get(), 0, &mfx_session);
+    if (status != MFX_ERR_NONE) {
+        LOG_ERROR << "MFXCreateSession() failed: " << MfxStatusStr(status);
+        return {};
+    }
+
+    return mfx_session;
+}
 
 bool SetMfxLoaderConfigFilters(mfxLoader loader, mfxConfigFilters filters)
 {
