@@ -19,9 +19,11 @@
 #include <cstdint>
 #include <memory>
 #include <thread>
+#include <vector>
 
 #include <mfx.h>
 
+#include "codecs.hpp"
 #include "linux/camera.hpp"
 #include "linux/typedefs.hpp"
 #include "linux/video_frame.hpp"
@@ -54,6 +56,7 @@ class Encoder {
         bool Init();
         void RequestStop();
         void Join();
+        std::vector<VideoCodec> GetSupportedCodecs();
 
         Welford             s_encode_size_ = {};
         Welford             s_encode_time_ = {};

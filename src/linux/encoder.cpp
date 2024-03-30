@@ -15,6 +15,7 @@
 
 #include "linux/encoder.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <cerrno>
@@ -23,6 +24,7 @@
 #include <cstring>
 #include <format>
 #include <memory>
+#include <set>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -30,6 +32,7 @@
 #include <mfx.h>
 #include <plog/Log.h>
 
+#include "codecs.hpp"
 #include "event.hpp"
 #include "linux/camera.hpp"
 #include "linux/mfx.hpp"
@@ -93,6 +96,49 @@ void Encoder::Join()
         thread_.join();
         thread_ = {};
     }
+}
+
+std::vector<VideoCodec> Encoder::GetSupportedCodecs()
+{
+    std::vector<VideoCodec> codecs = {};
+    std::set<VideoCodec> codecs_set = {};
+
+    auto mfx_loader = MfxLoader::GetInstance();
+    if (!mfx_loader) {
+        LOG_ERROR << "MfxLoader::GetInstance() failed";
+        return codecs;
+    }
+
+    int impl_idx = 0;
+    mfxImplDescription *desc = nullptr;
+    while (MFXEnumImplementations(mfx_loader->Get(), impl_idx++,
+                                  MFX_IMPLCAPS_IMPLDESCSTRUCTURE,
+                                  reinterpret_cast<mfxHDL*>(&desc)) == MFX_ERR_NONE)
+    {
+        mfxEncoderDescription *enc = &desc->Enc;
+        for (int codec_idx = 0; codec_idx < enc->NumCodecs; ++codec_idx) {
+            auto codec = &enc->Codecs[codec_idx];
+            auto codec_id = codec->CodecID;
+            for (int profile_idx = 0; profile_idx < codec->NumProfiles; ++profile_idx) {
+                auto profile = &codec->Profiles[profile_idx];
+                for (int mem_idx = 0; mem_idx < profile->NumMemTypes; ++mem_idx) {
+                    auto mem = &profile->MemDesc[mem_idx];
+                    for (int fmt_idx = 0; fmt_idx < mem->NumColorFormats; ++fmt_idx) {
+                        auto fmt = mem->ColorFormats[fmt_idx];
+                        auto value = FromMfxCodecAndFormat(codec_id, fmt);
+                        if (value != VideoCodec::UNKNOWN) {
+                            codecs_set.insert(value);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    codecs.assign(codecs_set.begin(), codecs_set.end());
+    std::sort(codecs.begin(), codecs.end());
+
+    return codecs;
 }
 
 void Encoder::RunEncoder(std::stop_token st)
