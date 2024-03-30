@@ -271,6 +271,10 @@ bool App::InitVideoCodecs()
         return false;
     }
     decoder_codecs_ = decoder_->GetSupportedCodecs();
+    if (decoder_codecs_->empty()) {
+        LOG_FATAL << "No codecs supported by decoder";
+        return false;
+    }
     for (auto& codec : *decoder_codecs_) {
         LOG_DEBUG << "Decoder supports: " << ToString(codec);
     }
@@ -285,6 +289,10 @@ bool App::InitVideoCodecs()
         return false;
     }
     encoder_codecs_ = encoder_->GetSupportedCodecs();
+    if (encoder_codecs_->empty()) {
+        LOG_FATAL << "No codecs supported by encoder";
+        return false;
+    }
     for (auto& codec : *encoder_codecs_) {
         LOG_DEBUG << "Encoder supports: " << ToString(codec);
     }
