@@ -88,11 +88,10 @@ Encoder::~Encoder()
     free(mfx_videoparam_encode_.ExtParam);
 }
 
-bool Encoder::Init(const CameraFormat& fmt)
+void Encoder::StartThread(const CameraFormat& fmt)
 {
     camera_format_ = fmt;
     thread_ = std::jthread([&](std::stop_token st) { RunEncoder(st); });
-    return true;
 }
 
 void Encoder::RequestStop()

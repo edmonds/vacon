@@ -51,7 +51,7 @@ class Encoder {
         static std::unique_ptr<Encoder> Create(const EncoderParams&);
         Encoder(Encoder&&) = default;
         ~Encoder();
-        bool Init(const CameraFormat&);
+        void StartThread(const CameraFormat&);
         void RequestStop();
         void Join();
         std::vector<VideoCodec> GetSupportedCodecs();

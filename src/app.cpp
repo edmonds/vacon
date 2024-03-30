@@ -387,7 +387,7 @@ void App::CreateConference()
     if (invite_) {
         LOG_INFO << "Starting conference using invite " << invite_->Encode();
         StartNetworkHandler();
-        encoder_->Init(camera_->GetCameraFormat());
+        encoder_->StartThread(camera_->GetCameraFormat());
         decoder_->Init();
     } else {
         LOG_FATAL << "Invite::Create() failed!";
