@@ -51,12 +51,25 @@ std::atomic_size_t n_frames_encode_stall    = 0;
 
 std::unique_ptr<Encoder> Encoder::Create(const EncoderParams& params)
 {
+    auto t_start = std::chrono::steady_clock::now();
+
     if (!params.encoder_queue) {
         LOG_ERROR << "Encoder CameraBufferQueue must be provided";
         return nullptr;
     }
 
-    return std::make_unique<Encoder>(Encoder(params));
+    auto enc = std::make_unique<Encoder>(Encoder(params));
+    enc->mfx_session_ = GetMfxSession();
+    if (!enc->mfx_session_) {
+        LOG_ERROR << "GetMfxSession() failed";
+        return nullptr;
+    }
+
+    auto t_end = std::chrono::steady_clock::now();
+    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+    LOG_INFO << std::format("Created video encoder in {} ms", millis);
+
+    return enc;
 }
 
 Encoder::~Encoder()
@@ -152,8 +165,8 @@ void Encoder::RunEncoder(std::stop_token st)
     util::SetThreadName("VMfxWorker");
 
     PushEvent(Event::EncoderStarting);
-    if (!InitEncoder()) {
-        LOG_ERROR << "Video encoder initialization failed !!!";
+    if (!InitMfxEncoder()) {
+        LOG_ERROR << "InitMfxEncoder() failed";
         PushEvent(Event::EncoderFailed);
         return;
     }
@@ -197,45 +210,14 @@ void Encoder::RunEncoder(std::stop_token st)
     LOG_DEBUG << "Stopping video encoder thread ID " << std::this_thread::get_id();
 }
 
-bool Encoder::InitEncoder()
+bool Encoder::InitMfxEncoder()
 {
-    LOG_DEBUG <<
-        std::format("EncoderParams: camera format {}, bitrate {}",
-                    params_.camera_format.Str(),
-                    params_.bitrate_kbps);
-
-    auto t_start = std::chrono::steady_clock::now();
-
-    auto mfx_loader = MfxLoader::GetInstance();
-    if (!mfx_loader) {
-        LOG_ERROR << "MFXLoader::GetInstance() failed";
-        return false;
-    }
-
-    auto status = MFXCreateSession(mfx_loader->Get(), 0, &mfx_session_);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXCreateSession() failed: " << MfxStatusStr(status);
-        return false;
-    }
-
     if (!InitMfxVideoParams()) {
         LOG_ERROR << "InitMfxVideoParams() failed";
         return false;
     }
 
-    if (!SetMfxLoaderConfigFilters(mfx_loader->Get(),
-        {
-            { "mfxImplDescription.ApiVersion.Version", ((2 << 16) | 2) },
-            { "mfxImplDescription.Impl", MFX_IMPL_TYPE_HARDWARE },
-            { "mfxImplDescription.mfxEncoderDescription.encoder.CodecID", mfx_videoparam_encode_.mfx.CodecId },
-            { "mfxImplDescription.mfxVPPDescription.filter.FilterFourCC", MFX_EXTBUFF_VPP_SCALING },
-        }))
-    {
-        LOG_ERROR << "SetMfxLoaderConfigFilters() failed";
-        return false;
-    }
-
-    status = MFXVideoVPP_Query(mfx_session_, &mfx_videoparam_vpp_, &mfx_videoparam_vpp_);
+    auto status = MFXVideoVPP_Query(mfx_session_, &mfx_videoparam_vpp_, &mfx_videoparam_vpp_);
     LOG_DEBUG << "MFXVideoVPP_Query() returned: " << MfxStatusStr(status);
 
     status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
@@ -252,10 +234,6 @@ bool Encoder::InitEncoder()
         LOG_ERROR << "MFXVideoENCODE_Init() failed: " << MfxStatusStr(status);
         return false;
     }
-
-    auto t_end = std::chrono::steady_clock::now();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
-    LOG_INFO << std::format("Initialized video encoder in {} ms", millis);
 
     return true;
 }

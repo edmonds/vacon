@@ -64,7 +64,7 @@ class Encoder {
         Encoder(const EncoderParams& params)
             : params_(params) {};
         void RunEncoder(std::stop_token);
-        bool InitEncoder();
+        bool InitMfxEncoder();
         bool InitMfxVideoParams();
         bool SetMfxFourCc();
         bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);
