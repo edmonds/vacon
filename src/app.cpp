@@ -103,7 +103,7 @@ int App::AppInit(int argc, char *argv[])
 
 void App::AppQuit()
 {
-    StopVideo();
+    StopConference();
     linux::MfxLoader::DestroyInstance();
 }
 
@@ -338,7 +338,7 @@ void App::StartVideoCamera()
     camera_->Init();
 }
 
-void App::StopVideo()
+void App::StopConference()
 {
     StopNetworkHandler();
 

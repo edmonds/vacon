@@ -49,8 +49,8 @@ class App {
         void StartNetworkHandler();
         void StartVideoCamera();
         void StopNetworkHandler();
-        void StopVideo();
 
+        void StopConference();
         void CreateConference();
         void CopyInviteToClipboard();
         void JoinConferenceFromClipboard();
