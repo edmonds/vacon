@@ -197,8 +197,6 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
             LOG_DEBUG << "[CameraStarted] Calling Camera::ExportBuffersToOpenGL() on render thread";
             camera_->ExportBuffersToOpenGL(sdl_renderer_);
         }
-        LOG_DEBUG << "[CameraStarted] Starting video encoder";
-        StartVideoEncoder();
         break;
 
     case Event::CameraFailed: {
