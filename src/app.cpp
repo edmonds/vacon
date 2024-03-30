@@ -313,6 +313,8 @@ void App::StartNetworkHandler()
         .stun_server                    = args_.get<std::string>("--network-stun-server"),
         .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
         .incoming_video_packet_queue    = incoming_video_packet_queue_,
+        .decoder_codecs                 = decoder_codecs_,
+        .encoder_codecs                 = encoder_codecs_,
     };
 
     // Start the NetworkHandler.

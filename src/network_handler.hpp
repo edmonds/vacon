@@ -28,6 +28,7 @@
 #include <nlohmann/json_fwd.hpp>
 #include <rtc/rtc.hpp>
 
+#include "codecs.hpp"
 #include "invite.hpp"
 #include "linux/typedefs.hpp"
 #include "stats.hpp"
@@ -39,6 +40,8 @@ struct NetworkHandlerParams {
     std::string stun_server;
     std::shared_ptr<linux::VideoPacketQueue> outgoing_video_packet_queue;
     std::shared_ptr<RtcPacketQueue> incoming_video_packet_queue;
+    std::shared_ptr<std::vector<VideoCodec>> decoder_codecs;
+    std::shared_ptr<std::vector<VideoCodec>> encoder_codecs;
 };
 
 class NetworkHandler {

@@ -59,6 +59,16 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
         return nullptr;
     }
 
+    if (!params.decoder_codecs || params.decoder_codecs->empty()) {
+        LOG_ERROR << "NetworkHandlerParams.decoder_codecs must be set and support at least one codec";
+        return nullptr;
+    }
+
+    if (!params.encoder_codecs || params.encoder_codecs->empty()) {
+        LOG_ERROR << "NetworkHandlerParams.encoder_codecs must be set and support at least one codec";
+        return nullptr;
+    }
+
     auto nh = std::make_unique<NetworkHandler>(NetworkHandler {});
     nh->params_ = params;
     nh->config_.iceServers.emplace_back(nh->params_.stun_server);
