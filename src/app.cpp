@@ -308,8 +308,8 @@ void App::StartNetworkHandler()
     // Start the NetworkHandler.
     nh_ = NetworkHandler::Create(params);
     if (nh_) {
-        nh_->Init();
-        nh_->StartAsync();
+        nh_->StartDrainThread();
+        nh_->StartConnectThread();
     } else {
         LOG_DEBUG << "NetworkHandler::Create() failed";
     }

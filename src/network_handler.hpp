@@ -46,8 +46,8 @@ class NetworkHandler {
         static std::unique_ptr<NetworkHandler> Create(const NetworkHandlerParams& params);
         NetworkHandler(NetworkHandler&&) = default;
         ~NetworkHandler();
-        void Init();
-        void StartAsync();
+        void StartDrainThread();
+        void StartConnectThread();
 
         Welford                                         s_recv_fps_ = {};
         Welford                                         s_send_fps_ = {};

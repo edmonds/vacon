@@ -92,12 +92,12 @@ NetworkHandler::~NetworkHandler()
     track_ = nullptr;
 }
 
-void NetworkHandler::Init()
+void NetworkHandler::StartDrainThread()
 {
     threads_.emplace_back(std::jthread { [&](std::stop_token st) { RunOutgoingDrain(st); } });
 }
 
-void NetworkHandler::StartAsync()
+void NetworkHandler::StartConnectThread()
 {
     if (starting_) {
         return;
