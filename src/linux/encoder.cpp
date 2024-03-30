@@ -111,10 +111,10 @@ void Encoder::Join()
     }
 }
 
-std::vector<VideoCodec> Encoder::GetSupportedCodecs()
+std::shared_ptr<std::vector<VideoCodec>> Encoder::GetSupportedCodecs()
 {
-    std::vector<VideoCodec> codecs = {};
-    std::set<VideoCodec> codecs_set = {};
+    auto codecs = std::make_shared<std::vector<VideoCodec>>();
+    auto codecs_set = std::set<VideoCodec>{};
 
     auto mfx_loader = MfxLoader::GetInstance();
     if (!mfx_loader) {
@@ -148,8 +148,8 @@ std::vector<VideoCodec> Encoder::GetSupportedCodecs()
         }
     }
 
-    codecs.assign(codecs_set.begin(), codecs_set.end());
-    std::sort(codecs.begin(), codecs.end());
+    codecs->assign(codecs_set.begin(), codecs_set.end());
+    std::sort(codecs->begin(), codecs->end());
 
     return codecs;
 }

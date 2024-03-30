@@ -54,7 +54,8 @@ class Encoder {
         void StartThread(const CameraFormat&);
         void RequestStop();
         void Join();
-        std::vector<VideoCodec> GetSupportedCodecs();
+
+        std::shared_ptr<std::vector<VideoCodec>> GetSupportedCodecs();
 
         Welford             s_encode_size_ = {};
         Welford             s_encode_time_ = {};

@@ -270,7 +270,8 @@ bool App::InitVideoCodecs()
         LOG_FATAL << "linux::Decoder::Create() failed!";
         return false;
     }
-    for (auto& codec : decoder_->GetSupportedCodecs()) {
+    decoder_codecs_ = decoder_->GetSupportedCodecs();
+    for (auto& codec : *decoder_codecs_) {
         LOG_DEBUG << "Decoder supports: " << ToString(codec);
     }
 
@@ -283,7 +284,8 @@ bool App::InitVideoCodecs()
         LOG_FATAL << "linux::Encoder::Create() failed!";
         return false;
     }
-    for (auto& codec : encoder_->GetSupportedCodecs()) {
+    encoder_codecs_ = encoder_->GetSupportedCodecs();
+    for (auto& codec : *encoder_codecs_) {
         LOG_DEBUG << "Encoder supports: " << ToString(codec);
     }
 

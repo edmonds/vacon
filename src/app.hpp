@@ -21,6 +21,7 @@
 #include <SDL3/SDL.h>
 #include <argparse/argparse.hpp>
 
+#include "codecs.hpp"
 #include "event.hpp"
 #include "invite.hpp"
 #include "linux/camera.hpp"
@@ -111,8 +112,14 @@ class App {
         std::unique_ptr<linux::Decoder>
             decoder_                                    = nullptr;
 
+        std::shared_ptr<std::vector<VideoCodec>>
+            decoder_codecs_                             = nullptr;
+
         std::unique_ptr<linux::Encoder>
             encoder_                                    = nullptr;
+
+        std::shared_ptr<std::vector<VideoCodec>>
+            encoder_codecs_                             = nullptr;
 
         std::unique_ptr<NetworkHandler>
             nh_                                         = nullptr;

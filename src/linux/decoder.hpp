@@ -65,7 +65,8 @@ class Decoder {
         void StartThread();
         void RequestStop();
         void Join();
-        std::vector<VideoCodec> GetSupportedCodecs();
+
+        std::shared_ptr<std::vector<VideoCodec>> GetSupportedCodecs();
 
         Welford             s_decode_time_ = {};
 
