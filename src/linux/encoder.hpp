@@ -37,8 +37,6 @@ extern std::atomic_size_t n_frames_encode_fail;
 extern std::atomic_size_t n_frames_encode_stall;
 
 struct EncoderParams {
-    CameraFormat camera_format;
-
     uint32_t bitrate_kbps;
 
     std::shared_ptr<CameraBufferQueue>
@@ -53,7 +51,7 @@ class Encoder {
         static std::unique_ptr<Encoder> Create(const EncoderParams&);
         Encoder(Encoder&&) = default;
         ~Encoder();
-        bool Init();
+        bool Init(const CameraFormat&);
         void RequestStop();
         void Join();
         std::vector<VideoCodec> GetSupportedCodecs();
@@ -72,7 +70,8 @@ class Encoder {
         bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);
         std::shared_ptr<VideoFrame> EncodeCameraBuffer(const CameraBufferRef&);
 
-        EncoderParams       params_;
+        EncoderParams       params_ = {};
+        CameraFormat        camera_format_ = {};
 
         std::jthread        thread_ = {};
 

@@ -75,8 +75,9 @@ Encoder::~Encoder()
     free(mfx_videoparam_encode_.ExtParam);
 }
 
-bool Encoder::Init()
+bool Encoder::Init(const CameraFormat& fmt)
 {
+    camera_format_ = fmt;
     thread_ = std::jthread([&](std::stop_token st) { RunEncoder(st); });
     return true;
 }
@@ -339,37 +340,37 @@ bool Encoder::InitMfxVideoParams()
     mfx_videoparam_vpp_.vpp.In.FrameRateExtN =
     mfx_videoparam_vpp_.vpp.Out.FrameRateExtN =
     mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtN =
-        params_.camera_format.FrameRateN();
+        camera_format_.FrameRateN();
 
     // Frame rate denominator.
     mfx_videoparam_vpp_.vpp.In.FrameRateExtD =
     mfx_videoparam_vpp_.vpp.Out.FrameRateExtD =
     mfx_videoparam_encode_.mfx.FrameInfo.FrameRateExtD =
-        params_.camera_format.FrameRateD();
+        camera_format_.FrameRateD();
 
     // Width of the video frame in pixels. Must be a multiple of 16.
     mfx_videoparam_vpp_.vpp.In.Width =
     mfx_videoparam_vpp_.vpp.Out.Width =
     mfx_videoparam_encode_.mfx.FrameInfo.Width =
-        VACON_ALIGN16(params_.camera_format.Width());
+        VACON_ALIGN16(camera_format_.Width());
 
     // Height of the video frame in pixels. Must be a multiple of 16.
     mfx_videoparam_vpp_.vpp.In.Height =
     mfx_videoparam_vpp_.vpp.Out.Height =
     mfx_videoparam_encode_.mfx.FrameInfo.Height =
-        VACON_ALIGN16(params_.camera_format.Height());
+        VACON_ALIGN16(camera_format_.Height());
 
     // Width in pixels.
     mfx_videoparam_vpp_.vpp.In.CropW =
     mfx_videoparam_vpp_.vpp.Out.CropW =
     mfx_videoparam_encode_.mfx.FrameInfo.CropW =
-        params_.camera_format.Width();
+        camera_format_.Width();
 
     // Height in pixels.
     mfx_videoparam_vpp_.vpp.In.CropH =
     mfx_videoparam_vpp_.vpp.Out.CropH =
     mfx_videoparam_encode_.mfx.FrameInfo.CropH =
-        params_.camera_format.Height();
+        camera_format_.Height();
 
     // PicStruct
     mfx_videoparam_vpp_.vpp.In.PicStruct =
@@ -445,7 +446,7 @@ bool Encoder::SetMfxFourCc()
     map["Y210"] = { MFX_FOURCC_Y210, MFX_CHROMAFORMAT_YUV422, 10, 10, 1 };
 
     // Set pixel format parameters.
-    auto it = map.find(params_.camera_format.FourCcStr());
+    auto it = map.find(camera_format_.FourCcStr());
     if (it != map.end()) {
         LOG_DEBUG << std::format("Using {} for video pixel format", it->first);
 
@@ -469,7 +470,7 @@ bool Encoder::SetMfxFourCc()
             return false;
         }
     } else {
-        LOG_ERROR << "Unhandled input pixel format: " << params_.camera_format.FourCcStr();
+        LOG_ERROR << "Unhandled input pixel format: " << camera_format_.FourCcStr();
         return false;
     }
 
