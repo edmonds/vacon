@@ -346,30 +346,12 @@ void App::StartVideoCamera()
 
 void App::StartVideoDecoder()
 {
-    decoder_ = linux::Decoder::Create(linux::DecoderParams {
-        .incoming_video_packet_queue    = incoming_video_packet_queue_,
-        .decoded_video_frame_queue      = decoded_video_frame_queue_,
-    });
-    if (!decoder_) {
-        LOG_FATAL << "linux::Decoder::Create() failed!";
-        return;
-    }
     decoder_->Init();
 }
 
 void App::StartVideoEncoder()
 {
-    encoder_ = linux::Encoder::Create(linux::EncoderParams {
-        .camera_format                  = camera_->GetCameraFormat(),
-        .bitrate_kbps                   = args_.get<unsigned>("--video-encoder-bitrate"),
-        .encoder_queue                  = encoder_queue_,
-        .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
-    });
-    if (!encoder_) {
-        LOG_FATAL << "[CameraStarted] linux::Encoder::Create() failed!";
-        return;
-    }
-    encoder_->Init();
+    encoder_->Init(camera_->GetCameraFormat());
 }
 
 void App::StopVideo()
