@@ -81,6 +81,8 @@ int App::AppInit(int argc, char *argv[])
         return -1;
     }
 
+    StartVideoCamera();
+
     auto invite_str = args_.get<std::string>("invite");
     if (invite_str != "") {
         invite_ = Invite::Decode(invite_str);
@@ -292,7 +294,6 @@ void App::StartVideo()
         return;
     }
 
-    StartVideoCamera();
     StartVideoDecoder();
 }
 
