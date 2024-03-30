@@ -321,17 +321,11 @@ void App::StopNetworkHandler()
     invite_ = nullptr;
 }
 
-void App::StartVideo()
+void App::StartVideoCamera()
 {
     if (camera_) {
         return;
     }
-
-    StartVideoDecoder();
-}
-
-void App::StartVideoCamera()
-{
     camera_ = linux::Camera::Create(linux::CameraParams {
         .device         = args_.get<std::string>("--camera-device"),
         .encoder_queue  = encoder_queue_,
@@ -403,7 +397,8 @@ void App::CreateConference()
     if (invite_) {
         LOG_INFO << "Starting conference using invite " << invite_->Encode();
         StartNetworkHandler();
-        StartVideo();
+        StartVideoEncoder();
+        StartVideoDecoder();
     } else {
         LOG_FATAL << "Invite::Create() failed!";
     }
