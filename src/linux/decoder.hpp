@@ -19,6 +19,7 @@
 #include <memory>
 #include <stop_token>
 #include <thread>
+#include <vector>
 
 #include <SDL3/SDL.h>
 #include <mfx.h>
@@ -26,6 +27,7 @@
 #include <va/va_drmcommon.h>
 #include <wayland-client.h>
 
+#include "codecs.hpp"
 #include "linux/typedefs.hpp"
 #include "rtc_packet.hpp"
 #include "stats.hpp"
@@ -63,6 +65,7 @@ class Decoder {
         bool Init();
         void RequestStop();
         void Join();
+        std::vector<VideoCodec> GetSupportedCodecs();
 
         Welford             s_decode_time_ = {};
 

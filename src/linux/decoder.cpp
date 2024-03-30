@@ -15,11 +15,13 @@
 
 #include "linux/decoder.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <chrono>
 #include <format>
 #include <memory>
+#include <set>
 #include <thread>
 #include <vector>
 
@@ -35,6 +37,7 @@
 #include <va/va_wayland.h>
 #include <wayland-client.h>
 
+#include "codecs.hpp"
 #include "event.hpp"
 #include "linux/mfx.hpp"
 #include "linux/mfx_loader.hpp"
@@ -101,6 +104,49 @@ void Decoder::Join()
         thread_.join();
         thread_ = {};
     }
+}
+
+std::vector<VideoCodec> Decoder::GetSupportedCodecs()
+{
+    std::vector<VideoCodec> codecs = {};
+    std::set<VideoCodec> codecs_set = {};
+
+    auto mfx_loader = MfxLoader::GetInstance();
+    if (!mfx_loader) {
+        LOG_ERROR << "MfxLoader::GetInstance() failed";
+        return codecs;
+    }
+
+    int impl_idx = 0;
+    mfxImplDescription *desc = nullptr;
+    while (MFXEnumImplementations(mfx_loader->Get(), impl_idx++,
+                                  MFX_IMPLCAPS_IMPLDESCSTRUCTURE,
+                                  reinterpret_cast<mfxHDL*>(&desc)) == MFX_ERR_NONE)
+    {
+        mfxDecoderDescription *dec = &desc->Dec;
+        for (int codec_idx = 0; codec_idx < dec->NumCodecs; ++codec_idx) {
+            auto codec = &dec->Codecs[codec_idx];
+            auto codec_id = codec->CodecID;
+            for (int profile_idx = 0; profile_idx < codec->NumProfiles; ++profile_idx) {
+                auto profile = &codec->Profiles[profile_idx];
+                for (int mem_idx = 0; mem_idx < profile->NumMemTypes; ++mem_idx) {
+                    auto mem = &profile->MemDesc[mem_idx];
+                    for (int fmt_idx = 0; fmt_idx < mem->NumColorFormats; ++fmt_idx) {
+                        auto fmt = mem->ColorFormats[fmt_idx];
+                        auto value = FromMfxCodecAndFormat(codec_id, fmt);
+                        if (value != VideoCodec::UNKNOWN) {
+                            codecs_set.insert(value);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    codecs.assign(codecs_set.begin(), codecs_set.end());
+    std::sort(codecs.begin(), codecs.end());
+
+    return codecs;
 }
 
 void Decoder::RunDecoder(std::stop_token st)
