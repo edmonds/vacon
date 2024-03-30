@@ -21,6 +21,7 @@
 #include <SDL3/SDL.h>
 #include <argparse/argparse.hpp>
 
+#include "event.hpp"
 #include "invite.hpp"
 #include "linux/camera.hpp"
 #include "linux/decoder.hpp"
@@ -84,6 +85,7 @@ class App {
         int             verbosity_                      = 0;
 
         int             n_camera_timeouts_              = 0;
+        Event           last_camera_event_              = Event::Invalid;
 
         float           font_size_sans_                 = 14.0f;
         float           font_size_mono_                 = 10.0f;

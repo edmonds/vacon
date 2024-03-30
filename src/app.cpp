@@ -179,10 +179,12 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
     switch (event) {
 
     case Event::CameraStarting:
+        last_camera_event_ = event;
         LOG_DEBUG << "[CameraStarting]";
         break;
 
     case Event::CameraStarted:
+        last_camera_event_ = event;
         n_camera_timeouts_ = 0;
         if (sdl_renderer_) {
             LOG_DEBUG << "[CameraStarted] Calling Camera::ExportBuffersToOpenGL() on render thread";
@@ -193,6 +195,7 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         break;
 
     case Event::CameraFailed: {
+        last_camera_event_ = event;
         LOG_FATAL << "[CameraFailed]";
         const int MAX_CAMERA_TIMEOUTS = 3;
         if (n_camera_timeouts_ < MAX_CAMERA_TIMEOUTS) {
@@ -202,8 +205,9 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
     }
 
     case Event::CameraTimeout:
-        LOG_DEBUG << "[CameraTimeout]";
+        last_camera_event_ = event;
         ++n_camera_timeouts_;
+        LOG_DEBUG << "[CameraTimeout]";
         break;
 
     case Event::DecoderStarting:
@@ -368,6 +372,11 @@ void App::StopVideo()
 
 void App::CreateConference()
 {
+    if (last_camera_event_ != Event::CameraStarted) {
+        LOG_FATAL << "Camera not started, cannot create conference";
+        return;
+    }
+
     if (!invite_) {
         invite_ = Invite::Create(InviteParams {
             .signaling_server   = vacon::kAppDefaultSignalingServer,

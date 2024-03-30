@@ -18,6 +18,8 @@
 namespace vacon {
 
 enum class Event {
+    Invalid,
+
     CameraStarting,
     CameraStarted,
     CameraFailed,
