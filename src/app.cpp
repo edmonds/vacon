@@ -71,6 +71,11 @@ int App::AppInit(int argc, char *argv[])
         return -1;
     }
 
+    if (!InitVideoCodecs()) {
+        LOG_FATAL << "App::InitVideoCodecs() failed";
+        return -1;
+    }
+
     if (!InitSDL()) {
         LOG_FATAL << "App::InitSDL() failed";
         return -1;
@@ -255,6 +260,36 @@ int App::AppIterate()
     RenderFrame();
 
     return 0;
+}
+
+bool App::InitVideoCodecs()
+{
+    decoder_ = linux::Decoder::Create(linux::DecoderParams {
+        .incoming_video_packet_queue    = incoming_video_packet_queue_,
+        .decoded_video_frame_queue      = decoded_video_frame_queue_,
+    });
+    if (!decoder_) {
+        LOG_FATAL << "linux::Decoder::Create() failed!";
+        return false;
+    }
+    for (auto& codec : decoder_->GetSupportedCodecs()) {
+        LOG_DEBUG << "Decoder supports: " << ToString(codec);
+    }
+
+    encoder_ = linux::Encoder::Create(linux::EncoderParams {
+        .bitrate_kbps                   = args_.get<unsigned>("--video-encoder-bitrate"),
+        .encoder_queue                  = encoder_queue_,
+        .outgoing_video_packet_queue    = outgoing_video_packet_queue_,
+    });
+    if (!encoder_) {
+        LOG_FATAL << "linux::Encoder::Create() failed!";
+        return false;
+    }
+    for (auto& codec : encoder_->GetSupportedCodecs()) {
+        LOG_DEBUG << "Encoder supports: " << ToString(codec);
+    }
+
+    return true;
 }
 
 void App::StartNetworkHandler()

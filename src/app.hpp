@@ -45,6 +45,7 @@ class App {
         // app.cpp
         int ShutdownEvent();
         void ProcessUserEvent(const SDL_UserEvent*);
+        bool InitVideoCodecs();
         void StartNetworkHandler();
         void StartVideo();
         void StartVideoCamera();
