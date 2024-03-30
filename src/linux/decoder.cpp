@@ -55,7 +55,20 @@ std::atomic_size_t n_frames_decode_overflow = 0;
 
 std::unique_ptr<Decoder> Decoder::Create(const DecoderParams& params)
 {
-    return std::make_unique<Decoder>(Decoder(params));
+    auto t_start = std::chrono::steady_clock::now();
+
+    auto dec = std::make_unique<Decoder>(Decoder(params));
+    dec->mfx_session_ = GetMfxSession();
+    if (!dec->mfx_session_) {
+        LOG_ERROR << "GetMfxSession() failed";
+        return nullptr;
+    }
+
+    auto t_end = std::chrono::steady_clock::now();
+    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+    LOG_INFO << std::format("Created video decoder in {} ms", millis);
+
+    return dec;
 }
 
 Decoder::~Decoder()
@@ -155,11 +168,16 @@ void Decoder::RunDecoder(std::stop_token st)
     util::SetThreadName("VDecoderVideo");
 
     PushEvent(Event::DecoderStarting);
-    if (!InitDecoder()) {
-        LOG_ERROR << "InitDecoder() failed!";
+
+    mfx_videoparam_decode_.mfx.CodecId = MFX_CODEC_HEVC;
+    mfx_videoparam_decode_.IOPattern = MFX_IOPATTERN_OUT_VIDEO_MEMORY;
+
+    if (!InitVaapi()) {
+        LOG_ERROR << "InitVaapi() failed";
         PushEvent(Event::DecoderFailed);
         return;
     }
+
     PushEvent(Event::DecoderStarted);
 
     while (!st.stop_requested()) {
@@ -173,60 +191,6 @@ void Decoder::RunDecoder(std::stop_token st)
     }
 
     LOG_DEBUG << "Stopping video decoder thread ID " << std::this_thread::get_id();
-}
-
-bool Decoder::InitDecoder()
-{
-    auto t_start = std::chrono::steady_clock::now();
-
-    auto mfx_loader = MfxLoader::GetInstance();
-    if (!mfx_loader) {
-        LOG_ERROR << "MfxLoader::GetInstance() failed";
-        return false;
-    }
-
-    mfx_videoparam_decode_.mfx.CodecId = MFX_CODEC_HEVC;
-    mfx_videoparam_decode_.IOPattern = MFX_IOPATTERN_OUT_VIDEO_MEMORY;
-
-    auto status = MFXCreateSession(mfx_loader->Get(), 0, &mfx_session_);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXCreateSession() failed: " << MfxStatusStr(status);
-        return false;
-    }
-
-    if (!SetMfxLoaderConfigFilters(mfx_loader->Get(),
-        {
-            { "mfxImplDescription.AccelerationMode", MFX_ACCEL_MODE_VIA_VAAPI },
-            { "mfxImplDescription.ApiVersion.Version", ((2 << 16) | 9) },
-            { "mfxImplDescription.Impl", MFX_IMPL_TYPE_HARDWARE },
-            { "mfxImplDescription.mfxDecoderDescription.decoder.CodecID", mfx_videoparam_decode_.mfx.CodecId },
-        }))
-    {
-        LOG_ERROR << "SetMfxLoaderConfigFilters() failed";
-        return false;
-    }
-
-    if (!SetMfxLoaderConfigFiltersCombined(mfx_loader->Get(),
-        {
-            { "mfxSurfaceTypesSupported.surftype.SurfaceType", MFX_SURFACE_TYPE_VAAPI },
-            { "mfxSurfaceTypesSupported.surftype.surfcomp.SurfaceComponent", MFX_SURFACE_COMPONENT_DECODE },
-            { "mfxSurfaceTypesSupported.surftype.surfcomp.SurfaceFlags", MFX_SURFACE_FLAG_EXPORT_SHARED },
-        }))
-    {
-        LOG_ERROR << "SetMfxLoaderConfigFilters() failed";
-        return false;
-    }
-
-    if (!InitVaapi()) {
-        LOG_ERROR << "InitVaapi() failed";
-        return false;
-    }
-
-    auto t_end = std::chrono::steady_clock::now();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
-    LOG_INFO << std::format("Initialized video decoder in {} ms", millis);
-
-    return true;
 }
 
 bool Decoder::InitVaapi()
