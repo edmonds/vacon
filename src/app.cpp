@@ -338,16 +338,6 @@ void App::StartVideoCamera()
     camera_->Init();
 }
 
-void App::StartVideoDecoder()
-{
-    decoder_->Init();
-}
-
-void App::StartVideoEncoder()
-{
-    encoder_->Init(camera_->GetCameraFormat());
-}
-
 void App::StopVideo()
 {
     StopNetworkHandler();
@@ -397,8 +387,8 @@ void App::CreateConference()
     if (invite_) {
         LOG_INFO << "Starting conference using invite " << invite_->Encode();
         StartNetworkHandler();
-        StartVideoEncoder();
-        StartVideoDecoder();
+        encoder_->Init(camera_->GetCameraFormat());
+        decoder_->Init();
     } else {
         LOG_FATAL << "Invite::Create() failed!";
     }

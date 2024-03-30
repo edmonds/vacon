@@ -48,8 +48,6 @@ class App {
         bool InitVideoCodecs();
         void StartNetworkHandler();
         void StartVideoCamera();
-        void StartVideoDecoder();
-        void StartVideoEncoder();
         void StopNetworkHandler();
         void StopVideo();
 
