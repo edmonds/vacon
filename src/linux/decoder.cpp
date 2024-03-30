@@ -96,10 +96,9 @@ Decoder::~Decoder()
     }
 }
 
-bool Decoder::Init()
+void Decoder::StartThread()
 {
     thread_ = std::jthread([&](std::stop_token st) { RunDecoder(st); });
-    return true;
 }
 
 void Decoder::RequestStop()

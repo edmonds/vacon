@@ -62,7 +62,7 @@ class Decoder {
         static std::unique_ptr<Decoder> Create(const DecoderParams&);
         Decoder(Decoder&&) = default;
         ~Decoder();
-        bool Init();
+        void StartThread();
         void RequestStop();
         void Join();
         std::vector<VideoCodec> GetSupportedCodecs();
