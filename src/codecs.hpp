@@ -38,7 +38,7 @@ constexpr VideoCodec FromString(std::string_view codec) {
     if (codec == "HEVC_10_420") return VideoCodec::HEVC_10_420;
     if (codec == "VP9_8_420")   return VideoCodec::VP9_8_420;
     if (codec == "HEVC_8_420")  return VideoCodec::HEVC_8_420;
-    if (codec == "AVC8_420")    return VideoCodec::AVC_8_420;
+    if (codec == "AVC_8_420")   return VideoCodec::AVC_8_420;
     return VideoCodec::UNKNOWN;
 }
 
