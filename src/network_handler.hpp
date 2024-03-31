@@ -23,6 +23,7 @@
 #include <stop_token>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json_fwd.hpp>
@@ -34,6 +35,9 @@
 #include "stats.hpp"
 
 namespace vacon {
+
+typedef std::vector<std::pair<VideoCodec, rtc::Description::Direction>>
+    CodecDirections;
 
 struct NetworkHandlerParams {
     std::shared_ptr<Invite> invite;
@@ -52,6 +56,9 @@ class NetworkHandler {
         void StartDrainThread();
         void StartConnectThread();
 
+        VideoCodec                                      wanted_decoder_ = VideoCodec::UNKNOWN;
+        VideoCodec                                      wanted_encoder_ = VideoCodec::UNKNOWN;
+
         Welford                                         s_recv_fps_ = {};
         Welford                                         s_send_fps_ = {};
 
@@ -63,19 +70,26 @@ class NetworkHandler {
         void RunConnect(std::stop_token);
         void RunOutgoingDrain(std::stop_token);
         void OnWsMessage(nlohmann::json message);
-        void CreatePeerConnection(const std::optional<rtc::Description>& offer = std::nullopt);
+        void CreatePeerConnection(std::optional<rtc::Description> offer = std::nullopt);
         void ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_info);
         void SendVideoPacket(const std::byte *data, size_t size, uint64_t pts);
+        CodecDirections GetCodecDirections();
+        std::pair<VideoCodec, int> BestDecoderFromDescription(rtc::Description&);
+        std::pair<VideoCodec, int> BestEncoderFromDescription(rtc::Description&);
+        void SetupVideoTracks(rtc::Description&);
 
         NetworkHandlerParams                            params_ = {};
+        CodecDirections                                 codec_directions_ = {};
         bool                                            starting_ = false;
         std::vector<std::jthread>                       threads_ = {};
-        rtc::Configuration                              config_;
-        std::shared_ptr<rtc::WebSocket>                 ws_;
-        std::shared_ptr<rtc::PeerConnection>            peer_;
-        std::shared_ptr<rtc::RtcpSrReporter>            sender_reporter_;
-        std::shared_ptr<rtc::RtpPacketizationConfig>    rtp_config_;
-        std::shared_ptr<rtc::Track>                     track_;
+        rtc::Configuration                              config_ = {};
+        std::shared_ptr<rtc::WebSocket>                 ws_ = nullptr;
+        std::shared_ptr<rtc::PeerConnection>            peer_ = nullptr;
+        std::shared_ptr<rtc::RtcpSrReporter>            sender_reporter_ = nullptr;
+        std::shared_ptr<rtc::RtpPacketizationConfig>    rtp_config_ = nullptr;
+        std::shared_ptr<rtc::Track>                     track_recv_ = nullptr;
+        std::shared_ptr<rtc::Track>                     track_send_ = nullptr;
+        std::vector<std::shared_ptr<rtc::Track>>        tracks_ = {};
 
         struct {
             ssize_t                                     n_frames_recv = -1;
