@@ -56,8 +56,15 @@ class NetworkHandler {
         void StartDrainThread();
         void StartConnectThread();
 
-        VideoCodec                                      wanted_decoder_ = VideoCodec::UNKNOWN;
-        VideoCodec                                      wanted_encoder_ = VideoCodec::UNKNOWN;
+        VideoCodec WantedDecoder()
+        {
+            return wanted_decoder_;
+        };
+
+        VideoCodec WantedEncoder()
+        {
+            return wanted_encoder_;
+        };
 
         Welford                                         s_recv_fps_ = {};
         Welford                                         s_send_fps_ = {};
@@ -90,6 +97,8 @@ class NetworkHandler {
         std::shared_ptr<rtc::Track>                     track_recv_ = nullptr;
         std::shared_ptr<rtc::Track>                     track_send_ = nullptr;
         std::vector<std::shared_ptr<rtc::Track>>        tracks_ = {};
+        VideoCodec                                      wanted_decoder_ = VideoCodec::UNKNOWN;
+        VideoCodec                                      wanted_encoder_ = VideoCodec::UNKNOWN;
 
         struct {
             ssize_t                                     n_frames_recv = -1;
