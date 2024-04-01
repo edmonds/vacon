@@ -61,5 +61,29 @@ constexpr VideoCodec FromMfxCodecAndFormat(mfxU32 codec, mfxU32 fmt)
     return VideoCodec::UNKNOWN;
 }
 
+constexpr mfxU32 ToMfxCodec(VideoCodec codec)
+{
+    switch (codec) {
+    case VideoCodec::AV1_8_420: [[fallthrough]];
+    case VideoCodec::AV1_10_420:
+        return MFX_CODEC_AV1;
+
+    case VideoCodec::VP9_8_420: [[fallthrough]];
+    case VideoCodec::VP9_10_420:
+        return MFX_CODEC_VP9;
+
+    case VideoCodec::HEVC_8_420: [[fallthrough]];
+    case VideoCodec::HEVC_10_420:
+        return MFX_CODEC_HEVC;
+
+    case VideoCodec::AVC_8_420:
+        return MFX_CODEC_AVC;
+
+    case VideoCodec::UNKNOWN: [[fallthrough]];
+    default:
+        return 0;
+    }
+}
+
 } // namespace linux
 } // namespace vacon
