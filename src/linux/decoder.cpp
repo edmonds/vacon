@@ -96,8 +96,9 @@ Decoder::~Decoder()
     }
 }
 
-void Decoder::StartThread()
+void Decoder::StartThread(VideoCodec codec)
 {
+    codec_ = codec;
     thread_ = std::jthread([&](std::stop_token st) { RunDecoder(st); });
 }
 
@@ -168,7 +169,14 @@ void Decoder::RunDecoder(std::stop_token st)
 
     PushEvent(Event::DecoderStarting);
 
-    mfx_videoparam_decode_.mfx.CodecId = MFX_CODEC_HEVC;
+    auto codec_id = ToMfxCodec(codec_);
+    if (codec_id == 0) {
+        LOG_ERROR << std::format("Cannot convert codec ID {} to MFX codec value", (int)codec_);
+        PushEvent(Event::DecoderFailed);
+        return;
+    }
+
+    mfx_videoparam_decode_.mfx.CodecId = codec_id;
     mfx_videoparam_decode_.IOPattern = MFX_IOPATTERN_OUT_VIDEO_MEMORY;
 
     if (!InitVaapi()) {

@@ -62,7 +62,7 @@ class Decoder {
         static std::unique_ptr<Decoder> Create(const DecoderParams&);
         Decoder(Decoder&&) = default;
         ~Decoder();
-        void StartThread();
+        void StartThread(VideoCodec);
         void RequestStop();
         void Join();
 
@@ -79,6 +79,7 @@ class Decoder {
         void DecodePacket(std::shared_ptr<RtcPacket>);
 
         DecoderParams       params_;
+        VideoCodec          codec_ = VideoCodec::UNKNOWN;
 
         std::jthread        thread_ = {};
 
