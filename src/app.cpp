@@ -240,9 +240,15 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         break;
 
     case Event::NetworkStarting:
+        LOG_DEBUG << "[NetworkStarting]";
         break;
 
     case Event::NetworkStarted:
+        LOG_DEBUG << std::format("[NetworkStarted] Starting encoder ({}) and decoder ({})",
+                                 ToString(nh_->WantedEncoder()),
+                                 ToString(nh_->WantedDecoder()));
+        encoder_->StartThread(camera_->GetCameraFormat());
+        decoder_->StartThread(nh_->WantedDecoder());
         break;
 
     case Event::NetworkFailed:
@@ -399,8 +405,6 @@ void App::CreateConference()
     if (invite_) {
         LOG_INFO << "Starting conference using invite " << invite_->Encode();
         StartNetworkHandler();
-        encoder_->StartThread(camera_->GetCameraFormat());
-        decoder_->StartThread();
     } else {
         LOG_FATAL << "Invite::Create() failed!";
     }
