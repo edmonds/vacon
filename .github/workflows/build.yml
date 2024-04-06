@@ -39,7 +39,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: libsdl-org/SDL
-        ref: "prerelease-3.1.0"
+        ref: "prerelease-3.1.1"
         path: sdl
 
     - name: Checkout VPL
