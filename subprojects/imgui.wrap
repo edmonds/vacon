@@ -1,6 +1,6 @@
 [wrap-git]
 url = https://github.com/ocornut/imgui.git
-revision = 868facff9ded2d61425c67deeba354eb24275bd1
+revision = 4f9ba19e520bea478f5cb654d37ef45e6404bd52
 depth = 1
 patch_directory = imgui
 
