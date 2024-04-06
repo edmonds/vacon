@@ -53,7 +53,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: oneapi-src/oneVPL-intel-gpu
-        ref: "intel-onevpl-24.1.5"
+        ref: "intel-onevpl-24.2.0"
         path: oneVPL-intel-gpu
 
     - name: Install meson and ninja
