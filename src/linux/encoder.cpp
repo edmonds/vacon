@@ -26,7 +26,6 @@
 #include <memory>
 #include <optional>
 #include <set>
-#include <string>
 #include <thread>
 #include <unordered_map>
 
@@ -588,7 +587,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
     mfxSyncPoint syncp = {};
     auto status =
         MFXVideoENCODE_EncodeFrameAsync(mfx_session_,
-                                        nullptr /* ctrl */,
+                                        nullptr,
                                         frame->surface,
                                         &frame->bitstream,
                                         &syncp);
@@ -606,7 +605,7 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
     // Wait for the encoding request to complete and return the encoded frame.
     bool stalled = false;
     do {
-        status = MFXVideoCORE_SyncOperation(mfx_session_, syncp, 10 /* wait ms */);
+        status = MFXVideoCORE_SyncOperation(mfx_session_, syncp, 10 /* ms */);
         if (status == MFX_WRN_IN_EXECUTION) {
             stalled = true;
         }
