@@ -71,6 +71,9 @@ class Encoder {
         void RunEncoder(std::stop_token);
         bool InitMfxEncoder();
         bool InitMfxVideoParams();
+        bool SetMfxCodec();
+        bool SetMfxCodecAV1();
+        bool SetMfxCodecHEVC();
         bool SetMfxFourCc();
         bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);
         std::shared_ptr<VideoFrame> EncodeCameraBuffer(const CameraBufferRef&);
@@ -81,6 +84,7 @@ class Encoder {
         EncoderParams       params_ = {};
         VideoCodec          codec_ = {};
         CameraFormat        camera_format_ = {};
+        bool                need_vpp_scaling_ = false;
 
         std::jthread        thread_ = {};
 

@@ -257,11 +257,6 @@ bool Encoder::InitMfxEncoder()
 
 bool Encoder::InitMfxVideoParams()
 {
-    if (!SetMfxFourCc()) {
-        LOG_ERROR << "SetMfxFourCc() failed";
-        return false;
-    }
-
     // Upload the surface data for the VPP input from system memory and put the
     // output in video memory. This allows the encoder to read the uncompressed
     // data from video memory without a roundtrip through system memory.
@@ -279,13 +274,6 @@ bool Encoder::InitMfxVideoParams()
 
     // Hint to enable low power consumption mode for encoders.
     mfx_videoparam_encode_.mfx.LowPower = MFX_CODINGOPTION_ON;
-
-    // Specifies the codec format identifier in the FourCC code.
-    mfx_videoparam_encode_.mfx.CodecId = MFX_CODEC_HEVC;
-
-    // The codec profile.
-    mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN10;
-    //mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN;
 
     // Best quality.
     mfx_videoparam_encode_.mfx.TargetUsage = MFX_TARGETUSAGE_BEST_QUALITY;
@@ -311,14 +299,7 @@ bool Encoder::InitMfxVideoParams()
     mfx_videoparam_encode_.mfx.IdrInterval = 1;
 
     // Video Conferencing Mode rate control method.
-    //
-    // "This algorithm is similar to VBR and uses the same set of parameters
-    // InitialDelayInKB, TargetKbps, and MaxKbps. It is tuned for IPPP GOP
-    // pattern and streams with strong temporal correlation between frames. It
-    // produces better objective and subjective video quality in these
-    // conditions than other bitrate control algorithms. It does not support
-    // interlaced content, B-frames and produced stream is not HRD compliant."
-    mfx_videoparam_encode_.mfx.RateControlMethod = MFX_RATECONTROL_VCM;
+    mfx_videoparam_encode_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
 
     // Supposedly, maximum possible size of any compressed frames.
     mfx_videoparam_encode_.mfx.BufferSizeInKB = 256;
@@ -410,7 +391,68 @@ bool Encoder::InitMfxVideoParams()
     mfx_videoparam_encode_.ExtParam[1] = (mfxExtBuffer*)&mfx_eco2_;
     mfx_videoparam_encode_.ExtParam[2] = (mfxExtBuffer*)&mfx_eco3_;
 
+    if (!SetMfxCodec()) {
+        LOG_ERROR << "SetMfxCodec() failed";
+        return false;
+    }
+
+    if (!SetMfxFourCc()) {
+        LOG_ERROR << "SetMfxFourCc() failed";
+        return false;
+    }
+
     // Success.
+    return true;
+}
+
+bool Encoder::SetMfxCodec()
+{
+    auto codec_id = ToMfxCodec(codec_);
+    if (codec_id == 0) {
+        LOG_ERROR << std::format("Cannot convert codec ID {} to MFX codec value", (int)codec_);
+        return false;
+    }
+
+    switch (codec_id) {
+        case MFX_CODEC_AV1:
+            return SetMfxCodecAV1();
+        case MFX_CODEC_HEVC:
+            return SetMfxCodecHEVC();
+        default:
+            LOG_ERROR << "Unhandled codec " << ToString(codec_);
+            return false;
+    }
+
+    return true;
+}
+
+bool Encoder::SetMfxCodecAV1()
+{
+    mfx_videoparam_encode_.mfx.CodecId = MFX_CODEC_AV1;
+    mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_AV1_MAIN;
+    return true;
+}
+
+bool Encoder::SetMfxCodecHEVC()
+{
+    mfx_videoparam_encode_.mfx.CodecId = MFX_CODEC_HEVC;
+    if (codec_ == VideoCodec::HEVC_10_420) {
+        mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN10;
+    } else if (codec_ == VideoCodec::HEVC_8_420) {
+        mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_HEVC_MAIN;
+    } else {
+        LOG_ERROR << "Unhandled codec ID {}" << ToString(codec_);
+        return false;
+    }
+
+    // "This algorithm is similar to VBR and uses the same set of parameters
+    // InitialDelayInKB, TargetKbps, and MaxKbps. It is tuned for IPPP GOP
+    // pattern and streams with strong temporal correlation between frames. It
+    // produces better objective and subjective video quality in these
+    // conditions than other bitrate control algorithms. It does not support
+    // interlaced content, B-frames and produced stream is not HRD compliant."
+    mfx_videoparam_encode_.mfx.RateControlMethod = MFX_RATECONTROL_VCM;
+
     return true;
 }
 
@@ -432,36 +474,49 @@ bool Encoder::SetMfxFourCc()
         }
     };
 
-    std::unordered_map<std::string, fourcc_mfx_params> map;
-    map["NV12"] = { MFX_FOURCC_NV12, MFX_CHROMAFORMAT_YUV420, 8, 8, 0 };
-    map["YUYV"] = { MFX_FOURCC_YUY2, MFX_CHROMAFORMAT_YUV422, 8, 8, 0 };
-    map["YUY2"] = { MFX_FOURCC_YUY2, MFX_CHROMAFORMAT_YUV422, 8, 8, 0 };
-    map["UYVY"] = { MFX_FOURCC_UYVY, MFX_CHROMAFORMAT_YUV422, 8, 8, 0 };
-    map["P010"] = { MFX_FOURCC_P010, MFX_CHROMAFORMAT_YUV420, 10, 10, 1 };
-    map["Y210"] = { MFX_FOURCC_Y210, MFX_CHROMAFORMAT_YUV422, 10, 10, 1 };
+    std::unordered_map<uint32_t, fourcc_mfx_params> map;
+    map[MFX_FOURCC_NV12] = { MFX_FOURCC_NV12, MFX_CHROMAFORMAT_YUV420, 8, 8, 0 };
+    map[MFX_FOURCC_YUY2] = { MFX_FOURCC_YUY2, MFX_CHROMAFORMAT_YUV422, 8, 8, 0 };
+    map[MFX_FOURCC_UYVY] = { MFX_FOURCC_UYVY, MFX_CHROMAFORMAT_YUV422, 8, 8, 0 };
+    map[MFX_FOURCC_P010] = { MFX_FOURCC_P010, MFX_CHROMAFORMAT_YUV420, 10, 10, 1 };
+    map[MFX_FOURCC_Y210] = { MFX_FOURCC_Y210, MFX_CHROMAFORMAT_YUV422, 10, 10, 1 };
 
-    // Set pixel format parameters.
-    auto it = map.find(camera_format_.FourCcStr());
+    auto fmt = camera_format_.MfxFourCc();
+    auto& sup_fmts = supported_pixel_formats_[codec_];
+
+    auto it = map.find(fmt);
     if (it != map.end()) {
-        LOG_DEBUG << std::format("Using {} for video pixel format", it->first);
-
-        // Set VPP input parameters to match the camera format.
         auto fourcc = it->second;
-        fourcc.ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.In);
 
-        // Set VPP output and encoder input parameters to a pixel format
-        // suitable for 10-bit hardware encoding. Use a FourCC with the same
-        // chroma format as the camera input format.
-        if (fourcc.ChromaFormat == MFX_CHROMAFORMAT_YUV420) {
-            LOG_DEBUG << "Using P010 for encoder pixel format";
-            map["P010"].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
-            map["P010"].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
-        } else if (fourcc.ChromaFormat == MFX_CHROMAFORMAT_YUV422) {
-            LOG_DEBUG << "Using Y210 for encoder pixel format";
-            map["Y210"].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
-            map["Y210"].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
+        if (sup_fmts.contains(fmt)) {
+            // The encoder directly supports the surface pixel format of the
+            // video capture pixel format. Conversion of the pixel format is
+            // unnecessary, so don't enable VPP.
+
+            need_vpp_scaling_ = false;
+            fourcc.ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
+
+            LOG_INFO
+                << "Encoding directly from pixel format "
+                << util::FourCcToString(fmt);
+        } else if (sup_fmts.contains(MFX_FOURCC_P010)) {
+            // The encoder does not support encoding from the video capture
+            // pixel format. Conversion of the pixel format is required, so
+            // enable VPP.
+
+            need_vpp_scaling_ = true;
+            fourcc.ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.In);
+            map[MFX_FOURCC_P010].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
+            map[MFX_FOURCC_P010].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
+
+            LOG_INFO
+                << std::format("Enabling MFX VPP scaling of pixel format {} to {}",
+                               util::FourCcToString(mfx_videoparam_vpp_.vpp.In.FourCC),
+                               util::FourCcToString(mfx_videoparam_encode_.mfx.FrameInfo.FourCC));
         } else {
-            LOG_ERROR << "Unhandled chroma format: " << fourcc.ChromaFormat;
+            LOG_ERROR
+                << "Don't know how to setup encoder for pixel format "
+                << util::FourCcToString(fmt);
             return false;
         }
     } else {
