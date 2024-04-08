@@ -75,7 +75,9 @@ class Encoder {
         bool SetMfxCodecAV1();
         bool SetMfxCodecHEVC();
         bool SetMfxFourCc();
-        bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);
+        bool CopyCameraBufferToSurface(const CameraBufferRef&,
+                                       const mfxFrameInfo&,
+                                       mfxFrameSurface1*);
         std::shared_ptr<VideoFrame> EncodeCameraBuffer(const CameraBufferRef&);
 
         std::unordered_map<VideoCodec, std::set<mfxU32>>
