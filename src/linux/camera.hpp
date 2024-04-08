@@ -82,6 +82,14 @@ struct CameraFormat {
         default: return ChromaFormat::Invalid;
         }
     }
+    uint32_t MfxFourCc() const
+    {
+        auto fmt = FourCc();
+        if (fmt == V4L2_PIX_FMT_YUYV) {
+            fmt = v4l2_fourcc('Y','U','Y','2');
+        }
+        return fmt;
+    }
     std::string Str() const { return std::format("{}x{}@{} {}", Width(), Height(), FrameRate(), FourCcStr()); }
 };
 
