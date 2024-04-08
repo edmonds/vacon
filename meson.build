@@ -120,6 +120,7 @@ vacon_sources = [
   'src/linux/mfx.cpp',
   'src/linux/mfx_loader.cpp',
   'src/network_handler.cpp',
+  'src/rtc_utils.cpp',
   'src/rtp/generic_packetizer.cpp',
   'src/rtp/generic_depacketizer.cpp',
   'src/sdl.cpp',
