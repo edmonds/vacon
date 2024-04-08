@@ -114,6 +114,8 @@ void Encoder::Join()
 
 std::shared_ptr<std::vector<VideoCodec>> Encoder::GetSupportedCodecs()
 {
+    supported_pixel_formats_.clear();
+
     auto codecs = std::make_shared<std::vector<VideoCodec>>();
     auto codecs_set = std::set<VideoCodec>{};
 
@@ -141,8 +143,15 @@ std::shared_ptr<std::vector<VideoCodec>> Encoder::GetSupportedCodecs()
                         auto fmt = mem->ColorFormats[fmt_idx];
                         auto value = FromMfxCodecAndFormat(codec_id, fmt);
                         if (value != VideoCodec::UNKNOWN) {
+                            auto& sup = supported_pixel_formats_[value];
+                            sup.insert(fmt);
                             codecs_set.insert(value);
                         }
+                        LOG_VERBOSE
+                            << std::format("MFX codec '{}' profile {} supports pixel format {}",
+                                           util::FourCcToString(codec_id),
+                                           profile->Profile,
+                                           util::FourCcToString(fmt));
                     }
                 }
             }

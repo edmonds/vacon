@@ -18,7 +18,9 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <set>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <mfx.h>
@@ -70,6 +72,9 @@ class Encoder {
         bool SetMfxFourCc();
         bool CopyCameraBufferToSurface(const CameraBufferRef&, mfxFrameSurface1&);
         std::shared_ptr<VideoFrame> EncodeCameraBuffer(const CameraBufferRef&);
+
+        std::unordered_map<VideoCodec, std::set<mfxU32>>
+                            supported_pixel_formats_ = {};
 
         EncoderParams       params_ = {};
         VideoCodec          codec_ = {};
