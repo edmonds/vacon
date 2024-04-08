@@ -303,8 +303,8 @@ bool Encoder::InitMfxVideoParams()
     // Video Conferencing Mode rate control method.
     mfx_videoparam_encode_.mfx.RateControlMethod = MFX_RATECONTROL_CBR;
 
-    // Supposedly, maximum possible size of any compressed frames.
-    mfx_videoparam_encode_.mfx.BufferSizeInKB = 256;
+    // XXX: Supposedly, maximum possible size of any compressed frames.
+    mfx_videoparam_encode_.mfx.BufferSizeInKB = 128;
 
     // For CBR and VCM, used to estimate the targeted frame size by dividing
     // the frame rate by the bitrate.
@@ -535,7 +535,8 @@ std::shared_ptr<VideoFrame> Encoder::EncodeCameraBuffer(const CameraBufferRef& c
     auto t_start = std::chrono::steady_clock::now();
 
     // Initialize the frame's data.
-    auto frame = std::make_shared<VideoFrame>(1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
+    // XXX: Why are some codecs exceeding BufferSizeInKB?
+    auto frame = std::make_shared<VideoFrame>(4 * 1024 * mfx_videoparam_encode_.mfx.BufferSizeInKB);
     frame->pts = cref.buf_.PtsMicros();
 
     if (need_vpp_scaling_) {
