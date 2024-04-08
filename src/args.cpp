@@ -16,7 +16,7 @@
 #include "app.hpp"
 
 #include <cstdlib>
-#include <stdexcept>
+#include <exception>
 
 #include <argparse/argparse.hpp>
 
@@ -48,6 +48,14 @@ void App::ParseArgs(int argc, char *argv[])
          .default_value(kDefaultVideoEncoderBitrateKbps)
          .scan<'u', unsigned>()
          .nargs(1);
+
+    args_.add_argument("--video-force-decoder")
+         .metavar("CODEC")
+         .help("force negotiation of video decoding codec");
+
+    args_.add_argument("--video-force-encoder")
+         .metavar("CODEC")
+         .help("force negotiation of video encoding codec");
 
     args_.add_argument("--network-stun-server")
          .metavar("STUN-URL")
