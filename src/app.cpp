@@ -247,7 +247,7 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         LOG_DEBUG << std::format("[NetworkStarted] Starting encoder ({}) and decoder ({})",
                                  ToString(nh_->WantedEncoder()),
                                  ToString(nh_->WantedDecoder()));
-        encoder_->StartThread(camera_->GetCameraFormat());
+        encoder_->StartThread(nh_->WantedEncoder(), camera_->GetCameraFormat());
         decoder_->StartThread(nh_->WantedDecoder());
         break;
 

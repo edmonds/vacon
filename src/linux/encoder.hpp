@@ -51,7 +51,7 @@ class Encoder {
         static std::unique_ptr<Encoder> Create(const EncoderParams&);
         Encoder(Encoder&&) = default;
         ~Encoder();
-        void StartThread(const CameraFormat&);
+        void StartThread(VideoCodec, const CameraFormat&);
         void RequestStop();
         void Join();
 
@@ -72,6 +72,7 @@ class Encoder {
         std::shared_ptr<VideoFrame> EncodeCameraBuffer(const CameraBufferRef&);
 
         EncoderParams       params_ = {};
+        VideoCodec          codec_ = {};
         CameraFormat        camera_format_ = {};
 
         std::jthread        thread_ = {};
