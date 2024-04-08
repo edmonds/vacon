@@ -234,16 +234,18 @@ bool Encoder::InitMfxEncoder()
         return false;
     }
 
-    auto status = MFXVideoVPP_Query(mfx_session_, &mfx_videoparam_vpp_, &mfx_videoparam_vpp_);
-    LOG_DEBUG << "MFXVideoVPP_Query() returned: " << MfxStatusStr(status);
+    if (need_vpp_scaling_) {
+        auto status = MFXVideoVPP_Query(mfx_session_, &mfx_videoparam_vpp_, &mfx_videoparam_vpp_);
+        LOG_DEBUG << "MFXVideoVPP_Query() returned: " << MfxStatusStr(status);
 
-    status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
-    if (status != MFX_ERR_NONE) {
-        LOG_ERROR << "MFXVideoVPP_Init() failed: " << MfxStatusStr(status);
-        return false;
+        status = MFXVideoVPP_Init(mfx_session_, &mfx_videoparam_vpp_);
+        if (status != MFX_ERR_NONE) {
+            LOG_ERROR << "MFXVideoVPP_Init() failed: " << MfxStatusStr(status);
+            return false;
+        }
     }
 
-    status = MFXVideoENCODE_Query(mfx_session_, &mfx_videoparam_encode_, &mfx_videoparam_encode_);
+    auto status = MFXVideoENCODE_Query(mfx_session_, &mfx_videoparam_encode_, &mfx_videoparam_encode_);
     LOG_DEBUG << "MFXVideoENCODE_Query() returned: " << MfxStatusStr(status);
 
     status = MFXVideoENCODE_Init(mfx_session_, &mfx_videoparam_encode_);
