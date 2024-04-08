@@ -24,6 +24,7 @@
 #include <cstring>
 #include <format>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <thread>
@@ -112,7 +113,7 @@ void Encoder::Join()
     }
 }
 
-std::shared_ptr<std::vector<VideoCodec>> Encoder::GetSupportedCodecs()
+std::shared_ptr<std::vector<VideoCodec>> Encoder::GetSupportedCodecs(std::optional<VideoCodec> force)
 {
     supported_pixel_formats_.clear();
 
@@ -145,7 +146,14 @@ std::shared_ptr<std::vector<VideoCodec>> Encoder::GetSupportedCodecs()
                         if (value != VideoCodec::UNKNOWN) {
                             auto& sup = supported_pixel_formats_[value];
                             sup.insert(fmt);
-                            codecs_set.insert(value);
+
+                            if (force) {
+                                if (*force == value) {
+                                    codecs_set.insert(value);
+                                }
+                            } else {
+                                codecs_set.insert(value);
+                            }
                         }
                         LOG_VERBOSE
                             << std::format("MFX codec '{}' profile {} supports pixel format {}",

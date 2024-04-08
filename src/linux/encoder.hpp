@@ -18,6 +18,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <set>
 #include <thread>
 #include <unordered_map>
@@ -57,7 +58,8 @@ class Encoder {
         void RequestStop();
         void Join();
 
-        std::shared_ptr<std::vector<VideoCodec>> GetSupportedCodecs();
+        std::shared_ptr<std::vector<VideoCodec>>
+            GetSupportedCodecs(std::optional<VideoCodec> force = std::nullopt);
 
         Welford             s_encode_size_ = {};
         Welford             s_encode_time_ = {};
