@@ -23,7 +23,6 @@
 #include <stop_token>
 #include <string>
 #include <thread>
-#include <utility>
 #include <vector>
 
 #include <nlohmann/json_fwd.hpp>
@@ -35,9 +34,6 @@
 #include "stats.hpp"
 
 namespace vacon {
-
-typedef std::vector<std::pair<VideoCodec, rtc::Description::Direction>>
-    CodecDirections;
 
 struct NetworkHandlerParams {
     std::shared_ptr<Invite> invite;
@@ -78,15 +74,12 @@ class NetworkHandler {
         void RunOutgoingDrain(std::stop_token);
         void OnWsMessage(nlohmann::json message);
         void CreatePeerConnection(std::optional<rtc::Description> offer = std::nullopt);
+        void FinishSetupVideoTracksFromAnswer(rtc::Description&);
         void ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_info);
         void SendVideoPacket(const std::byte *data, size_t size, uint64_t pts);
-        CodecDirections GetCodecDirections();
-        std::pair<VideoCodec, int> BestDecoderFromDescription(rtc::Description&);
-        std::pair<VideoCodec, int> BestEncoderFromDescription(rtc::Description&);
-        void SetupVideoTracks(rtc::Description&);
+        rtc::Description SetupVideoTracksFromOffer(rtc::Description&);
 
         NetworkHandlerParams                            params_ = {};
-        CodecDirections                                 codec_directions_ = {};
         bool                                            starting_ = false;
         std::vector<std::jthread>                       threads_ = {};
         rtc::Configuration                              config_ = {};

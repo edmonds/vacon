@@ -15,7 +15,6 @@
 
 #include "network_handler.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <exception>
@@ -24,7 +23,6 @@
 #include <optional>
 #include <string>
 #include <thread>
-#include <utility>
 #include <variant>
 
 #include <nlohmann/json.hpp>
@@ -35,6 +33,7 @@
 #include "codecs.hpp"
 #include "event.hpp"
 #include "rtc_packet.hpp"
+#include "rtc_utils.hpp"
 #include "rtp/generic_depacketizer.hpp"
 #include "rtp/generic_packetizer.hpp"
 #include "util.hpp"
@@ -77,7 +76,6 @@ std::unique_ptr<NetworkHandler> NetworkHandler::Create(const NetworkHandlerParam
     auto nh = std::make_unique<NetworkHandler>(NetworkHandler {});
     nh->params_ = params;
     nh->config_.iceServers.emplace_back(nh->params_.stun_server);
-    nh->codec_directions_ = nh->GetCodecDirections();
 
     return nh;
 }
@@ -237,21 +235,6 @@ void NetworkHandler::CloseWebSocket()
     }
 }
 
-static void LogDescriptionVideo(rtc::Description& desc)
-{
-    for (unsigned int i = 0; i < desc.mediaCount(); ++i) {
-        if (std::holds_alternative<rtc::Description::Media*>(desc.media(i))) {
-            auto media = std::get<rtc::Description::Media*>(desc.media(i));
-            auto payload_types = media->payloadTypes();
-            for (auto payload_type : payload_types) {
-                const auto rtp_map = media->rtpMap(payload_type);
-                LOG_DEBUG << std::format("Video #{}, payload type {}, format \"{}\"",
-                                         i, payload_type, rtp_map->format);
-            }
-        }
-    }
-}
-
 void NetworkHandler::OnWsMessage(json message)
 {
     LOG_DEBUG << "Received WebSocket message: " << message.dump();
@@ -266,205 +249,17 @@ void NetworkHandler::OnWsMessage(json message)
         LOG_DEBUG << "Got offer, creating peer connection and sending answer";
         auto sdp = message["sdp"].get<std::string>();
         auto desc = rtc::Description(sdp, type);
+        LogDescriptionVideo(desc, "[OnWsMessage, incoming offer]");
         CreatePeerConnection(desc);
-
-        LOG_DEBUG << "Setting up video tracks based on incoming offer";
-        SetupVideoTracks(desc);
     } else if (type == "answer") {
         LOG_DEBUG << "Got answer, completing session startup";
         auto sdp = message["sdp"].get<std::string>();
         auto desc = rtc::Description(sdp, type);
-
-        LOG_DEBUG << "Setting up video tracks based on incoming answer";
-        SetupVideoTracks(desc);
+        LogDescriptionVideo(desc, "[OnWsMessage, incoming answer]");
         peer_->setRemoteDescription(desc);
+        FinishSetupVideoTracksFromAnswer(desc);
     } else {
         LOG_DEBUG << std::format("Unknown message type '{}'", type);
-    }
-}
-
-static std::vector<rtc::Description::Media*> GetVideosFromDescription(rtc::Description &desc)
-{
-    auto res = std::vector<rtc::Description::Media*>();
-    for (unsigned int i = 0; i < desc.mediaCount(); ++i) {
-        if (std::holds_alternative<rtc::Description::Media*>(desc.media(i))) {
-            auto media = std::get<rtc::Description::Media*>(desc.media(i));
-            if (media->type() != "video") {
-                continue;
-            }
-            res.push_back(media);
-        }
-    }
-    return res;
-}
-
-static VideoCodec GetVideoCodecFromMedia(rtc::Description::Media* media)
-{
-    auto payload_types = media->payloadTypes();
-    if (payload_types.size() != 1) {
-        return VideoCodec::UNKNOWN;
-    }
-    auto payload_type = payload_types.front();
-    const auto rtp_map = media->rtpMap(payload_type);
-    return FromString(rtp_map->format);
-}
-
-static int GetPayloadTypeFromMedia(rtc::Description::Media* media)
-{
-    auto payload_types = media->payloadTypes();
-    if (payload_types.size() != 1) {
-        return -1;
-    }
-    return payload_types.front();
-}
-
-void NetworkHandler::SetupVideoTracks(rtc::Description& desc)
-{
-    LogDescriptionVideo(desc);
-
-    for (auto video : GetVideosFromDescription(desc)) {
-        auto codec = GetVideoCodecFromMedia(video);
-
-        if (codec == VideoCodec::UNKNOWN) {
-            continue;
-        }
-
-        switch (video->direction()) {
-        case rtc::Description::Direction::SendRecv:
-            if (wanted_decoder_ == VideoCodec::UNKNOWN) {
-                wanted_decoder_ = codec;
-            }
-            if (wanted_encoder_ == VideoCodec::UNKNOWN) {
-                wanted_encoder_ = codec;
-            }
-            break;
-
-        case rtc::Description::Direction::SendOnly:
-            if (wanted_encoder_ == VideoCodec::UNKNOWN) {
-                wanted_encoder_ = codec;
-            }
-            break;
-
-        case rtc::Description::Direction::RecvOnly:
-            if (wanted_decoder_ == VideoCodec::UNKNOWN) {
-                wanted_decoder_ = codec;
-            }
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    if (wanted_decoder_ == VideoCodec::UNKNOWN) {
-        LOG_ERROR << "Couldn't determine decoder to use from description";
-        return;
-    }
-
-    if (wanted_encoder_ == VideoCodec::UNKNOWN) {
-        LOG_ERROR << "Couldn't determine encoder to use from description";
-        return;
-    }
-
-    LOG_INFO << std::format("Want to use {} for decoding", ToString(wanted_decoder_));
-    LOG_INFO << std::format("Want to use {} for encoding", ToString(wanted_encoder_));
-
-    for (auto track : tracks_) {
-        auto media = track->description();
-        auto media_codec = GetVideoCodecFromMedia(&media);
-
-        // Skip if track doesn't match the wanted decoder or wanted encoder.
-        if (media_codec != wanted_decoder_ &&
-            media_codec != wanted_encoder_)
-        {
-            continue;
-        }
-
-        if (wanted_decoder_ == wanted_encoder_) {
-            // Consistency check.
-            if (track->direction() != rtc::Description::Direction::SendRecv) {
-                LOG_ERROR << "Wanted decoder is same as wanted encoder but track is not SendRecv direction";
-                break;
-            }
-
-            rtp_config_ = std::make_shared<rtc::RtpPacketizationConfig>
-                (kFixedSsrc,
-                 ToString(media_codec),
-                 GetPayloadTypeFromMedia(&media),
-                 GenericRtpPacketizer::defaultClockRate);
-
-            // This is a SendRecv track so a packetizer is needed for the sent
-            // frames.
-            auto packetizer = std::make_shared<GenericRtpPacketizer>(rtp_config_);
-            track->setMediaHandler(packetizer);
-
-            // This is a SendRecv track so a de-packetizer is needed for the
-            // received frames.
-            auto depacketizer = std::make_shared<GenericRtpDepacketizer>();
-            track->chainMediaHandler(depacketizer);
-
-            // This is a SendRecv track so an onFrame callback is needed to
-            // process the incoming video frames.
-            track->onFrame([&](rtc::binary msg, rtc::FrameInfo frame_info) {
-                ReceiveVideoPacket(msg, frame_info);
-            });
-
-            // Use this track for both sending and receiving.
-            track_recv_ = track;
-            track_send_ = track;
-            // track_ = track;
-
-            // Looking at the remaining tracks is unnecessary.
-            break;
-        } else if (media_codec == wanted_decoder_) {
-            // Consistency check.
-            if (track->direction() != rtc::Description::Direction::RecvOnly) {
-                LOG_ERROR << "Track for wanted decoder is not RecvOnly direction";
-                break;
-            }
-
-            // This is a RecvOnly track so only a de-packetizer is needed for
-            // the received frames.
-            auto depacketizer = std::make_shared<GenericRtpDepacketizer>();
-            track->chainMediaHandler(depacketizer);
-
-            // This is a RecvOnly track so an onFrame callback is needed to
-            // process the incoming video frames.
-            track->onFrame([&](rtc::binary msg, rtc::FrameInfo frame_info) {
-                ReceiveVideoPacket(msg, frame_info);
-            });
-
-            // Use this track for receiving.
-            track_recv_ = track;
-        } else if (media_codec == wanted_encoder_) {
-            // Consistency check.
-            if (track->direction() != rtc::Description::Direction::SendOnly) {
-                LOG_ERROR << "Track for wanted encoder is not SendOnly direction";
-                break;
-            }
-
-            rtp_config_ = std::make_shared<rtc::RtpPacketizationConfig>
-                (kFixedSsrc,
-                 ToString(media_codec),
-                 GetPayloadTypeFromMedia(&media),
-                 GenericRtpPacketizer::defaultClockRate);
-
-            // This is a SendOnly track so only a packetizer is needed for the
-            // sent frames.
-            auto packetizer = std::make_shared<GenericRtpPacketizer>(rtp_config_);
-            track->setMediaHandler(packetizer);
-
-            // Use this track for sending.
-            track_send_ = track;
-        }
-    }
-
-    if (!track_recv_) {
-        LOG_ERROR << "Could not setup receive direction video track";
-    }
-
-    if (!track_send_) {
-        LOG_ERROR << "Could not setup send direction video track";
     }
 }
 
@@ -475,15 +270,19 @@ void NetworkHandler::CreatePeerConnection(std::optional<rtc::Description> offer)
     peer_->onGatheringStateChange([&, wws = util::make_weak_ptr(ws_)](rtc::PeerConnection::GatheringState state) {
         if (state == rtc::PeerConnection::GatheringState::Complete) {
             auto description = peer_->localDescription();
+            auto type = description->typeString();
+            LogDescriptionVideo(*description, std::format("[onGatheringStateChange, outgoing {}]", type));
+
             json message = {
-                { "type", description->typeString() },
+                { "type", type },
                 { "sdp", std::string(description.value()) },
             };
+
             auto message_crypted = params_.invite->EncryptJson(message);
             if (message_crypted == std::vector<std::byte>{}) {
                 LOG_ERROR << "Failed to encrypt binary WebSocket data";
             } else {
-                LOG_DEBUG << "[PeerConnection] Sending WebSocket message: " << message.dump();
+                LOG_DEBUG << "[onGatheringStateChange] Sending WebSocket message: " << message.dump();
                 if (auto ws = wws.lock()) {
                     ws->send(message_crypted);
                 }
@@ -492,87 +291,150 @@ void NetworkHandler::CreatePeerConnection(std::optional<rtc::Description> offer)
     });
 
     if (offer) {
-        peer_->onLocalDescription([](rtc::Description description) {
+        peer_->onLocalDescription([](rtc::Description desc) {
+            auto type = desc.typeString();
             json message = {
-                { "type", description.typeString() },
-                { "sdp", std::string(description) },
+                { "type", type },
+                { "sdp", std::string(desc) },
             };
-            LOG_DEBUG << "[PeerConnection onLocalDescription] Local Description: " << message.dump();
+            LogDescriptionVideo(desc, std::format("[onLocalDescription, {}]", type));
+            LOG_DEBUG << "[onLocalDescription] Local Description: " << message.dump();
         });
-    }
 
-    if (offer) {
         // The answer is being created in response to the remote peer's offer.
         // Based on the intersection of the local and remote encoder/decoder
         // capabilities, the best codec will be selected for each direction in
         // the answer.
 
-        auto best_decoder = BestDecoderFromDescription(*offer);
-        auto best_encoder = BestEncoderFromDescription(*offer);
-
-        // Remove all media tracks from the modified offer.
-        offer->clearMedia();
-
-        if (best_decoder == best_encoder) {
-            // Add a single video track to handle send/receive directions.
-            auto codec_name = ToString(best_decoder.first);
-            auto payload_type = best_decoder.second;
-            rtc::Description::Video video(codec_name, rtc::Description::Direction::SendRecv);
-            video.addVideoCodec(payload_type, codec_name);
-            video.addSSRC(kFixedSsrc, codec_name);
-            tracks_.emplace_back(peer_->addTrack(video));
-            // Add the track to the modified offer.
-            offer->addMedia(video);
-        } else {
-            // Add a video track for the decoder to handle the receive direction.
-            {
-                auto codec_name = ToString(best_decoder.first);
-                auto payload_type = best_decoder.second;
-                rtc::Description::Video video(codec_name, rtc::Description::Direction::RecvOnly);
-                video.addVideoCodec(payload_type, codec_name);
-                video.addSSRC(kFixedSsrc, codec_name);
-                tracks_.emplace_back(peer_->addTrack(video));
-                // Add the receive track to the modified offer.
-                offer->addMedia(video);
-            }
-
-            // Add a video track for the encoder to handle the send direction.
-            {
-                auto codec_name = ToString(best_encoder.first);
-                auto payload_type = best_encoder.second;
-                rtc::Description::Video video(codec_name, rtc::Description::Direction::SendOnly);
-                video.addVideoCodec(payload_type, codec_name);
-                video.addSSRC(kFixedSsrc, codec_name);
-                tracks_.emplace_back(peer_->addTrack(video));
-                // Add the send track to the modified offer.
-                offer->addMedia(video);
-            }
-        }
+        auto answer = SetupVideoTracksFromOffer(offer.value());
+        LogDescriptionVideo(answer, "[CreatePeerConnection, answer]");
+        peer_->setRemoteDescription(answer);
     } else {
         // The offer is being created. Every codec supported by the local
         // encoder/decoder needs to be added to the offer, and the remote peer
         // will select the actual codecs to be used for each direction based on
         // its local encoder/decoder capabilities.
 
-        // Add a video track for every codec supported by the local encoder
-        // and decoder.
         int video_payload_type = 101;
-        for (const auto& codec_dir : codec_directions_) {
-            auto codec_name = ToString(codec_dir.first);
-            auto direction = codec_dir.second;
-            rtc::Description::Video video(codec_name, direction);
-            video.addVideoCodec(video_payload_type++, codec_name);
-            video.addSSRC(kFixedSsrc, codec_name);
-            tracks_.emplace_back(peer_->addTrack(video));
-            // The track will be implicitly added to the offer.
+        // Add the OfferVideo track. This is the local peer's outgoing video.
+        {
+            rtc::Description::Video video("OfferVideo", rtc::Description::Direction::SendOnly);
+            for (auto codec : *params_.encoder_codecs) {
+                auto codec_name = ToString(codec);
+                video.addVideoCodec(video_payload_type++, codec_name);
+                video.addSSRC(kFixedSsrc, codec_name);
+            }
+            track_send_ = peer_->addTrack(video);
         }
-    }
-
-    if (offer) {
-        peer_->setRemoteDescription(offer.value());
-    } else {
+        // Add the AnswerVideo track. This is the remote peer's incoming video.
+        {
+            rtc::Description::Video video("AnswerVideo", rtc::Description::Direction::RecvOnly);
+            for (auto codec : *params_.decoder_codecs) {
+                auto codec_name = ToString(codec);
+                video.addVideoCodec(video_payload_type++, codec_name);
+                video.addSSRC(kFixedSsrc + 1, codec_name);
+            }
+            track_recv_ = peer_->addTrack(video);
+        }
         peer_->setLocalDescription();
     }
+}
+
+rtc::Description NetworkHandler::SetupVideoTracksFromOffer(rtc::Description& offer)
+{
+    // The answer is being created in response to the remote peer's offer.
+    // Based on the intersection of the local and remote encoder/decoder
+    // capabilities, the best codec will be selected for each direction in
+    // the answer.
+
+    auto answer = offer;
+
+    // Add the OfferVideo track. This is the remote peer's incoming video.
+    if (auto offer_video = DescriptionMediaByMid(answer, "OfferVideo")) {
+        if (auto best = SelectBestVideoCodec(offer_video.value(), params_.decoder_codecs)) {
+            wanted_decoder_ = best.value();
+            auto codec_name = ToString(wanted_decoder_);
+            LOG_INFO << "Wanted decoder is " << codec_name;
+
+            track_recv_ = peer_->addTrack(offer_video.value()->reciprocate());
+            track_recv_->chainMediaHandler(std::make_shared<GenericRtpDepacketizer>());
+            track_recv_->onFrame([&](rtc::binary msg, rtc::FrameInfo frame_info) {
+                ReceiveVideoPacket(msg, frame_info);
+            });
+        } else {
+            LOG_WARNING << "Couldn't negotiate a compatible codec for OfferVideo";
+        }
+    } else {
+        LOG_WARNING << "Didn't get OfferVideo :-(";
+    }
+
+    // Add the AnswerVideo track. This is the local peer's outgoing video.
+    if (auto answer_video = DescriptionMediaByMid(answer, "AnswerVideo")) {
+        if (auto best = SelectBestVideoCodec(answer_video.value(), params_.encoder_codecs)) {
+            wanted_encoder_ = best.value();
+            auto codec_name = ToString(wanted_encoder_);
+            LOG_INFO << "Wanted encoder is " << codec_name;
+
+            auto video = (*answer_video.value()).reciprocate();
+            track_send_ = peer_->addTrack(video);
+            rtp_config_ = std::make_shared<rtc::RtpPacketizationConfig>
+                (kFixedSsrc + 1,
+                 codec_name,
+                 DescriptionMediaPayloadTypeByFormat(&video, codec_name),
+                 GenericRtpPacketizer::defaultClockRate);
+            track_send_->chainMediaHandler(std::make_shared<GenericRtpPacketizer>(rtp_config_));
+        } else {
+            LOG_WARNING << "Couldn't negotiate a compatible codec for AnswerVideo";
+        }
+    } else {
+        LOG_WARNING << "Didn't get AnswerVideo :-(";
+    }
+
+    return answer;
+}
+
+void NetworkHandler::FinishSetupVideoTracksFromAnswer(rtc::Description& answer)
+{
+    if (!track_send_) {
+        LOG_ERROR << "track_send_ not setup";
+        return;
+    }
+    if (!track_recv_) {
+        LOG_ERROR << "track_recv_ not setup";
+        return;
+    }
+
+    // Set up the OfferVideo track. This is the local peer's outgoing video.
+    auto offer_video = DescriptionMediaByMid(answer, "OfferVideo");
+    if (!offer_video) {
+        LOG_ERROR << "No media description for mid OfferVideo in answer";
+        return;
+    }
+    wanted_encoder_ = DescriptionVideoCodec(offer_video.value());
+    auto encoder_name = ToString(wanted_encoder_);
+    LOG_INFO << "Wanted encoder is " << encoder_name;
+    auto payload_type = DescriptionMediaPayloadTypeByFormat(offer_video.value(), encoder_name);
+    if (payload_type == -1) {
+        LOG_ERROR << "Could not find payload type for codec {} in OfferVideo";
+        return;
+    }
+    rtp_config_ = std::make_shared<rtc::RtpPacketizationConfig>
+        (kFixedSsrc, encoder_name, payload_type, GenericRtpPacketizer::defaultClockRate);
+    track_send_->setMediaHandler(std::make_shared<GenericRtpPacketizer>(rtp_config_));
+
+    // Set up the AnswerVideo track. This is the remote peer's incoming video.
+    auto answer_video = DescriptionMediaByMid(answer, "AnswerVideo");
+    if (!answer_video) {
+        LOG_ERROR << "No media description for mid AnswerVideo in answer";
+        return;
+    }
+    wanted_decoder_ = DescriptionVideoCodec(answer_video.value());;
+    auto decoder_name = ToString(wanted_decoder_);
+    LOG_INFO << "Wanted decoder is " << decoder_name;
+    track_recv_->chainMediaHandler(std::make_shared<GenericRtpDepacketizer>());
+    track_recv_->onFrame([&](rtc::binary msg, rtc::FrameInfo frame_info) {
+        ReceiveVideoPacket(msg, frame_info);
+    });
 }
 
 void NetworkHandler::ReceiveVideoPacket(rtc::binary msg, rtc::FrameInfo frame_info)
@@ -646,108 +508,6 @@ void NetworkHandler::SendVideoPacket(const std::byte *data, size_t size, uint64_
     } catch (const std::exception &e) {
         LOG_INFO << "Unable to send packet: " << e.what();
     }
-}
-
-CodecDirections NetworkHandler::GetCodecDirections()
-{
-    CodecDirections res = {};
-
-    for (auto e : *params_.encoder_codecs) {
-        std::pair<VideoCodec, rtc::Description::Direction>
-            entry(e, rtc::Description::Direction::SendOnly);
-
-        auto d_begin = params_.decoder_codecs->begin();
-        auto d_end = params_.decoder_codecs->end();
-        if (std::find(d_begin, d_end, e) != d_end) {
-            entry.second = rtc::Description::Direction::SendRecv;
-        }
-
-        res.push_back(entry);
-    }
-
-    for (auto d : *params_.decoder_codecs) {
-        auto found = false;
-        for (auto &r : res) {
-            if (d == r.first) {
-                found = true;
-            }
-        }
-
-        if (!found) {
-            std::pair<VideoCodec, rtc::Description::Direction>
-                entry(d, rtc::Description::Direction::RecvOnly);
-
-            res.push_back(entry);
-        }
-    }
-
-    return res;
-}
-
-static bool CanRecv(rtc::Description::Direction dir)
-{
-    return (dir == rtc::Description::Direction::RecvOnly ||
-            dir == rtc::Description::Direction::SendRecv);
-}
-
-static bool CanSend(rtc::Description::Direction dir)
-{
-    return (dir == rtc::Description::Direction::SendOnly ||
-            dir == rtc::Description::Direction::SendRecv);
-}
-
-std::pair<VideoCodec, int> NetworkHandler::BestDecoderFromDescription(rtc::Description& desc)
-{
-    for (auto our_codec : *params_.decoder_codecs) {
-        for (unsigned int i = 0; i < desc.mediaCount(); ++i) {
-            if (std::holds_alternative<rtc::Description::Media*>(desc.media(i))) {
-                auto media = std::get<rtc::Description::Media*>(desc.media(i));
-                if (media->type() != "video") {
-                    continue;
-                }
-
-                auto payload_types = media->payloadTypes();
-                if (payload_types.size() != 1) {
-                    continue;
-                }
-                auto payload_type = payload_types.front();
-
-                const auto rtp_map = media->rtpMap(payload_type);
-                VideoCodec their_codec = FromString(rtp_map->format);
-                if (CanRecv(media->direction()) && our_codec == their_codec) {
-                    return std::make_pair(our_codec, payload_type);
-                }
-            }
-        }
-    }
-    return std::make_pair(VideoCodec::UNKNOWN, 0);
-}
-
-std::pair<VideoCodec, int> NetworkHandler::BestEncoderFromDescription(rtc::Description& desc)
-{
-    for (auto our_codec : *params_.encoder_codecs) {
-        for (unsigned int i = 0; i < desc.mediaCount(); ++i) {
-            if (std::holds_alternative<rtc::Description::Media*>(desc.media(i))) {
-                auto media = std::get<rtc::Description::Media*>(desc.media(i));
-                if (media->type() != "video") {
-                    continue;
-                }
-
-                auto payload_types = media->payloadTypes();
-                if (payload_types.size() != 1) {
-                    continue;
-                }
-                auto payload_type = payload_types.front();
-
-                const auto rtp_map = media->rtpMap(payload_type);
-                VideoCodec their_codec = FromString(rtp_map->format);
-                if (CanSend(media->direction()) && our_codec == their_codec) {
-                    return std::make_pair(our_codec, payload_type);
-                }
-            }
-        }
-    }
-    return std::make_pair(VideoCodec::UNKNOWN, 0);
 }
 
 } // namespace vacon
