@@ -435,10 +435,11 @@ DecodedFrame::~DecodedFrame()
 bool DecodedFrame::ExportToOpenGL(SDL_Renderer *sdl_renderer)
 {
     switch (prime_.fourcc) {
-    case MFX_FOURCC_P010:
+    case VA_FOURCC_NV12: [[fallthrough]];
+    case VA_FOURCC_P010:
         break;
     default:
-        LOG_ERROR << std::format("Unhandled DRM pixel format {} ({:#010x})",
+        LOG_ERROR << std::format("Unhandled VA DRM pixel format {} ({:#010x})",
                                  util::FourCcToString(prime_.fourcc),
                                  prime_.fourcc);
         return false;
@@ -470,8 +471,8 @@ bool DecodedFrame::ExportToOpenGL(SDL_Renderer *sdl_renderer)
         EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, drm_format_modifier_hi,
     };
 
-    if (prime_.fourcc == DRM_FORMAT_P010) {
-        // P010 is a "semi-planar" format and needs additional attributes
+    if (prime_.fourcc == VA_FOURCC_NV12 || prime_.fourcc == VA_FOURCC_P010) {
+        // NV12 and P010 are "semi-planar" formats and need additional attributes
         // specifying the UV plane.
         std::vector<EGLAttrib> more_attrs = {
             EGL_DMA_BUF_PLANE1_PITCH_EXT,       prime_.layers[0].pitch[1],
