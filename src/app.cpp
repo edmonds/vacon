@@ -294,7 +294,14 @@ bool App::InitVideoCodecs()
         LOG_FATAL << "linux::Encoder::Create() failed!";
         return false;
     }
-    encoder_codecs_ = encoder_->GetSupportedCodecs();
+
+    if (auto force_str = args_.present("--video-force-encoder")) {
+        VideoCodec force = FromString(*force_str);
+        encoder_codecs_ = encoder_->GetSupportedCodecs(force);
+    } else {
+        encoder_codecs_ = encoder_->GetSupportedCodecs();
+    }
+
     if (encoder_codecs_->empty()) {
         LOG_FATAL << "No codecs supported by encoder";
         return false;
