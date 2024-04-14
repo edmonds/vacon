@@ -498,15 +498,25 @@ bool Encoder::SetMfxFourCc()
     if (it != map.end()) {
         auto fourcc = it->second;
 
+        // It looks like NV12 is the only pixel format that the Intel encoder
+        // can actually deal with directly, all other pixel formats require VPP
+        // scaling, even YUY2.
+        if (fmt != MFX_FOURCC_NV12) {
+            need_vpp_scaling_ = true;
+        }
+
         if (sup_fmts.contains(fmt)) {
-            // The encoder directly supports the surface pixel format of the
-            // video capture pixel format. Conversion of the pixel format is
-            // unnecessary, so don't enable VPP.
-            need_vpp_scaling_ = false;
+            // The encoder supports the surface pixel format of the video
+            // capture pixel format.
             fourcc.ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
-            LOG_INFO
-                << "Encoding directly from pixel format "
-                << util::FourCcToString(fmt);
+            if (need_vpp_scaling_) {
+                fourcc.ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.In);
+                fourcc.ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
+            } else {
+                LOG_INFO
+                    << "Encoding directly from pixel format "
+                    << util::FourCcToString(fmt);
+            }
         } else if (sup_fmts.contains(MFX_FOURCC_P010)) {
             // The encoder does not support encoding from the video capture
             // pixel format. Conversion of the pixel format is required, so
