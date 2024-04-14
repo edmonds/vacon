@@ -37,10 +37,18 @@ std::string MfxStatusStr(mfxStatus status);
 
 constexpr VideoCodec FromMfxCodecAndFormat(mfxU32 codec, mfxU32 fmt)
 {
-    if (codec == MFX_CODEC_AVC && fmt == MFX_FOURCC_NV12) {
-        return VideoCodec::AVC_8_420;
+    if (codec == MFX_CODEC_AVC) {
+        if (fmt == MFX_FOURCC_NV12 ||
+            fmt == MFX_FOURCC_YUY2 ||
+            fmt == MFX_FOURCC_UYVY)
+        {
+            return VideoCodec::AVC_8_420;
+        }
     } else if (codec == MFX_CODEC_HEVC) {
-        if (fmt == MFX_FOURCC_NV12) {
+        if (fmt == MFX_FOURCC_NV12 ||
+            fmt == MFX_FOURCC_YUY2 ||
+            fmt == MFX_FOURCC_UYVY)
+        {
             return VideoCodec::HEVC_8_420;
         } else if (fmt == MFX_FOURCC_P010) {
             return VideoCodec::HEVC_10_420;
