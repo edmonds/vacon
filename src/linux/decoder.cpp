@@ -21,6 +21,7 @@
 #include <chrono>
 #include <format>
 #include <memory>
+#include <optional>
 #include <set>
 #include <thread>
 #include <vector>
@@ -119,7 +120,7 @@ void Decoder::Join()
     }
 }
 
-std::shared_ptr<std::vector<VideoCodec>> Decoder::GetSupportedCodecs()
+std::shared_ptr<std::vector<VideoCodec>> Decoder::GetSupportedCodecs(std::optional<VideoCodec> force)
 {
     auto codecs = std::make_shared<std::vector<VideoCodec>>();
     auto codecs_set = std::set<VideoCodec>{};
@@ -148,7 +149,13 @@ std::shared_ptr<std::vector<VideoCodec>> Decoder::GetSupportedCodecs()
                         auto fmt = mem->ColorFormats[fmt_idx];
                         auto value = FromMfxCodecAndFormat(codec_id, fmt);
                         if (value != VideoCodec::UNKNOWN) {
-                            codecs_set.insert(value);
+                            if (force) {
+                                if (*force == value) {
+                                    codecs_set.insert(value);
+                                }
+                            } else {
+                                codecs_set.insert(value);
+                            }
                         }
                     }
                 }

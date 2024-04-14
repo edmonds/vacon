@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <stop_token>
 #include <thread>
 #include <vector>
@@ -66,7 +67,8 @@ class Decoder {
         void RequestStop();
         void Join();
 
-        std::shared_ptr<std::vector<VideoCodec>> GetSupportedCodecs();
+        std::shared_ptr<std::vector<VideoCodec>>
+            GetSupportedCodecs(std::optional<VideoCodec> force = std::nullopt);
 
         VideoCodec Codec() const { return codec_; }
 
