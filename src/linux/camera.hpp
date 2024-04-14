@@ -51,8 +51,8 @@ struct CameraParams {
 
 enum class ChromaFormat {
     Invalid,
-    YUV420_8,
     YUV422_8,
+    YUV420_8,
 };
 
 struct CameraFormat {

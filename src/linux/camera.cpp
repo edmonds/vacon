@@ -384,7 +384,11 @@ bool Camera::EnumerateFormats()
     // - 1280x720@60 is better than 960x720@60
     //
     // Then chroma format:
-    // - 4:2:2 1920x1080@60 is better than 4:2:0 1920x1080@60
+    // - 4:2:0 1920x1080@60 is "better" than 4:2:2 1920x1080@60
+    //
+    //   (Because we only support 4:2:0 codecs and if NV12 is available from the
+    //    camera we can avoid enabling VPP scaling.)
+    //
     // - 4:2:0 1920x1080@60 is better than 4:2:2 1280x720@60
     //
     std::sort(formats_.begin(), formats_.end(),
