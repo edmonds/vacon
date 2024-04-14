@@ -22,7 +22,6 @@
 #include <memory>
 #include <span>
 #include <thread>
-#include <utility>
 #include <vector>
 
 #include <linux/videodev2.h>
@@ -90,7 +89,10 @@ struct CameraFormat {
         }
         return fmt;
     }
-    std::string Str() const { return std::format("{}x{}@{} {}", Width(), Height(), FrameRate(), FourCcStr()); }
+    operator std::string() const
+    {
+        return std::format("{}x{}@{} {}", Width(), Height(), FrameRate(), FourCcStr());
+    }
 };
 
 struct CameraBuffer {

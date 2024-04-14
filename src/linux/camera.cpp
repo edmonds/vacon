@@ -25,7 +25,6 @@
 #include <format>
 #include <memory>
 #include <thread>
-#include <utility>
 #include <vector>
 
 #include <linux/version.h>
@@ -245,7 +244,7 @@ bool Camera::InitCamera()
     t_last_ = std::chrono::steady_clock::now();
     auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t_last_ - t_start).count();
     LOG_INFO << std::format("Initialized V4L2 device {} with format {} in {} ms",
-                            params_.device, format_.Str(), millis);
+                            params_.device, std::string(format_), millis);
 
     return true;
 }
@@ -398,7 +397,7 @@ bool Camera::EnumerateFormats()
               [](const CameraFormat& a, const CameraFormat& b) { return a.FrameRate() > b.FrameRate(); });
 
     for (auto& format : formats_) {
-        LOG_DEBUG << std::format("Usable camera format: {}", format.Str());
+        LOG_DEBUG << std::format("Usable camera format: {}", std::string(format));
     }
 
     if (formats_.empty()) {
@@ -492,7 +491,7 @@ bool Camera::InitV4L2()
         actual.FrameRate() != format_.FrameRate())
     {
         LOG_ERROR << std::format("Unable to set capture parameters! Tried to set {}, but driver used {}!",
-                                 format_.Str(), actual.Str());
+                                 std::string(format_), std::string(actual));
         return false;
     }
 
