@@ -75,6 +75,7 @@ class Encoder {
         bool InitMfxVideoParams();
         bool SetMfxCodec();
         bool SetMfxCodecAV1();
+        bool SetMfxCodecAVC();
         bool SetMfxCodecHEVC();
         bool SetMfxFourCc();
         bool CopyCameraBufferToSurface(const CameraBufferRef&,

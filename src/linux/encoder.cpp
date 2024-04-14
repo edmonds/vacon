@@ -417,6 +417,8 @@ bool Encoder::SetMfxCodec()
     switch (codec_id) {
         case MFX_CODEC_AV1:
             return SetMfxCodecAV1();
+        case MFX_CODEC_AVC:
+            return SetMfxCodecAVC();
         case MFX_CODEC_HEVC:
             return SetMfxCodecHEVC();
         default:
@@ -431,6 +433,13 @@ bool Encoder::SetMfxCodecAV1()
 {
     mfx_videoparam_encode_.mfx.CodecId = MFX_CODEC_AV1;
     mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_AV1_MAIN;
+    return true;
+}
+
+bool Encoder::SetMfxCodecAVC()
+{
+    mfx_videoparam_encode_.mfx.CodecId = MFX_CODEC_AVC;
+    mfx_videoparam_encode_.mfx.CodecProfile = MFX_PROFILE_AVC_HIGH;
     return true;
 }
 
