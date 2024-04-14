@@ -24,9 +24,7 @@ enum class VideoCodec {
     UNKNOWN,
     AV1_10_420,
     AV1_8_420,
-    VP9_10_420,
     HEVC_10_420,
-    VP9_8_420,
     HEVC_8_420,
     AVC_8_420,
 };
@@ -34,9 +32,7 @@ enum class VideoCodec {
 constexpr VideoCodec FromString(std::string_view codec) {
     if (codec == "AV1_10_420")  return VideoCodec::AV1_10_420;
     if (codec == "AV1_8_420")   return VideoCodec::AV1_8_420;
-    if (codec == "VP9_10_420")  return VideoCodec::VP9_10_420;
     if (codec == "HEVC_10_420") return VideoCodec::HEVC_10_420;
-    if (codec == "VP9_8_420")   return VideoCodec::VP9_8_420;
     if (codec == "HEVC_8_420")  return VideoCodec::HEVC_8_420;
     if (codec == "AVC_8_420")   return VideoCodec::AVC_8_420;
     return VideoCodec::UNKNOWN;
@@ -46,9 +42,7 @@ constexpr std::string ToString(VideoCodec codec) {
     switch (codec) {
         case VideoCodec::AV1_10_420:    return "AV1_10_420";
         case VideoCodec::AV1_8_420:     return "AV1_8_420";
-        case VideoCodec::VP9_10_420:    return "VP9_10_420";
         case VideoCodec::HEVC_10_420:   return "HEVC_10_420";
-        case VideoCodec::VP9_8_420:     return "VP9_8_420";
         case VideoCodec::HEVC_8_420:    return "HEVC_8_420";
         case VideoCodec::AVC_8_420:     return "AVC_8_420";
         default: return "UNKNOWN-CODEC";

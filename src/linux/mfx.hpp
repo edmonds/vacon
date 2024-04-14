@@ -53,12 +53,6 @@ constexpr VideoCodec FromMfxCodecAndFormat(mfxU32 codec, mfxU32 fmt)
         } else if (fmt == MFX_FOURCC_P010) {
             return VideoCodec::HEVC_10_420;
         }
-    } else if (codec == MFX_CODEC_VP9) {
-        if (fmt == MFX_FOURCC_NV12) {
-            return VideoCodec::VP9_8_420;
-        } else if (fmt == MFX_FOURCC_P010) {
-            return VideoCodec::VP9_10_420;
-        }
     } else if (codec == MFX_CODEC_AV1) {
         if (fmt == MFX_FOURCC_NV12) {
             return VideoCodec::AV1_8_420;
@@ -75,10 +69,6 @@ constexpr mfxU32 ToMfxCodec(VideoCodec codec)
     case VideoCodec::AV1_8_420: [[fallthrough]];
     case VideoCodec::AV1_10_420:
         return MFX_CODEC_AV1;
-
-    case VideoCodec::VP9_8_420: [[fallthrough]];
-    case VideoCodec::VP9_10_420:
-        return MFX_CODEC_VP9;
 
     case VideoCodec::HEVC_8_420: [[fallthrough]];
     case VideoCodec::HEVC_10_420:
