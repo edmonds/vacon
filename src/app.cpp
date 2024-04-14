@@ -191,6 +191,7 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         break;
 
     case Event::CameraStarted:
+        camera_format_str_ = std::string(camera_->GetCameraFormat());
         last_camera_event_ = event;
         n_camera_timeouts_ = 0;
         if (sdl_renderer_) {
@@ -220,7 +221,8 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         break;
 
     case Event::DecoderStarted:
-        LOG_DEBUG << "[DecoderStarted]";
+        decoder_codec_str_ = ToString(decoder_->Codec());
+        LOG_DEBUG << "[DecoderStarted] Started decoder (" << decoder_codec_str_ << ")";;
         break;
 
     case Event::DecoderFailed:
@@ -232,7 +234,8 @@ void App::ProcessUserEvent(const SDL_UserEvent *user)
         break;
 
     case Event::EncoderStarted:
-        LOG_DEBUG << "[EncoderStarted]";
+        encoder_codec_str_ = ToString(encoder_->Codec());
+        LOG_DEBUG << "[EncoderStarted] Started encoder (" << encoder_codec_str_ << ")";
         break;
 
     case Event::EncoderFailed:

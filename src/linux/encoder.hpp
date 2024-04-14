@@ -61,6 +61,8 @@ class Encoder {
         std::shared_ptr<std::vector<VideoCodec>>
             GetSupportedCodecs(std::optional<VideoCodec> force = std::nullopt);
 
+        VideoCodec Codec() const { return codec_; }
+
         Welford             s_encode_size_ = {};
         Welford             s_encode_time_ = {};
 
@@ -84,7 +86,7 @@ class Encoder {
                             supported_pixel_formats_ = {};
 
         EncoderParams       params_ = {};
-        VideoCodec          codec_ = {};
+        VideoCodec          codec_ = VideoCodec::UNKNOWN;
         CameraFormat        camera_format_ = {};
         bool                need_vpp_scaling_ = false;
 

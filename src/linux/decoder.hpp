@@ -68,6 +68,8 @@ class Decoder {
 
         std::shared_ptr<std::vector<VideoCodec>> GetSupportedCodecs();
 
+        VideoCodec Codec() const { return codec_; }
+
         Welford             s_decode_time_ = {};
 
     private:

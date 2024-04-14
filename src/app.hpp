@@ -86,6 +86,10 @@ class App {
         int             n_camera_timeouts_              = 0;
         Event           last_camera_event_              = Event::Invalid;
 
+        std::string     camera_format_str_              = "";
+        std::string     decoder_codec_str_              = "";
+        std::string     encoder_codec_str_              = "";
+
         float           font_size_sans_                 = 14.0f;
         float           font_size_mono_                 = 10.0f;
         bool            enable_my_camera_               = true;

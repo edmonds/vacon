@@ -189,6 +189,16 @@ void App::ShowStatsOverlay(bool* p_open)
 
         ImGui::Separator();
 
+        if (!camera_format_str_.empty()) {
+            ImGui::Text("Camera format:  %s", camera_format_str_.c_str());
+        }
+        if (!decoder_codec_str_.empty()) {
+            ImGui::Text("Decoder codec:  %s", decoder_codec_str_.c_str());
+        }
+        if (!encoder_codec_str_.empty()) {
+            ImGui::Text("Encoder codec:  %s", encoder_codec_str_.c_str());
+        }
+
         ImGui::Text("Camera frames:  %zu (M:%zu, OE:%zu, OP:%zu)",
                     linux::n_frames_camera_success          .load(std::memory_order_relaxed),
                     linux::n_frames_camera_missed           .load(std::memory_order_relaxed),
