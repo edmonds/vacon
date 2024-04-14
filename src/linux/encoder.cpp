@@ -502,27 +502,27 @@ bool Encoder::SetMfxFourCc()
             // The encoder directly supports the surface pixel format of the
             // video capture pixel format. Conversion of the pixel format is
             // unnecessary, so don't enable VPP.
-
             need_vpp_scaling_ = false;
             fourcc.ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
-
             LOG_INFO
                 << "Encoding directly from pixel format "
                 << util::FourCcToString(fmt);
         } else if (sup_fmts.contains(MFX_FOURCC_P010)) {
             // The encoder does not support encoding from the video capture
             // pixel format. Conversion of the pixel format is required, so
-            // enable VPP.
-
+            // enable VPP and convert to P010.
             need_vpp_scaling_ = true;
             fourcc.ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.In);
             map[MFX_FOURCC_P010].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
             map[MFX_FOURCC_P010].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
-
-            LOG_INFO
-                << std::format("Enabling MFX VPP scaling of pixel format {} to {}",
-                               util::FourCcToString(mfx_videoparam_vpp_.vpp.In.FourCC),
-                               util::FourCcToString(mfx_videoparam_encode_.mfx.FrameInfo.FourCC));
+        } else if (sup_fmts.contains(MFX_FOURCC_NV12)) {
+            // The encoder does not support encoding from the video capture
+            // pixel format. Conversion of the pixel format is required, so
+            // enable VPP and convert to NV12.
+            need_vpp_scaling_ = true;
+            fourcc.ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.In);
+            map[MFX_FOURCC_NV12].ToMfxFrameInfo(&mfx_videoparam_vpp_.vpp.Out);
+            map[MFX_FOURCC_NV12].ToMfxFrameInfo(&mfx_videoparam_encode_.mfx.FrameInfo);
         } else {
             LOG_ERROR
                 << "Don't know how to setup encoder for pixel format "
@@ -532,6 +532,13 @@ bool Encoder::SetMfxFourCc()
     } else {
         LOG_ERROR << "Unhandled input pixel format: " << camera_format_.FourCcStr();
         return false;
+    }
+
+    if (need_vpp_scaling_) {
+        LOG_INFO
+            << std::format("Enabling MFX VPP scaling of pixel format {} to {}",
+                           util::FourCcToString(mfx_videoparam_vpp_.vpp.In.FourCC),
+                           util::FourCcToString(mfx_videoparam_encode_.mfx.FrameInfo.FourCC));
     }
 
     // Success.
