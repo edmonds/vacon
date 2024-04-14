@@ -498,13 +498,7 @@ bool Encoder::SetMfxFourCc()
     if (it != map.end()) {
         auto fourcc = it->second;
 
-        // XXX: Need to enable VPP scaling for the codecs that take YUY2 input
-        // for some reason, otherwise the decoded output is corrupted.
-        if (fmt == MFX_FOURCC_YUY2) {
-            need_vpp_scaling_ = true;
-        }
-
-        if (!need_vpp_scaling_ && sup_fmts.contains(fmt)) {
+        if (sup_fmts.contains(fmt)) {
             // The encoder directly supports the surface pixel format of the
             // video capture pixel format. Conversion of the pixel format is
             // unnecessary, so don't enable VPP.
