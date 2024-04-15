@@ -493,6 +493,11 @@ bool Encoder::SetMfxFourCc()
 
     auto fmt = camera_format_.MfxFourCc();
     auto& sup_fmts = supported_pixel_formats_[codec_];
+    for (auto sup_fmt : sup_fmts) {
+        LOG_INFO << std::format("Codec {} supports pixel format {}",
+                                ToString(codec_),
+                                util::FourCcToString(sup_fmt));
+    }
 
     auto it = map.find(fmt);
     if (it != map.end()) {
