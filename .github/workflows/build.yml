@@ -49,12 +49,12 @@ jobs:
         ref: "v2.10.2"
         path: libvpl
 
-    - name: Checkout oneVPL-intel-gpu
+    - name: Checkout intel/vpl-gpu-rt
       uses: actions/checkout@v4
       with:
-        repository: oneapi-src/oneVPL-intel-gpu
-        ref: "intel-onevpl-24.2.0"
-        path: oneVPL-intel-gpu
+        repository: intel/vpl-gpu-rt
+        ref: "intel-onevpl-24.2.1"
+        path: vpl-gpu-rt
 
     - name: Install meson and ninja
       run: |
@@ -215,8 +215,8 @@ jobs:
         mkdir -p /opt/vacon/bin
         sudo install -m 0755 build/vacon /opt/vacon/bin/vacon
 
-    - name: Build oneVPL-intel-gpu
-      working-directory: "./oneVPL-intel-gpu"
+    - name: Build vpl-gpu-rt
+      working-directory: "./vpl-gpu-rt"
       run: |
         cmake -B build -G Ninja \
           --install-prefix /opt/vacon \
