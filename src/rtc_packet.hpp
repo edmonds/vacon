@@ -37,8 +37,8 @@ class RtcPacket {
 
         ~RtcPacket() = default;
 
-        rtc::binary msg_ = {};
-        rtc::FrameInfo frame_info_ = {0};
+        rtc::binary msg_;
+        rtc::FrameInfo frame_info_;
 
     private:
         RtcPacket(rtc::binary msg, rtc::FrameInfo frame_info)

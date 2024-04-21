@@ -41,7 +41,7 @@ rtc::message_vector GenericRtpDepacketizer::ReassemblePackets(rtc::message_vecto
 {
     rtc::message_vector out = {};
     auto buf = rtc::binary{};
-    auto frame_info = std::make_shared<rtc::FrameInfo>(timestamp);
+    auto frame_info = std::make_shared<rtc::FrameInfo>(0, timestamp);
     auto frag_sequence_started = false;
     ssize_t last_sequence = -2;
 
